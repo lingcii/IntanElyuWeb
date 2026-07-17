@@ -62,18 +62,6 @@ php -S localhost:8080
 Serves the PHP pages at **http://localhost:8080**.  
 Open http://localhost:8080/login.php in your browser.
 
-### 3 — React App (optional)
-
-```bash
-cd React
-npm install      # first time only
-npm run dev
-```
-
-Runs the React SPA at **http://localhost:5173**.  
-The Vite proxy forwards all `/api/*` requests to `http://127.0.0.1:8000`.
-
----
 
 ## Architecture
 
@@ -84,10 +72,7 @@ Browser
   │    Frontend/Website/Frontend/   (PHP pages, login, dashboards)
   │    Talks to Laravel via fetch() using window.API_CONFIG
   │
-  ├─ http://localhost:5173          ← Vite dev server (React)
-  │    React/src/                   (React SPA)
-  │    All /api/* proxied to 127.0.0.1:8000 by Vite
-  │
+
   └─ http://127.0.0.1:8000          ← Laravel (php artisan serve)
        backend/                     (REST API)
        Connects to Railway MySQL
@@ -112,7 +97,7 @@ SESSION_SECURE_COOKIE=false
   No database or Redis required for local development.
 - `SESSION_SECURE_COOKIE=false` — allows cookies over plain HTTP in dev.
 - `SESSION_SAME_SITE=lax` — allows cross-origin requests from the PHP frontend
-  and React dev server while still protecting against CSRF.
+  while still protecting against CSRF.
 
 ### Backend — `backend/config/cors.php`
 
@@ -120,7 +105,7 @@ All three dev origins are explicitly allowed with credentials:
 
 ```
 http://localhost:8080   ← PHP frontend
-http://localhost:5173   ← React Vite
+
 http://127.0.0.1:8000   ← Laravel itself
 ```
 
@@ -140,20 +125,6 @@ const baseUrl = `${window.location.protocol}//${apiHost}:${apiPort}`;
 When the page is served from `http://localhost:8080`, the API calls go to
 `http://localhost:8000/api/...` — the session cookie domain matches because
 both use `localhost`.
-
-### React — `React/vite.config.js`
-
-```js
-proxy: {
-  '/api': {
-    target: 'http://127.0.0.1:8000',
-    changeOrigin: true,
-  }
-}
-```
-
-All `/api/*` calls from the React app are proxied to Laravel.
-The React app never has hardcoded backend URLs.
 
 ### Backend — `public/.htaccess`
 
@@ -178,9 +149,6 @@ php artisan config:clear
 php artisan cache:clear
 php artisan route:clear
 
-# 3. Install frontend dependencies (React)
-cd ../React
-npm install
 ```
 
 The `backend/storage` and `backend/bootstrap/cache` folders must be writable.

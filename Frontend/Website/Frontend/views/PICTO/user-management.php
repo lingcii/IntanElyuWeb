@@ -41,15 +41,19 @@ ob_start();
     </div>
     <div class="um-kpi-card">
         <div class="um-kpi-icon green"><i class="fas fa-user-check"></i></div>
-        <div class="um-kpi-info"><h4>Active</h4><p id="kpiActive">—</p></div>
+        <div class="um-kpi-info"><h4>Active Users</h4><p id="kpiActive">—</p></div>
     </div>
     <div class="um-kpi-card">
         <div class="um-kpi-icon red"><i class="fas fa-user-slash"></i></div>
-        <div class="um-kpi-info"><h4>Inactive</h4><p id="kpiInactive">—</p></div>
+        <div class="um-kpi-info"><h4>Inactive Users</h4><p id="kpiInactive">—</p></div>
     </div>
     <div class="um-kpi-card">
-        <div class="um-kpi-icon purple"><i class="fas fa-user-tag"></i></div>
-        <div class="um-kpi-info"><h4>Roles in Use</h4><p id="kpiRoles">—</p></div>
+        <div class="um-kpi-icon orange"><i class="fas fa-hiking"></i></div>
+        <div class="um-kpi-info"><h4>Total Tourists</h4><p id="kpiTourists">—</p></div>
+    </div>
+    <div class="um-kpi-card">
+        <div class="um-kpi-icon red"><i class="fas fa-user-plus"></i></div>
+        <div class="um-kpi-info"><h4>Recently Added</h4><p id="kpiRecentlyAdded">—</p></div>
     </div>
 </div>
 
@@ -68,7 +72,7 @@ ob_start();
         </div>
         <select class="um-filter-select" id="roleFilter" onchange="applyFilters()" aria-label="Filter by role">
             <option value="">All Roles</option>
-            <option value="picto">PICTO</option>
+            <option value="pitco">PICTO</option>
             <option value="lupto">LUPTO</option>
             <option value="tourist">Tourist</option>
             <optgroup label="Municipal Tourism Offices">
@@ -98,6 +102,7 @@ ob_start();
             <option value="">All Statuses</option>
             <option value="active">Active</option>
             <option value="inactive">Inactive</option>
+            <option value="archived">Archived</option>
         </select>
         <button class="btn-gov btn-gov-secondary" onclick="clearFilters()">
             <i class="fas fa-times"></i> Clear
@@ -180,31 +185,9 @@ ob_start();
                         <label class="um-form-label" for="formRole">Role <span class="required">*</span></label>
                         <select id="formRole" class="um-form-control" required onchange="onRoleChange()">
                             <option value="">— Select Role —</option>
-                            <option value="picto">PICTO</option>
+                            <option value="pitco">PICTO</option>
                             <option value="lupto">LUPTO</option>
-                            <option value="tourist">Tourist</option>
-                            <optgroup label="Municipal Tourism Offices">
-                                <option value="san_juan_mto">San Juan MTO</option>
-                                <option value="san_fernando_mto">San Fernando MTO</option>
-                                <option value="bauang_mto">Bauang MTO</option>
-                                <option value="agoo_mto">Agoo MTO</option>
-                                <option value="luna_mto">Luna MTO</option>
-                                <option value="san_gabriel_mto">San Gabriel MTO</option>
-                                <option value="balaoan_mto">Balaoan MTO</option>
-                                <option value="aringay_mto">Aringay MTO</option>
-                                <option value="rosario_mto">Rosario MTO</option>
-                                <option value="bacnotan_mto">Bacnotan MTO</option>
-                                <option value="naguilian_mto">Naguilian MTO</option>
-                                <option value="tubao_mto">Tubao MTO</option>
-                                <option value="pugo_mto">Pugo MTO</option>
-                                <option value="caba_mto">Caba MTO</option>
-                                <option value="santo_tomas_mto">Santo Tomas MTO</option>
-                                <option value="bangar_mto">Bangar MTO</option>
-                                <option value="burgos_mto">Burgos MTO</option>
-                                <option value="bagulin_mto">Bagulin MTO</option>
-                                <option value="santol_mto">Santol MTO</option>
-                                <option value="sudipen_mto">Sudipen MTO</option>
-                            </optgroup>
+                            <option value="municipal">MUNICIPAL</option>
                         </select>
                     </div>
                     <!-- Municipality (shown for MTO roles) -->
@@ -214,26 +197,11 @@ ob_start();
                             <option value="">— Select Municipality —</option>
                         </select>
                     </div>
-                    <!-- Status -->
-                    <div class="um-form-group">
-                        <label class="um-form-label" for="formStatus">Account Status <span class="required">*</span></label>
-                        <select id="formStatus" class="um-form-control" required>
-                            <option value="active">Active</option>
-                            <option value="inactive">Inactive</option>
-                        </select>
-                    </div>
-                    <!-- Password (add mode only / optional in edit) -->
-                    <div class="um-form-group" id="formPasswordGroup">
-                        <label class="um-form-label" for="formPassword">
-                            Password <span class="required" id="pwRequired">*</span>
-                        </label>
-                        <div class="um-pw-wrap">
-                            <input type="password" id="formPassword" class="um-form-control" placeholder="Min. 6 characters" autocomplete="new-password">
-                            <button type="button" class="um-pw-toggle" onclick="togglePwVis('formPassword', this)" aria-label="Toggle visibility">
-                                <i class="fas fa-eye"></i>
-                            </button>
-                        </div>
-                        <span class="um-form-hint" id="pwHint">Leave blank to keep current password.</span>
+                    <!-- Status (auto-set) -->
+                    <input type="hidden" id="formStatus" value="active">
+                    <!-- Password (auto-set) -->
+                    <input type="hidden" id="formPassword" value="PASSWORD123">
+                    <div class="um-form-group" id="formPasswordGroup" style="display:none;">
                     </div>
                 </div><!-- /form-grid -->
             </form>
@@ -275,6 +243,30 @@ ob_start();
             <button class="btn-gov btn-gov-secondary" onclick="closeResetPwModal()">Cancel</button>
             <button class="btn-gov" onclick="submitResetPassword()">
                 <i class="fas fa-check"></i> Reset Password
+            </button>
+        </div>
+    </div>
+</div>
+
+
+<!-- SAVE CONFIRMATION MODAL -->
+<div class="um-modal-overlay" id="umSaveConfirmModal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="umSaveConfirmHeading">
+    <div class="um-modal sm">
+        <div class="um-modal-body" style="padding:32px 28px 24px; text-align:center;">
+            <div class="um-confirm-icon info" style="margin-bottom:18px;">
+                <i class="fas fa-user-check" style="font-size:22px;"></i>
+            </div>
+            <h4 id="umSaveConfirmHeading" style="margin:0 0 8px; font-size:16px; font-weight:700; color:var(--text-primary);">Confirm Save</h4>
+            <p class="um-confirm-text" id="umSaveConfirmText">Are you sure you want to save this user?</p>
+        </div>
+        <div class="um-modal-footer" style="justify-content:center; gap:12px;">
+            <button class="btn-gov btn-gov-secondary" onclick="closeSaveConfirm()" style="min-width:110px;">
+                <i class="fas fa-times"></i> Cancel
+            </button>
+            <button class="btn-gov" id="umSaveConfirmBtn" onclick="confirmSaveUser()" style="min-width:130px;">
+                <i class="fas fa-check" id="umSaveConfirmIcon"></i>
+                <i class="fas fa-circle-notch fa-spin" id="umSaveConfirmSpinner" style="display:none;"></i>
+                <span id="umSaveConfirmLabel">Yes, Save User</span>
             </button>
         </div>
     </div>

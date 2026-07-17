@@ -6,13 +6,13 @@ return [
     | CORS Configuration
     |--------------------------------------------------------------------------
     |
-    | Allows the PHP frontend (http://localhost:8080) and the React dev server
-    | (http://localhost:5173) to call the Laravel API (http://127.0.0.1:8000).
+    | Allows the website frontend (port 8080) and mobile frontend (port 3000)
+    | to call the Laravel API (http://127.0.0.1:8000).
     |
-    | Both frontends run as separate processes in the non-XAMPP setup:
-    |   - PHP built-in server:  php -S localhost:8080   (Frontend)
-    |   - Laravel:              php artisan serve        (Backend, port 8000)
-    |   - Vite dev server:      npm run dev              (React, port 5173)
+    | Both frontends run as separate processes:
+    |   - Mobile PHP server:  php -S localhost:3000   (Mobile)
+    |   - Website PHP server: php -S localhost:8080   (Website)
+    |   - Laravel:            php artisan serve        (Backend, port 8000)
     |
     */
 
@@ -20,26 +20,30 @@ return [
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => [
-        // PHP built-in dev server (Frontend)
-        'http://localhost:8080',
-        'http://127.0.0.1:8080',
+    'allowed_origins' => env('CORS_ALLOWED_ORIGINS')
+        ? explode(',', env('CORS_ALLOWED_ORIGINS'))
+        : [
+            // Mobile PHP built-in dev server (port 3000)
+            'http://localhost:3000',
+            'http://127.0.0.1:3000',
 
-        // React + Vite dev server
-        'http://localhost:5173',
-        'http://127.0.0.1:5173',
+            // Website PHP built-in dev server (port 8080)
+            'http://localhost:8080',
+            'http://127.0.0.1:8080',
+            'http://localhost:8081',
 
-        // Laravel itself (for same-origin requests / Artisan serve)
-        'http://localhost:8000',
-        'http://127.0.0.1:8000',
+            // Laravel itself (for same-origin requests / Artisan serve)
+            'http://localhost:8000',
+            'http://127.0.0.1:8000',
 
-        // Generic localhost (no port) — kept for compatibility
-        'http://localhost',
-        'http://127.0.0.1',
+            // Generic localhost (no port)  kept for compatibility
+            'http://localhost',
+            'http://127.0.0.1',
 
-        // Cloudflare tunnel (remote access / staging)
-        'https://boc-cornell-rolled-delicious.trycloudflare.com',
-    ],
+            // Auto-Injected Ngrok URL (updated by configure-tunnels.js at runtime)
+            // Cloudflare tunnel (remote access / staging)
+            'https://boc-cornell-rolled-delicious.trycloudflare.com',
+        ],
 
     'allowed_origins_patterns' => [],
 
@@ -53,7 +57,7 @@ return [
      * IMPORTANT: credentials must be true so the session cookie is sent
      * with every cross-origin request from the frontend dev servers.
      * The allowed_origins list above must NOT use a wildcard when this
-     * is true — each origin must be listed explicitly.
+     * is true � each origin must be listed explicitly.
      */
     'supports_credentials' => true,
 ];

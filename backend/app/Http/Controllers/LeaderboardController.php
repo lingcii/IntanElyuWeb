@@ -15,10 +15,14 @@ class LeaderboardController extends Controller
                 SELECT
                     u.id                                              AS user_id,
                     u.name                                            AS full_name,
+                    u.role                                            AS role,
+                    u.avatar                                          AS avatar,
+                    m.name                                            AS municipality_name,
                     u.last_activity                                   AS last_activity_date,
                     COALESCE(up.total_points, 0)                      AS total_points,
                     COALESCE(up.completed_activities, 0)              AS completed_activities,
                     COALESCE(up.points_since, u.created_at)           AS points_since,
+                    0                                                 AS spots_managed,
                     ROW_NUMBER() OVER (
                         ORDER BY
                             COALESCE(up.total_points, 0)               DESC,
@@ -27,6 +31,7 @@ class LeaderboardController extends Controller
                     ) AS `rank`
                 FROM users u
                 LEFT JOIN user_points up ON up.user_id = u.id
+                LEFT JOIN municipalities m ON m.id = u.municipality_id
                 WHERE u.role = 'tourist' AND u.status = 'active'
             )
         ";
@@ -35,16 +40,17 @@ class LeaderboardController extends Controller
     public function top3(): JsonResponse
     {
         $rows = \Illuminate\Support\Facades\Cache::remember('leaderboard:top3', 60, function () {
-            return DB::select($this->rankedCte() . 'SELECT * FROM ranked WHERE `rank` <= 3 ORDER BY `rank` ASC');
+            $rows = DB::select($this->rankedCte() . 'SELECT * FROM ranked WHERE `rank` <= 3 ORDER BY `rank` ASC');
+            return $this->castRows($rows);
         });
 
-        return response()->json(['success' => true, 'top3' => $this->castRows($rows)]);
+        return response()->json(['success' => true, 'top3' => $rows]);
     }
 
     public function kpis(): JsonResponse
     {
-        $kpi = \Illuminate\Support\Facades\Cache::remember('leaderboard:kpis', 60, function () {
-            return DB::selectOne("
+        $kpis = \Illuminate\Support\Facades\Cache::remember('leaderboard:kpis', 60, function () {
+            $kpi = DB::selectOne("
                 SELECT
                     COUNT(u.id)                               AS total_users,
                     COALESCE(SUM(up.total_points), 0)         AS grand_points,
@@ -54,25 +60,23 @@ class LeaderboardController extends Controller
                 LEFT JOIN user_points up ON up.user_id = u.id
                 WHERE u.role = 'tourist' AND u.status = 'active'
             ");
-        });
 
-        return response()->json([
-            'success' => true,
-            'kpis'    => [
+            return [
                 'total_users'      => (int) $kpi->total_users,
                 'grand_points'     => (int) $kpi->grand_points,
                 'total_activities' => (int) $kpi->total_activities,
                 'highest_points'   => (int) $kpi->highest_points,
-            ],
-        ]);
+            ];
+        });
+
+        return response()->json(['success' => true, 'kpis' => $kpis]);
     }
 
     public function index(Request $request): JsonResponse
     {
         $search  = $request->get('search', '');
         $sortBy  = $request->get('sort', 'points_desc');
-        $limit   = min(max((int) $request->get('limit', 100), 1), 100);
-        $offset  = max((int) $request->get('offset', 0), 0);
+        $show    = $request->get('show', '100');
 
         $orderMap = [
             'points_desc'     => 'total_points DESC, completed_activities DESC, points_since ASC',
@@ -82,6 +86,13 @@ class LeaderboardController extends Controller
         ];
         $orderSql = $orderMap[$sortBy] ?? $orderMap['points_desc'];
 
+        $limit  = null;
+        $offset = 0;
+        if ($show !== 'all') {
+            $limit  = min(max((int) $show, 1), 100);
+            $offset = max((int) $request->get('offset', 0), 0);
+        }
+
         $whereClause = '';
         $params      = [];
 
@@ -89,29 +100,32 @@ class LeaderboardController extends Controller
             $search = $request->get('search');
             $whereClause = "WHERE full_name LIKE ? OR CAST(user_id AS CHAR) LIKE ?";
             $params      = ["%{$search}%", "%{$search}%"];
-        } else {
-            $whereClause = 'WHERE `rank` <= 100';
         }
 
-        $cacheKey = "leaderboard:index:{$search}:{$sortBy}:{$limit}:{$offset}";
+        $cacheKey = "leaderboard:index:{$search}:{$sortBy}:{$show}:{$offset}";
 
-        $cachedData = \Illuminate\Support\Facades\Cache::remember($cacheKey, 60, function () use ($whereClause, $params, $orderSql, $limit, $offset) {
+        $cachedData = \Illuminate\Support\Facades\Cache::remember($cacheKey, 60, function () use ($whereClause, $params, $orderSql, $limit, $offset, $show) {
             $total = DB::selectOne($this->rankedCte() . "SELECT COUNT(*) as cnt FROM ranked {$whereClause}", $params)->cnt;
 
-            $rows = DB::select(
-                $this->rankedCte() . "SELECT * FROM ranked {$whereClause} ORDER BY {$orderSql} LIMIT {$limit} OFFSET {$offset}",
-                $params
-            );
+            $sql = $this->rankedCte() . "SELECT * FROM ranked {$whereClause} ORDER BY {$orderSql}";
+
+            if ($show === 'all') {
+                $sql .= " LIMIT " . max((int) $total, 1);
+            } else {
+                $sql .= " LIMIT {$limit} OFFSET {$offset}";
+            }
+
+            $rows = DB::select($sql, $params);
 
             return [
                 'total' => (int) $total,
-                'rows'  => $rows
+                'rows'  => $this->castRows($rows),
             ];
         });
 
         return response()->json([
             'success' => true,
-            'users'   => $this->castRows($cachedData['rows']),
+            'users'   => $cachedData['rows'],
             'total'   => $cachedData['total'],
             'offset'  => $offset,
             'limit'   => $limit,
@@ -124,9 +138,13 @@ class LeaderboardController extends Controller
             return [
                 'user_id'              => (int) $r->user_id,
                 'full_name'            => $r->full_name,
+                'role'                 => $r->role ?? 'tourist',
+                'avatar'               => $r->avatar ?? null,
+                'municipality_name'    => $r->municipality_name ?? null,
                 'last_activity_date'   => $r->last_activity_date ?: null,
                 'total_points'         => (int) $r->total_points,
                 'completed_activities' => (int) $r->completed_activities,
+                'spots_managed'        => (int) ($r->spots_managed ?? 0),
                 'rank'                 => (int) $r->rank,
                 'points_since'         => $r->points_since,
             ];

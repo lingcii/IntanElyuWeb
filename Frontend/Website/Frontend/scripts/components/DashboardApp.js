@@ -182,7 +182,7 @@ function DashboardApp() {
         if (!force && _isCached('dashboard')) return; // already fresh
         try {
             setLoading(true);
-            const response = await fetch('http://127.0.0.1:8000/api/lupto/dashboard', { credentials: 'include' });
+            const response = await fetch('${window.API_CONFIG?.BASE_URL || 'http://' + window.location.hostname + ':8000'}/api/lupto/dashboard', { credentials: 'include' });
             if (!response.ok) throw new Error('Failed to fetch dashboard data');
             const data = await response.json();
 
@@ -206,7 +206,7 @@ function DashboardApp() {
     const fetchUsersData = async (force = false) => {
         if (!force && _isCached('users')) return;
         try {
-            const response = await fetch('http://127.0.0.1:8000/api/lupto/users', { credentials: 'include' });
+            const response = await fetch('${window.API_CONFIG?.BASE_URL || 'http://' + window.location.hostname + ':8000'}/api/lupto/users', { credentials: 'include' });
             if (!response.ok) throw new Error('Failed to fetch users');
             const data = await response.json();
             setUsers(data.users || []);
@@ -223,7 +223,7 @@ function DashboardApp() {
         const cacheKey = 'spots_' + status;
         if (!force && _isCached(cacheKey)) return;
         try {
-            const response = await fetch(`http://127.0.0.1:8000/api/lupto/tourist-spots?status=${status}`, { credentials: 'include' });
+            const response = await fetch(`${window.API_CONFIG?.BASE_URL || 'http://' + window.location.hostname + ':8000'}/api/lupto/tourist-spots?status=${status}`, { credentials: 'include' });
             if (!response.ok) throw new Error('Failed to fetch spots');
             const data = await response.json();
             setPendingSpots(data || []);
@@ -242,7 +242,7 @@ function DashboardApp() {
     const fetchAnalyticsData = async (force = false) => {
         if (!force && _isCached('analytics')) return;
         try {
-            const response = await fetch('http://127.0.0.1:8000/api/lupto/analytics/full', { credentials: 'include' });
+            const response = await fetch('${window.API_CONFIG?.BASE_URL || 'http://' + window.location.hostname + ':8000'}/api/lupto/analytics/full', { credentials: 'include' });
             if (!response.ok) throw new Error('Failed to fetch analytics');
             const data = await response.json();
             setAnalytics(data);
@@ -598,7 +598,7 @@ function DashboardApp() {
         if (!selectedUser) return;
         setActionLoading(true);
         try {
-            const response = await fetch(`http://127.0.0.1:8000/api/lupto/users/${selectedUser.id}`, {
+            const response = await fetch(`${window.API_CONFIG?.BASE_URL || 'http://' + window.location.hostname + ':8000'}/api/lupto/users/${selectedUser.id}`, {
                 method: 'PUT',
                 credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },
@@ -633,7 +633,7 @@ function DashboardApp() {
         if (!selectedUser || !resetPasswordVal.trim()) return;
         setActionLoading(true);
         try {
-            const response = await fetch(`http://127.0.0.1:8000/api/lupto/users/${selectedUser.id}/password`, {
+            const response = await fetch(`${window.API_CONFIG?.BASE_URL || 'http://' + window.location.hostname + ':8000'}/api/lupto/users/${selectedUser.id}/password`, {
                 method: 'PATCH',
                 credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },
@@ -660,7 +660,7 @@ function DashboardApp() {
         const nextStatus = user.status === 'active' ? 'inactive' : 'active';
         setActionLoading(true);
         try {
-            const response = await fetch(`http://127.0.0.1:8000/api/lupto/users/${user.id}`, {
+            const response = await fetch(`${window.API_CONFIG?.BASE_URL || 'http://' + window.location.hostname + ':8000'}/api/lupto/users/${user.id}`, {
                 method: 'PUT',
                 credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },
@@ -688,7 +688,7 @@ function DashboardApp() {
         if (!confirm('Are you sure you want to approve this tourist spot attraction?')) return;
         setActionLoading(true);
         try {
-            const response = await fetch('http://127.0.0.1:8000/api/lupto/dashboard/approve-spot', {
+            const response = await fetch('${window.API_CONFIG?.BASE_URL || 'http://' + window.location.hostname + ':8000'}/api/lupto/dashboard/approve-spot', {
                 method: 'POST',
                 credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },
@@ -710,14 +710,18 @@ function DashboardApp() {
     };
 
     const handleRejectSpot = async (id) => {
-        if (!confirm('Are you sure you want to reject this tourist spot proposal?')) return;
+        const reason = prompt('Please enter a reason for rejection:');
+        if (!reason || !reason.trim()) {
+            alert('Rejection reason is required.');
+            return;
+        }
         setActionLoading(true);
         try {
-            const response = await fetch('http://127.0.0.1:8000/api/lupto/dashboard/reject-spot', {
+            const response = await fetch(`${window.API_CONFIG?.BASE_URL || 'http://' + window.location.hostname + ':8000'}/api/lupto/dashboard/reject-spot`, {
                 method: 'POST',
                 credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id })
+                body: JSON.stringify({ id, rejection_reason: reason.trim() })
             });
             const res = await response.json();
             if (res.success) {
@@ -745,7 +749,7 @@ function DashboardApp() {
         if (!confirm(`Are you sure you want to approve these ${selectedPendingIds.length} selected tourist spots?`)) return;
         setActionLoading(true);
         try {
-            const response = await fetch('http://127.0.0.1:8000/api/lupto/dashboard/batch-approve-spots', {
+            const response = await fetch('${window.API_CONFIG?.BASE_URL || 'http://' + window.location.hostname + ':8000'}/api/lupto/dashboard/batch-approve-spots', {
                 method: 'POST',
                 credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },

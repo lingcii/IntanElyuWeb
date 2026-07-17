@@ -2,6 +2,49 @@
    MUNICIPAL Dashboard Styles
    ============================================================ */
 
+/* Loading Overlay */
+.lupto-loading-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(255, 255, 255, 0.92);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    transition: opacity 0.3s ease;
+}
+
+.lupto-loading-overlay.fade-out {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.lupto-loading-content {
+    text-align: center;
+    background: #fff;
+    border: 1px solid #E5E7EB;
+    border-radius: 16px;
+    padding: 40px 56px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+}
+
+.lupto-loading-spinner {
+    width: 44px;
+    height: 44px;
+    border: 4px solid #E5E7EB;
+    border-top-color: #2563EB;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
 /* KPI Cards Layout */
 .lupto-kpi-grid {
     display: grid;
@@ -9,6 +52,7 @@
     gap: 16px;
     margin-bottom: 20px;
 }
+
 .lupto-kpi-card {
     background: #ffffff;
     border: 1px solid var(--border);
@@ -22,14 +66,17 @@
     position: relative;
     overflow: hidden;
 }
+
 .lupto-kpi-card:hover {
     transform: translateY(-4px);
     box-shadow: var(--shadow-md);
     border-color: var(--lupto-secondary);
 }
+
 .lupto-kpi-info {
     flex: 1;
 }
+
 .lupto-kpi-info h4 {
     margin: 0 0 8px 0;
     font-size: 12px;
@@ -38,6 +85,7 @@
     color: var(--text-secondary);
     font-weight: 600;
 }
+
 .lupto-kpi-value {
     font-size: 30px;
     font-weight: 800;
@@ -46,6 +94,7 @@
     display: block;
     line-height: 1.1;
 }
+
 .lupto-kpi-trend {
     font-size: 12px;
     font-weight: 600;
@@ -53,15 +102,19 @@
     align-items: center;
     gap: 4px;
 }
+
 .lupto-kpi-trend.trend-up {
     color: #16a34a;
 }
+
 .lupto-kpi-trend.trend-down {
     color: #dc2626;
 }
+
 .lupto-kpi-trend.trend-neutral {
     color: #64748b;
 }
+
 .lupto-kpi-icon {
     width: 60px;
     height: 60px;
@@ -70,26 +123,32 @@
     align-items: center;
     justify-content: center;
 }
+
 .lupto-kpi-icon.bg-blue {
-    background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+    background: none !important;
     color: #1e40af;
 }
+
 .lupto-kpi-icon.bg-green {
-    background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
+    background: none !important;
     color: #15803d;
 }
+
 .lupto-kpi-icon.bg-orange {
-    background: linear-gradient(135deg, #ffedd5 0%, #fed7aa 100%);
+    background: none !important;
     color: #c2410c;
 }
+
 .lupto-kpi-icon.bg-purple {
-    background: linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%);
+    background: none !important;
     color: #7c3aed;
 }
+
 .lupto-kpi-icon.bg-yellow {
-    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+    background: none !important;
     color: #b45309;
 }
+
 .lupto-kpi-icon i {
     font-size: 28px;
 }
@@ -101,6 +160,7 @@
     gap: 16px;
     margin-bottom: 20px;
 }
+
 .lupto-insight-card {
     background: #ffffff;
     border: 1px solid var(--border);
@@ -111,15 +171,19 @@
     align-items: flex-start;
     box-shadow: var(--shadow-sm);
 }
+
 .lupto-insight-card.success {
     border-left: 4px solid #22c55e;
 }
+
 .lupto-insight-card.warning {
     border-left: 4px solid #f59e0b;
 }
+
 .lupto-insight-card.info {
     border-left: 4px solid #3b82f6;
 }
+
 .lupto-insight-icon {
     width: 44px;
     height: 44px;
@@ -129,27 +193,33 @@
     justify-content: center;
     flex-shrink: 0;
 }
+
 .lupto-insight-card.success .lupto-insight-icon {
     background: #dcfce7;
     color: #16a34a;
 }
+
 .lupto-insight-card.warning .lupto-insight-icon {
     background: #fef3c7;
     color: #d97706;
 }
+
 .lupto-insight-card.info .lupto-insight-icon {
     background: #dbeafe;
     color: #2563eb;
 }
+
 .lupto-insight-icon i {
     font-size: 22px;
 }
+
 .lupto-insight-content h4 {
     margin: 0 0 6px 0;
     font-size: 14px;
     font-weight: 700;
     color: #1e293b;
 }
+
 .lupto-insight-content p {
     margin: 0;
     font-size: 13px;
@@ -164,6 +234,7 @@
     gap: 16px;
     margin-bottom: 20px;
 }
+
 .lupto-chart-card {
     background: #ffffff;
     border: 1px solid var(--border);
@@ -171,11 +242,13 @@
     padding: 18px;
     box-shadow: var(--shadow-sm);
 }
+
 .lupto-chart-header {
     margin-bottom: 14px;
     padding-bottom: 12px;
     border-bottom: 1px solid #f1f5f9;
 }
+
 .lupto-chart-header h3 {
     margin: 0;
     font-size: 15px;
@@ -185,9 +258,11 @@
     align-items: center;
     gap: 8px;
 }
+
 .lupto-chart-header h3 i {
     color: var(--lupto-primary);
 }
+
 .lupto-chart-container {
     height: 260px;
 }
@@ -197,9 +272,11 @@
     .lupto-kpi-grid {
         grid-template-columns: 1fr;
     }
+
     .lupto-insights-grid {
         grid-template-columns: 1fr;
     }
+
     .lupto-charts-grid {
         grid-template-columns: 1fr;
     }

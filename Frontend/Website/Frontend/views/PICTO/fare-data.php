@@ -24,7 +24,7 @@ ob_start();
             <i class="fas fa-sync-alt" id="refreshIcon"></i> Refresh
         </button>
         <button class="btn-gov" onclick="fd_switchTab('upload')">
-            <i class="fas fa-cloud-upload-alt"></i> Upload PDF
+            <i class="fas fa-cloud-upload-alt"></i> Upload CSV
         </button>
     </div>
 </div>
@@ -33,8 +33,8 @@ ob_start();
 
 <!-- ── Tabs ───────────────────────────────────────────────── -->
 <div class="fd-tabs" role="tablist">
-    <button class="fd-tab-btn active" id="tab-browse"  onclick="fd_switchTab('browse')"  role="tab"><i class="fas fa-table-list"></i> Browse Guides</button>
-    <button class="fd-tab-btn"        id="tab-upload"  onclick="fd_switchTab('upload')"  role="tab"><i class="fas fa-cloud-upload-alt"></i> Upload PDF</button>
+    <button class="fd-tab-btn active" id="tab-browse" onclick="fd_switchTab('browse')" role="tab"><i class="fas fa-table-list"></i> Browse Guides</button>
+    <button class="fd-tab-btn" id="tab-upload" onclick="fd_switchTab('upload')" role="tab"><i class="fas fa-cloud-upload-alt"></i> Upload CSV</button>
     <button class="fd-tab-btn"        id="tab-history" onclick="fd_switchTab('history')" role="tab"><i class="fas fa-history"></i> Upload History</button>
 </div>
 
@@ -48,6 +48,45 @@ ob_start();
         <span class="fd-info-badge guide"><i class="fas fa-file-alt"></i> <span id="badgeGuideName">—</span></span>
         <span class="fd-info-badge effective"><i class="fas fa-calendar-check"></i> Effective: <span id="badgeEffective">—</span></span>
         <span class="fd-info-badge updated"><i class="fas fa-clock"></i> Updated: <span id="badgeUpdated">—</span></span>
+    </div>
+
+    <!-- Statistics Grid -->
+    <div class="fd-stats-grid">
+        <div class="fd-stat-card">
+            <div class="fd-stat-info">
+                <h4>Total Fare Matrix</h4>
+                <p id="statGuides">—</p>
+            </div>
+            <div class="fd-stat-icon blue"><i class="fas fa-file-invoice-dollar"></i></div>
+        </div>
+        <div class="fd-stat-card">
+            <div class="fd-stat-info">
+                <h4>Active Fare Matrix</h4>
+                <p id="statActive">—</p>
+            </div>
+            <div class="fd-stat-icon green"><i class="fas fa-check-circle"></i></div>
+        </div>
+        <div class="fd-stat-card">
+            <div class="fd-stat-info">
+                <h4>Archived Fare Matrix</h4>
+                <p id="statArchived">—</p>
+            </div>
+            <div class="fd-stat-icon orange"><i class="fas fa-archive"></i></div>
+        </div>
+        <div class="fd-stat-card">
+            <div class="fd-stat-info">
+                <h4>Transportation Types</h4>
+                <p id="statTypes">—</p>
+            </div>
+            <div class="fd-stat-icon blue"><i class="fas fa-bus-simple"></i></div>
+        </div>
+        <div class="fd-stat-card">
+            <div class="fd-stat-info">
+                <h4>Last Updated Count</h4>
+                <p id="statLastUpdated">—</p>
+            </div>
+            <div class="fd-stat-icon red"><i class="fas fa-history"></i></div>
+        </div>
     </div>
 
     <!-- Search & filter -->
@@ -120,12 +159,12 @@ ob_start();
 </div>
 
 <!-- ════════════════════════════════════════════════════════
-     TAB: UPLOAD PDF
-═════════════════════════════════════════════════════════ -->
+     TAB: UPLOAD CSV
+ ═════════════════════════════════════════════════════════ -->
 <div class="fd-tab-panel" id="panel-upload">
     <div class="card">
         <div class="card-header flex-between">
-            <h3 class="card-title"><i class="fas fa-cloud-upload-alt"></i> Upload Official Fare Matrix PDF</h3>
+            <h3 class="card-title"><i class="fas fa-cloud-upload-alt"></i> Upload Official Fare Matrix CSV</h3>
             <span style="font-size:11px;padding:3px 10px;background:#e3f0fb;color:#0071c5;border-radius:20px;font-weight:600;">PICTO Admin</span>
         </div>
         <div class="card-body">
@@ -133,17 +172,17 @@ ob_start();
             <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:12px 16px;display:flex;gap:10px;align-items:flex-start;margin-bottom:20px;">
                 <i class="fas fa-info-circle" style="color:#1d4ed8;margin-top:1px;"></i>
                 <div style="font-size:13px;color:#1e40af;">
-                    <strong>Automatic Processing:</strong> Upload the official LTO/LTFRB Fare Matrix PDF and the system will automatically extract, validate, and store all fare data. The guide will be set to <em>Active</em> immediately — any existing active guide for the same vehicle type and region will be archived automatically.
+                    <strong>Automatic Processing:</strong> Upload the official CSV and the system will automatically parse, validate, and extract all fare data, vehicle types, titles, and effective dates from the file content.
                 </div>
             </div>
 
             <!-- Drop zone — input is OUTSIDE the zone to prevent bubble double-trigger -->
-            <input type="file" id="fdFileInput" accept=".pdf,application/pdf" style="display:none;">
+            <input type="file" id="fdFileInput" accept=".csv,text/csv" style="display:none;">
             <div class="fd-upload-zone" id="fdUploadZone">
-                <i class="fas fa-file-pdf fd-upload-icon"></i>
-                <h3>Drag &amp; Drop Fare Matrix PDF</h3>
+                <i class="fas fa-file-csv fd-upload-icon"></i>
+                <h3>Drag &amp; Drop Fare Matrix CSV</h3>
                 <p>or click anywhere in this box to browse</p>
-                <small>PDF files only · Max 20 MB</small>
+                <small>CSV files only · Max 20 MB</small>
             </div>
 
             <!-- Progress -->
@@ -224,10 +263,78 @@ ob_start();
     </div>
 </div>
 
+<!-- ── Add/Edit manual modal ─────────────────────────────── -->
+<div class="fd-modal-overlay" id="fdAddEditModal" onclick="if(event.target===this)fd_closeAddEdit()">
+    <div class="fd-modal" style="max-width:600px;">
+        <div class="fd-modal-header">
+            <h3 id="fdAddEditTitle"><i class="fas fa-plus"></i> Add Fare Matrix</h3>
+            <button class="fd-modal-close" onclick="fd_closeAddEdit()" aria-label="Close"><i class="fas fa-times"></i></button>
+        </div>
+        <form id="fdAddEditForm" onsubmit="fd_saveManual(event)">
+            <input type="hidden" id="aeGuideId">
+            <div class="fd-modal-body" style="padding:20px;">
+                <div class="fd-form-group" style="margin-bottom:12px;">
+                    <label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px;color:var(--text-primary);">Title</label>
+                    <input type="text" id="aeTitle" required class="fd-input" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:4px;" placeholder="e.g., General Fare Matrix 2026">
+                </div>
+                <div style="display:flex;gap:12px;margin-bottom:12px;">
+                    <div class="fd-form-group" style="flex:1;">
+                        <label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px;color:var(--text-primary);">Vehicle Type</label>
+                        <select id="aeVehicleType" required class="fd-input" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:4px;">
+                            <option value="PUB_Aircon">PUB Aircon</option>
+                            <option value="PUB_Ordinary">PUB Ordinary</option>
+                            <option value="PUJ_Aircon">PUJ Aircon</option>
+                            <option value="PUJ_Ordinary">PUJ Ordinary</option>
+                            <option value="Tricycle">Tricycle</option>
+                            <option value="Van">Van</option>
+                        </select>
+                    </div>
+                    <div class="fd-form-group" style="flex:1;">
+                        <label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px;color:var(--text-primary);">Region / Municipality</label>
+                        <input type="text" id="aeRegion" required class="fd-input" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:4px;" placeholder="e.g., La Union">
+                    </div>
+                </div>
+                <div class="fd-form-group" style="margin-bottom:16px;">
+                    <label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px;color:var(--text-primary);">Effective Date</label>
+                    <input type="date" id="aeEffectiveDate" required class="fd-input" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:4px;">
+                </div>
+
+                <div style="border-top:1px solid var(--border);padding-top:12px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                        <h4 style="margin:0;font-size:13px;color:var(--text-primary);"><i class="fas fa-list"></i> Fare Matrix Rows</h4>
+                        <button type="button" class="btn-gov" style="padding:4px 8px;font-size:11px;" onclick="ae_addRow()">
+                            <i class="fas fa-plus"></i> Add Row
+                        </button>
+                    </div>
+                    <div style="max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:4px;">
+                        <table style="width:100%;border-collapse:collapse;font-size:12px;" id="aeRowsTable">
+                            <thead style="background:#f8fafc;position:sticky;top:0;z-index:1;">
+                                <tr>
+                                    <th style="padding:6px;text-align:left;border-bottom:1px solid var(--border);">Distance (km)</th>
+                                    <th style="padding:6px;text-align:left;border-bottom:1px solid var(--border);">Regular Fare (₱)</th>
+                                    <th style="padding:6px;text-align:left;border-bottom:1px solid var(--border);">Discounted (₱)</th>
+                                    <th style="padding:6px;width:40px;border-bottom:1px solid var(--border);"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="aeRowsBody">
+                                <!-- Dynamic rows -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div class="fd-modal-footer">
+                <button type="button" class="btn-gov btn-gov-secondary" onclick="fd_closeAddEdit()">Cancel</button>
+                <button type="submit" class="btn-gov" id="aeSaveBtn">Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <!-- ── Toast container ───────────────────────────────────── -->
 <div id="fdToastContainer"></div>
 
-<script src="../../scripts/functions/PITCO/fare-data-api.js"></script>
+<script src="../../scripts/functions/PITCO/fare-data-api.js?v=<?php echo filemtime(__DIR__ . '/../../scripts/functions/PITCO/fare-data-api.js'); ?>"></script>
 
 <?php
 $pageContent = ob_get_clean();

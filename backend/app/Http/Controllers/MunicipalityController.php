@@ -9,9 +9,10 @@ use Illuminate\Http\Request;
 class MunicipalityController extends Controller
 {
     /** GET /api/{role}/municipalities */
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
-        return response()->json(['municipalities' => Municipality::orderBy('name')->get()]);
+        $municipalities = Municipality::orderBy('name')->get();
+        return $this->etagResponse($request, ['municipalities' => $municipalities]);
     }
 
     /** GET /api/{role}/municipalities/{id} */

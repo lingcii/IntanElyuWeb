@@ -7,48 +7,85 @@ use App\Models\TouristSpot;
 use App\Models\TouristSpotAudit;
 use App\Models\TouristSpotImage;
 use App\Models\User;
+use App\Enums\ActivityAction;
+use App\Services\ActivityLogService;
+use App\Services\NotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use App\Services\CacheInvalidationService;
 
 class TouristSpotController extends Controller
 {
     private const UPLOAD_DIR = 'tourist_spots';
-    private const UPLOAD_URL = 'http://127.0.0.1:8000/storage/tourist_spots/';
-
-    // Check if user is PICTO and restrict write operations
-    private function checkPICTOAccess(Request $request): bool
+    // UPLOAD_URL derived from APP_URL env — never hardcode a host
+    private static function uploadUrl(): string
     {
-        $role = $request->session()->get('user_role');
-        // If user is PICTO, return false to restrict write access
-        return $role !== 'picto';
+        return rtrim(env('APP_URL', 'http://127.0.0.1:8000'), '/') . '/storage/tourist_spots/';
+    }
+    
+    // Cache column check results to avoid hitting the database every time
+    private static ?bool $hasBarangayColumn = null;
+    private static ?bool $hasUpdatedAtColumn = null;
+
+
+    
+    // Check if the tourist_spots table has a specific column (cached)
+    private function hasColumn(string $column): bool
+    {
+        $cacheProperty = match ($column) {
+            'barangay' => 'hasBarangayColumn',
+            'updated_at' => 'hasUpdatedAtColumn',
+            default => null,
+        };
+        
+        if ($cacheProperty && self::$$cacheProperty !== null) {
+            return self::$$cacheProperty;
+        }
+        
+        $result = false;
+        try {
+            $result = Schema::hasColumn('tourist_spots', $column);
+        } catch (\Exception $e) {
+            $result = false;
+        }
+        
+        if ($cacheProperty) {
+            self::$$cacheProperty = $result;
+        }
+        
+        return $result;
     }
 
     // ──────────────────────────────────────────────────────────────────────────
     //  READ
     // ──────────────────────────────────────────────────────────────────────────
 
-    /** GET /api/tourist-spots  (all roles: access allowed) */
     public function index(Request $request): JsonResponse
     {
         $role           = $request->session()->get('user_role');
         $municipalityId = (int) $request->session()->get('user_municipality_id', 0);
 
-        $query = TouristSpot::select([
-            'id', 'name', 'municipality_id', 'barangay', 'category', 'entrance_fee', 
-            'description', 'photo_url', 'latitude', 'longitude', 'opening_time', 
-            'closing_time', 'is_maintenance', 'classification_status', 'created_at'
-        ])->with(['municipality:id,name', 'images']);
+        $cacheKey = "tourist-spots:list:{$role}:{$municipalityId}";
 
-        // Municipal users only see their own municipality's spots
-        if (in_array($role, User::$MUNICIPAL_ROLES) && $municipalityId) {
-            $query->where('municipality_id', $municipalityId);
-        }
+        $spots = Cache::remember($cacheKey, 300, function () use ($role, $municipalityId) {
+            $query = TouristSpot::select([
+                'id', 'name', 'municipality_id', 'barangay', 'category', 'description', 'entrance_fee', 'environmental_fee', 'fee_types',
+                'status', 'photo_url', 'latitude', 'longitude', 'opening_time',
+                'closing_time', 'is_maintenance', 'classification_status', 'rejection_reason', 'visits', 'rating', 'points', 'approved_by', 'approved_at', 'created_by', 'creator_role', 'created_at'
+            ])->with(['municipality:id,name', 'images', 'approver:id,name', 'creator:id,name']);
 
-        $spots = $query->latest()->get();
-        $spots = $this->attachPrimaryPhoto($spots);
+            if (in_array($role, User::$MUNICIPAL_ROLES) && $municipalityId) {
+                $query->where('municipality_id', $municipalityId);
+            }
 
-        return response()->json($spots);
+            $list = $query->latest()->get();
+            return $this->attachPrimaryPhoto($list)->toArray();
+        });
+
+        return $this->etagResponse($request, $spots);
     }
 
     /** GET /api/tourist-spots/{id} (all roles: access allowed) */
@@ -57,7 +94,7 @@ class TouristSpotController extends Controller
         $role           = $request->session()->get('user_role');
         $municipalityId = (int) $request->session()->get('user_municipality_id', 0);
 
-        $query = TouristSpot::with(['municipality:id,name', 'images'])->where('id', $id);
+        $query = TouristSpot::with(['municipality:id,name', 'images', 'approver:id,name', 'creator:id,name'])->where('id', $id);
 
         if (in_array($role, User::$MUNICIPAL_ROLES) && $municipalityId) {
             $query->where('municipality_id', $municipalityId);
@@ -77,17 +114,21 @@ class TouristSpotController extends Controller
     /** POST /api/tourist-spots/upload-image */
     public function uploadImage(Request $request): JsonResponse
     {
-        if (!$this->checkPICTOAccess($request)) {
-            return response()->json(['error' => 'PICTO users are not authorized to perform this action.'], 403);
-        }
-
-        $request->validate(['image' => 'required|image|mimes:jpeg,jpg,png|max:5120']);
+        $request->validate(['image' => 'required|image|mimes:jpeg,jpg,png|max:10240']); // 10MB
 
         $file     = $request->file('image');
-        $filename = 'spot_' . uniqid('', true) . '.' . $file->extension();
-        $file->storeAs(self::UPLOAD_DIR, $filename, 'public');
+        $filename = 'spot_' . uniqid() . '.' . $file->extension();
+        
+        // Ensure directory exists
+        $directory = storage_path('app/public/' . self::UPLOAD_DIR);
+        if (!is_dir($directory)) {
+            mkdir($directory, 0755, true);
+        }
+        
+        $file->move($directory, $filename);
 
-        $url = self::UPLOAD_URL . $filename;
+        // Return the proxy URL instead of the full storage URL
+        $url = '/api/serve-image.php?file=' . urlencode($filename);
 
         return response()->json([
             'success'   => true,
@@ -98,11 +139,12 @@ class TouristSpotController extends Controller
 
     public function store(Request $request): JsonResponse
     {
-        if (!$this->checkPICTOAccess($request)) {
-            return response()->json(['error' => 'PICTO users are not authorized to perform this action.'], 403);
+        $role = $request->session()->get('user_role');
+        if (in_array($role, User::$MUNICIPAL_ROLES)) {
+            $request->merge(['points' => 0]);
         }
 
-        $data           = $request->validate([
+        $rules = [
             'name'                  => 'required|string|max:255',
             'barangay'              => 'nullable|string|max:255',
             'category'              => 'required|string',
@@ -110,13 +152,27 @@ class TouristSpotController extends Controller
             'classification_status' => 'required|string',
             'municipality_id'       => 'sometimes|integer',
             'entrance_fee'          => 'nullable|numeric',
+            'environmental_fee'     => 'nullable|numeric',
+            'fee_types'             => 'nullable|array',
+            'fee_types.*'           => 'in:entrance,environmental',
             'latitude'              => 'nullable|numeric',
             'longitude'             => 'nullable|numeric',
             'opening_time'          => 'nullable|string',
             'closing_time'          => 'nullable|string',
             'is_maintenance'        => 'nullable|boolean',
             'images'                => 'nullable|array',
-        ]);
+            'points'                => 'required|integer|min:0',
+        ];
+
+        $feeTypes = $request->input('fee_types', []);
+        if (in_array('entrance', $feeTypes)) {
+            $rules['entrance_fee'] = 'required|numeric|min:0';
+        }
+        if (in_array('environmental', $feeTypes)) {
+            $rules['environmental_fee'] = 'required|numeric|min:0';
+        }
+
+        $data = $request->validate($rules);
 
         $role           = $request->session()->get('user_role');
         $sessionMuniId  = (int) $request->session()->get('user_municipality_id', 0);
@@ -133,65 +189,146 @@ class TouristSpotController extends Controller
         // Normalize category: accept comma-separated multi-category values
         $data['category'] = self::normalizeCategories($data['category']);
 
+        $data['fee_types'] = $data['fee_types'] ?? [];
+
+        // LUPTO can only create spots with EXISTING classification
+        // Accept both the raw label ('EXISTING') and the mapped stored value ('EXIST')
+        $classUpper = strtoupper($data['classification_status']);
+        if ($role === 'lupto' && !in_array($classUpper, ['EXISTING', 'EXIST'])) {
+            return response()->json(['error' => 'LUPTO can only create spots with EXISTING classification.'], 422);
+        }
+
         $mapped = TouristSpot::$STATUS_MAP[strtoupper($data['classification_status'])] ?? null;
         if (!in_array($mapped, TouristSpot::$VALID_STATUSES)) {
             return response()->json(['error' => 'Invalid classification status.'], 422);
         }
         $data['classification_status'] = $mapped;
 
-        $photoUrl = $data['images'][0]['photo_url'] ?? null;
+        // Determine approval status based on role
+        $initialStatus = 'approved';
+        if (in_array($role, User::$MUNICIPAL_ROLES)) {
+            $initialStatus = 'pending';
+        }
 
-        $spot = DB::transaction(function () use ($data, $photoUrl, $request) {
-            $spot = TouristSpot::create([
+        $photoUrl = $this->normalizePhotoUrl($data['images'][0]['photo_url'] ?? null);
+
+        $spot = DB::transaction(function () use ($data, $photoUrl, $request, $initialStatus, $role) {
+            // Create the spot data array without barangay first, then add it only if it exists
+            $spotData = [
                 'name'                  => $data['name'],
                 'municipality_id'       => $data['municipality_id'],
-                'barangay'              => $data['barangay'] ?? null,
                 'category'              => $data['category'],
                 'entrance_fee'          => $data['entrance_fee'] ?? 0,
+                'environmental_fee'     => $data['environmental_fee'] ?? 0,
+                'fee_types'             => $data['fee_types'] ?? [],
                 'description'           => $data['description'],
                 'photo_url'             => $photoUrl,
-                'latitude'              => $data['latitude']  ?? null,
-                'longitude'             => $data['longitude'] ?? null,
+                'latitude'              => $data['latitude']  ?? 0,
+                'longitude'             => $data['longitude'] ?? 0,
                 'opening_time'          => $data['opening_time']  ?? null,
                 'closing_time'          => $data['closing_time']  ?? null,
                 'is_maintenance'        => $data['is_maintenance'] ?? false,
-                'status'                => 'approved',
+                'status'                => $initialStatus,
                 'classification_status' => $data['classification_status'],
-            ]);
+                'points'                => (int) $data['points'],
+                'created_by'            => (int) $request->session()->get('user_id'),
+                'creator_role'          => $role,
+            ];
+
+            // Use the cached column checks
+            if ($this->hasColumn('barangay')) {
+                $spotData['barangay'] = $data['barangay'] ?? null;
+            }
+
+            // Create the spot manually to bypass automatic timestamps
+            $spot = new TouristSpot($spotData);
+            $spot->save();
 
             $this->syncImages($spot->id, $data['images'] ?? []);
-            Municipality::where('id', $spot->municipality_id)->increment('attraction_count');
-            $this->auditLog($spot->id, (int) $request->session()->get('user_id'), 'created', ['name' => $spot->name, 'category' => $spot->category], $request);
 
-            // Clear database cache so maps and dashboard show real-time changes
-            \Illuminate\Support\Facades\Cache::flush();
+            // Only increment attraction_count for approved spots (pending spots aren't counted yet)
+            if ($initialStatus === 'approved') {
+                Municipality::where('id', $spot->municipality_id)->increment('attraction_count');
+            }
+
+            $this->auditLog($spot->id, (int) $request->session()->get('user_id'), 'created', ['name' => $spot->name, 'category' => $spot->category, 'status' => $spot->status], $request);
+
+            ActivityLogService::log(
+                ActivityAction::SPOT_ADDED,
+                'Tourist Spots',
+                'New tourist spot "' . $spot->name . '" added',
+                null,
+                ['name' => $spot->name, 'category' => $spot->category, 'entrance_fee' => $spot->entrance_fee, 'status' => $spot->status],
+                $request
+            );
 
             return $spot;
         });
 
+        try {
+            NotificationService::notifyProvincial(
+                'spot_pending',
+                'New Tourist Spot Pending',
+                "A new tourist spot \"" . $spot->name . "\" has been submitted for approval.",
+                [
+                    'module'            => 'Dashboard',
+                    'action_url'        => 'dashboard.php',
+                    'spot_name'         => $spot->name,
+                    'municipality_name' => $spot->municipality?->name,
+                    'actor_name'        => $request->session()->get('user_name'),
+                ]
+            );
+        } catch (\Exception $e) {
+            // Notification failure must not block spot creation
+            \Log::warning('Notification failed on spot creation: ' . $e->getMessage());
+        }
+
+        CacheInvalidationService::invalidateAll($spot->municipality_id);
         return response()->json(['success' => true, 'message' => 'Tourist spot created successfully.', 'id' => $spot->id], 201);
     }
 
     public function update(Request $request, int $id): JsonResponse
     {
-        if (!$this->checkPICTOAccess($request)) {
-            return response()->json(['error' => 'PICTO users are not authorized to perform this action.'], 403);
+        $role = $request->session()->get('user_role');
+        if (in_array($role, User::$MUNICIPAL_ROLES)) {
+            $municipalityId = (int) $request->session()->get('user_municipality_id', 0);
+            $query = TouristSpot::where('id', $id);
+            if ($municipalityId) {
+                $query->where('municipality_id', $municipalityId);
+            }
+            $spot = $query->first();
+            $existingPoints = $spot ? (int)$spot->points : 0;
+            $request->merge(['points' => $existingPoints]);
         }
 
-        $data          = $request->validate([
+        $rules = [
             'name'                  => 'required|string|max:255',
             'barangay'              => 'nullable|string|max:255',
             'category'              => 'required|string',
             'description'           => 'required|string',
             'classification_status' => 'required|string',
             'entrance_fee'          => 'nullable|numeric',
+            'environmental_fee'     => 'nullable|numeric',
+            'fee_types'             => 'nullable|array',
+            'fee_types.*'           => 'in:entrance,environmental',
             'latitude'              => 'nullable|numeric',
             'longitude'             => 'nullable|numeric',
             'opening_time'          => 'nullable|string',
             'closing_time'          => 'nullable|string',
             'is_maintenance'        => 'nullable|boolean',
             'images'                => 'nullable|array',
-        ]);
+            'points'                => 'required|integer|min:0',
+        ];
+
+        $feeTypes = $request->input('fee_types', []);
+        if (in_array('entrance', $feeTypes)) {
+            $rules['entrance_fee'] = 'required|numeric|min:0';
+        }
+        if (in_array('environmental', $feeTypes)) {
+            $rules['environmental_fee'] = 'required|numeric|min:0';
+        }
+
+        $data = $request->validate($rules);
 
         $role           = $request->session()->get('user_role');
         $municipalityId = (int) $request->session()->get('user_municipality_id', 0);
@@ -201,10 +338,12 @@ class TouristSpotController extends Controller
             $query->where('municipality_id', $municipalityId);
         }
         $spot = $query->firstOrFail();
-        $old  = $spot->only(['name', 'category', 'entrance_fee', 'classification_status']);
+        $old  = $spot->only(['name', 'category', 'entrance_fee', 'classification_status', 'status']);
 
         // Normalize category: accept comma-separated multi-category values
         $data['category'] = self::normalizeCategories($data['category']);
+
+        $data['fee_types'] = $data['fee_types'] ?? [];
 
         $mapped = TouristSpot::$STATUS_MAP[strtoupper($data['classification_status'])] ?? null;
         if (!in_array($mapped, TouristSpot::$VALID_STATUSES)) {
@@ -212,41 +351,63 @@ class TouristSpotController extends Controller
         }
         $data['classification_status'] = $mapped;
 
-        $photoUrl = $data['images'][0]['photo_url'] ?? null;
+        $photoUrl = $this->normalizePhotoUrl($data['images'][0]['photo_url'] ?? null);
 
-        DB::transaction(function () use ($spot, $data, $photoUrl, $old, $request) {
-            $spot->update([
+        DB::transaction(function () use ($spot, $data, $photoUrl, $old, $request, $role) {
+            $updateData = [
                 'name'                  => $data['name'],
-                'barangay'              => $data['barangay'] ?? null,
                 'category'              => $data['category'],
                 'entrance_fee'          => $data['entrance_fee'] ?? 0,
+                'environmental_fee'     => $data['environmental_fee'] ?? 0,
+                'fee_types'             => $data['fee_types'] ?? [],
                 'description'           => $data['description'],
                 'photo_url'             => $photoUrl,
-                'latitude'              => $data['latitude']  ?? null,
-                'longitude'             => $data['longitude'] ?? null,
+                'latitude'              => $data['latitude']  ?? 0,
+                'longitude'             => $data['longitude'] ?? 0,
                 'opening_time'          => $data['opening_time']  ?? null,
                 'closing_time'          => $data['closing_time']  ?? null,
                 'is_maintenance'        => $data['is_maintenance'] ?? false,
                 'classification_status' => $data['classification_status'],
-            ]);
+                'points'                => (int) $data['points'],
+            ];
+
+            // When MTO edits a rejected spot, reset status to pending for re-approval
+            if (in_array($role, User::$MUNICIPAL_ROLES) && $spot->status === 'rejected') {
+                $updateData['status']        = 'pending';
+                $updateData['rejection_reason'] = null;
+                $updateData['approved_by']   = null;
+                $updateData['approved_at']   = null;
+            }
+
+            // Use the cached column check
+            if ($this->hasColumn('barangay')) {
+                $updateData['barangay'] = $data['barangay'] ?? null;
+            }
+
+            $spot->fill($updateData);
+            $spot->updated_at = now();
+            $spot->save();
 
             $this->syncImages($spot->id, $data['images'] ?? []);
             $this->auditLog($spot->id, (int) $request->session()->get('user_id'), 'updated', ['old' => $old, 'new' => $data], $request);
 
-            // Clear database cache so maps and dashboard show real-time changes
-            \Illuminate\Support\Facades\Cache::flush();
+            ActivityLogService::log(
+                ActivityAction::SPOT_UPDATED,
+                'Tourist Spots',
+                'Updated details for "' . $spot->name . '"',
+                $old,
+                ['name' => $data['name'], 'category' => $data['category'], 'entrance_fee' => $data['entrance_fee'] ?? 0, 'classification_status' => $data['classification_status'], 'status' => $updateData['status'] ?? $spot->status],
+                $request
+            );
         });
 
+        CacheInvalidationService::invalidateAll($spot->municipality_id);
         return response()->json(['success' => true, 'message' => 'Tourist spot updated successfully.']);
     }
 
     /** DELETE /api/tourist-spots/{id} */
     public function destroy(Request $request, int $id): JsonResponse
     {
-        if (!$this->checkPICTOAccess($request)) {
-            return response()->json(['error' => 'PICTO users are not authorized to perform this action.'], 403);
-        }
-
         $role           = $request->session()->get('user_role');
         $municipalityId = (int) $request->session()->get('user_municipality_id', 0);
 
@@ -262,11 +423,18 @@ class TouristSpotController extends Controller
 
             $this->auditLog($spot->id, (int) $request->session()->get('user_id'), 'deleted', ['name' => $spot->name], $request);
             $spot->delete();
-
-            // Clear database cache so maps and dashboard show real-time changes
-            \Illuminate\Support\Facades\Cache::flush();
         });
 
+        ActivityLogService::log(
+            ActivityAction::SPOT_DELETED,
+            'Tourist Spots',
+            'Tourist spot "' . $spot->name . '" deleted',
+            ['name' => $spot->name, 'municipality_id' => $spot->municipality_id],
+            null,
+            $request
+        );
+
+        CacheInvalidationService::invalidateAll($spot->municipality_id);
         return response()->json(['success' => true, 'message' => 'Tourist spot deleted successfully.']);
     }
 
@@ -289,15 +457,26 @@ class TouristSpotController extends Controller
 
     private function syncImages(int $spotId, array $images): void
     {
-        TouristSpotImage::where('spot_id', $spotId)->delete();
+        if (empty($images)) {
+            // No images supplied — leave existing images intact
+            return;
+        }
 
+        // Build a set of normalized URLs from the incoming payload
+        $incomingUrls = array_map(fn($img) => $this->normalizePhotoUrl($img['photo_url']), $images);
+
+        // Delete only images that are no longer in the incoming list
+        TouristSpotImage::where('spot_id', $spotId)
+            ->whereNotIn('photo_url', $incomingUrls)
+            ->delete();
+
+        // Upsert remaining images (preserves existing rows, inserts new ones)
         foreach ($images as $i => $image) {
-            TouristSpotImage::create([
-                'spot_id'    => $spotId,
-                'photo_url'  => $this->normalizePhotoUrl($image['photo_url']),
-                'is_primary' => $i === 0 ? 1 : 0,
-                'sort_order' => $i,
-            ]);
+            $url = $this->normalizePhotoUrl($image['photo_url']);
+            TouristSpotImage::updateOrCreate(
+                ['spot_id' => $spotId, 'photo_url' => $url],
+                ['is_primary' => $i === 0 ? 1 : 0, 'sort_order' => $i]
+            );
         }
     }
 
@@ -317,19 +496,95 @@ class TouristSpotController extends Controller
     }
 
     /**
-     * Ensure a stored photo_url is always a full HTTP URL.
-     * Legacy records stored bare filenames (e.g. "urbiztondo.jpg").
-     * New uploads store the full URL. Handle both.
+     * Ensure a stored photo_url uses the frontend proxy format whenever possible.
+     * Handles:
+     * - Proxy URLs (e.g. "/api/serve-image.php?file=xxx.jpg") → kept as-is
+     * - Full Laravel serveImage URLs → converted back to proxy format
+     * - Bare filenames (e.g. "urbiztondo.jpg") → wrapped in proxy format
+     * - Full storage URLs (any protocol/host) → converted to proxy format
+     * - Legacy paths (e.g. "/Gaw-at-GO-System/...") → converted to proxy format
+     *
+     * The proxy URL format (/api/serve-image.php?file=...) is relative and works
+     * regardless of the domain/port the frontend is accessed from.
      */
     private function normalizePhotoUrl(?string $url): ?string
     {
         if (!$url) return null;
-        // Already a full URL
-        if (str_starts_with($url, 'http://') || str_starts_with($url, 'https://')) {
-            return $url;
+
+        $filename = null;
+
+        if (str_contains($url, 'serve-image.php')) {
+            $parsed = parse_url($url);
+            parse_str($parsed['query'] ?? '', $params);
+            $filename = $params['file'] ?? null;
+        } elseif (str_contains($url, '/api/images/tourist-spots/')) {
+            $filename = basename(parse_url($url, PHP_URL_PATH) ?? '');
+        } elseif (filter_var($url, FILTER_VALIDATE_URL)) {
+            $filename = basename(parse_url($url, PHP_URL_PATH) ?? '');
+        } elseif (str_starts_with($url, '/') || str_starts_with($url, '..')) {
+            $filename = basename($url);
+        } else {
+            $filename = $url;
         }
-        // Bare filename — prepend storage URL
-        return rtrim(env('APP_URL', 'http://127.0.0.1:8000'), '/') . '/storage/' . self::UPLOAD_DIR . '/' . ltrim($url, '/');
+
+        if ($filename) {
+            return '/api/serve-image.php?file=' . urlencode($filename);
+        }
+
+        return null;
+    }
+
+    /**
+     * GET /api/serve-image.php?file=...
+     * Proxy-compatible image serving — mirrors the frontend serve-image.php.
+     * Used by the mobile app and any client that can't reach the frontend PHP server.
+     */
+    public function serveImageProxy(Request $request): \Symfony\Component\HttpFoundation\BinaryFileResponse
+    {
+        $filename = $request->query('file', '');
+        return $this->serveImage($filename);
+    }
+
+    /**
+     * GET /api/images/tourist-spots/{filename}
+     * Serves an image file from the filesystem, searching frontend + backend
+     * storage directories. No auth required — intended for <img> tags.
+     */
+    public function serveImage(string $filename): \Symfony\Component\HttpFoundation\BinaryFileResponse
+    {
+        if (!preg_match('/^[a-zA-Z0-9_\-\.]+$/', $filename)) {
+            abort(400, 'Invalid filename');
+        }
+
+        $directories = [
+            base_path('../Frontend/Website/Frontend/images/tourist_spots/'),
+            storage_path('app/public/tourist_spots/'),
+            storage_path('app/public/'),
+            public_path('storage/tourist_spots/'),
+            base_path('../Frontend/Website/Frontend/images/'),
+        ];
+
+        $imagePath = null;
+        foreach ($directories as $dir) {
+            $testPath = $dir . $filename;
+            if (file_exists($testPath)) {
+                $imagePath = $testPath;
+                break;
+            }
+        }
+
+        if (!$imagePath) {
+            abort(404, 'File not found');
+        }
+
+        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+        $mime = finfo_file($finfo, $imagePath);
+        finfo_close($finfo);
+
+        return response()->file($imagePath, [
+            'Content-Type' => $mime,
+            'Cache-Control' => 'public, max-age=31536000',
+        ]);
     }
 
     private function attachPrimaryPhoto($spots)
@@ -353,3 +608,4 @@ class TouristSpotController extends Controller
         } catch (\Exception) {}
     }
 }
+

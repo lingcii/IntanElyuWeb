@@ -20,17 +20,24 @@ class User extends Authenticatable
         'status',
         'municipality_id',
         'last_activity',
+        'api_token',
+        'xp',
+        'level',
+        'avatar',
+        'is_default_password',
     ];
 
     protected $hidden = [
         'password',
         'remember_token',
+        'api_token',
     ];
 
     protected $casts = [
-        'email_verified_at' => 'datetime',
-        'last_activity'     => 'datetime',
-        'created_at'        => 'datetime',
+        'email_verified_at'   => 'datetime',
+        'last_activity'       => 'datetime',
+        'created_at'          => 'datetime',
+        'is_default_password' => 'boolean',
     ];
 
     /** Valid roles in the system */
@@ -68,5 +75,15 @@ class User extends Authenticatable
     public function isMunicipal(): bool
     {
         return in_array($this->role, self::$MUNICIPAL_ROLES);
+    }
+
+    public function favorites()
+    {
+        return $this->hasMany(Favorite::class);
+    }
+
+    public function itineraries()
+    {
+        return $this->hasMany(Itinerary::class);
     }
 }

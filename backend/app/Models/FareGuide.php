@@ -8,7 +8,7 @@ class FareGuide extends Model
 {
     protected $fillable = [
         'title', 'vehicle_type', 'region', 'effective_date', 
-        'plate_number', 'status', 'created_by'
+        'status', 'created_by'
     ];
     
     public function creator()

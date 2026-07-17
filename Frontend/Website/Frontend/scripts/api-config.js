@@ -1,4 +1,4 @@
-(function() {
+﻿(function () {
     /**
      * api-config.js
      * Central configuration for all API calls.
@@ -16,7 +16,7 @@
     // ── Top-level guard ──────────────────────────────────────────────────────────
     // This exits immediately if the script was already loaded to prevent duplicate logic.
     if (window.__API_CONFIG_LOADED__) {
-        console.warn('[api-config] Script already loaded — skipping duplicate execution.');
+        void 0;
         return;
     }
     window.__API_CONFIG_LOADED__ = true;
@@ -29,16 +29,91 @@
     const apiPort = '8000';
     const baseUrl = `${window.location.protocol}//${apiHost}:${apiPort}`;
 
+    // Dynamically calculate the frontend base URL to support both XAMPP subfolders and php -S
+    let frontendBaseUrl = '';
+    
+    // 1. Try to derive from the current page URL (highly reliable since our directory structure is known)
+    const href = window.location.href;
+    const lowerHref = href.toLowerCase();
+    
+    if (lowerHref.includes('/views/')) {
+        const idx = lowerHref.indexOf('/views/');
+        frontendBaseUrl = href.substring(0, idx + 1); // include the trailing slash
+    } else if (lowerHref.endsWith('login.php') || lowerHref.includes('login.php?')) {
+        const idx = lowerHref.indexOf('login.php');
+        frontendBaseUrl = href.substring(0, idx);
+    } else if (lowerHref.endsWith('index.php') || lowerHref.includes('index.php?')) {
+        const idx = lowerHref.indexOf('index.php');
+        frontendBaseUrl = href.substring(0, idx);
+    }
+    
+    // 2. Fallback: try document.currentScript
+    if (!frontendBaseUrl && document.currentScript && document.currentScript.src) {
+        const scriptSrc = document.currentScript.src;
+        const idx = scriptSrc.toLowerCase().indexOf('scripts/api-config.js');
+        if (idx !== -1) {
+            frontendBaseUrl = scriptSrc.substring(0, idx);
+        }
+    }
+    
+    // 3. Last fallback: origin
+    if (!frontendBaseUrl) {
+        frontendBaseUrl = window.location.origin + '/';
+    }
+
+    // Recursive helper to normalize any photo_url keys in API responses
+    function normalizeAllUrls(obj) {
+        if (!obj || typeof obj !== 'object') return obj;
+
+        if (Array.isArray(obj)) {
+            for (let i = 0; i < obj.length; i++) {
+                obj[i] = normalizeAllUrls(obj[i]);
+            }
+            return obj;
+        }
+
+        for (const key in obj) {
+            if (Object.prototype.hasOwnProperty.call(obj, key)) {
+                if (key === 'photo_url' && typeof obj[key] === 'string') {
+                    obj[key] = window.API_CONFIG.normalizeImageUrl(obj[key]);
+                } else {
+                    obj[key] = normalizeAllUrls(obj[key]);
+                }
+            }
+        }
+        return obj;
+    }
+
     window.API_CONFIG = {
         BASE_URL: baseUrl,
+        FRONTEND_BASE_URL: frontendBaseUrl,
         activeRequests: {},
 
         // Role-scoped base paths
-        PITCO:     `${baseUrl}/api/pitco`,
-        LUPTO:     `${baseUrl}/api/lupto`,
+        PITCO: `${baseUrl}/api/pitco`,
+        PICTO: `${baseUrl}/api/pitco`,
+        LUPTO: `${baseUrl}/api/lupto`,
         MUNICIPAL: `${baseUrl}/api/municipal`,
-        AUTH:      `${baseUrl}/api/auth`,
-        PROFILE:   `${baseUrl}/api/profile`,
+        AUTH: `${baseUrl}/api/auth`,
+        PROFILE: `${baseUrl}/api/profile`,
+
+        /**
+         * Converts relative proxy URLs (e.g. /api/serve-image.php?file=...) into
+         * absolute URLs relative to the frontend domain and path.
+         */
+        normalizeImageUrl(url) {
+            if (!url) return '';
+            if (/^https?:\/\//i.test(url)) {
+                return url;
+            }
+            if (url.startsWith('/api/serve-image.php')) {
+                return this.FRONTEND_BASE_URL + url.substring(1);
+            }
+            if (url.startsWith('api/serve-image.php')) {
+                return this.FRONTEND_BASE_URL + url;
+            }
+            return url;
+        },
 
         /**
          * Returns the XSRF token from the cookie set by Laravel.
@@ -51,36 +126,14 @@
             return document.querySelector('meta[name="csrf-token"]')?.content || '';
         },
 
-        async fetch(url, options = {}) {
+        async _executeFetch(url, options = {}) {
             // Guard against accidental hardcoded hosts slipping through
             // from other parts of the codebase — warn loudly in dev.
             if (/^https?:\/\/(127\.0\.0\.1|localhost)/i.test(url) && !url.startsWith(baseUrl)) {
-                console.warn(
-                    `[api-config] URL "${url}" uses a different host than the current page (${baseUrl}). ` +
-                    `This will break the session cookie. Use window.API_CONFIG.* instead of a hardcoded host.`
-                );
+                void 0;
             }
 
             const method = (options.method || 'GET').toUpperCase();
-            let controller;
-
-            if (method === 'GET') {
-                try {
-                    const urlObj = new URL(url, window.location.origin);
-                    const pathKey = urlObj.pathname;
-
-                    if (this.activeRequests[pathKey]) {
-                        this.activeRequests[pathKey].abort();
-                    }
-
-                    controller = new AbortController();
-                    this.activeRequests[pathKey] = controller;
-                    options.signal = controller.signal;
-                } catch (e) {
-                    // If URL parsing fails, don't abort
-                }
-            }
-
             const defaults = {
                 credentials: 'include',
                 headers: {
@@ -96,26 +149,19 @@
 
             let response;
             try {
-                response = await fetch(url, mergedOptions);
+                response = await window.fetch(url, mergedOptions);
             } catch (networkError) {
                 if (networkError.name === 'AbortError') {
-                    return new Promise(() => {});
+                    throw networkError;
                 }
                 throw new Error('Network error: cannot reach the server. Is Laravel running on port 8000?');
-            } finally {
-                if (method === 'GET' && controller) {
-                    try {
-                        const urlObj = new URL(url, window.location.origin);
-                        const pathKey = urlObj.pathname;
-                        if (this.activeRequests[pathKey] === controller) {
-                            delete this.activeRequests[pathKey];
-                        }
-                    } catch (e) {}
-                }
             }
 
             const text = await response.text();
             if (!text.trim()) {
+                if (response.status === 304) {
+                    return null;
+                }
                 throw new Error(`Empty response (HTTP ${response.status})`);
             }
 
@@ -128,27 +174,109 @@
 
             if (!response.ok) {
                 if (response.status === 401) {
-                    console.warn('Session expired or unauthorized. Redirecting to login...');
+                    void 0;
                     let loginRedirect = 'login.php';
                     const path = window.location.pathname;
                     if (path.includes('/views/PICTO/') || path.includes('/views/LUPTO/') || path.includes('/views/MUNICIPAL/')) {
                         loginRedirect = '../../login.php';
                     }
                     window.location.href = loginRedirect;
-                    return new Promise(() => {}); // Halt further Javascript processing
+                    return new Promise(() => { }); // Halt further Javascript processing
                 }
                 throw new Error(data.error || data.message || `HTTP ${response.status}`);
             }
 
-            return data;
+            return normalizeAllUrls(data);
+        },
+
+        async fetch(url, options = {}) {
+            const method = (options.method || 'GET').toUpperCase();
+
+            // Write requests (POST, PUT, DELETE, PATCH) invalidate all active GET requests
+            if (method !== 'GET' && method !== 'HEAD') {
+                for (const key of Object.keys(this.activeRequests)) {
+                    try {
+                        this.activeRequests[key].controller.abort();
+                    } catch (e) {}
+                    delete this.activeRequests[key];
+                }
+                return this._executeFetch(url, options);
+            }
+
+            const cacheKey = url;
+            const externalSignal = options.signal;
+
+            if (externalSignal && externalSignal.aborted) {
+                throw new DOMException('The user aborted a request.', 'AbortError');
+            }
+
+            // Coalesce matching GET requests
+            if (this.activeRequests[cacheKey]) {
+                const entry = this.activeRequests[cacheKey];
+                entry.refCount++;
+
+                let abortHandler;
+                if (externalSignal) {
+                    abortHandler = () => {
+                        entry.refCount--;
+                        if (entry.refCount === 0) {
+                            entry.controller.abort();
+                        }
+                    };
+                    externalSignal.addEventListener('abort', abortHandler);
+                }
+
+                try {
+                    return await entry.promise;
+                } finally {
+                    if (externalSignal && abortHandler) {
+                        externalSignal.removeEventListener('abort', abortHandler);
+                    }
+                }
+            }
+
+            // Initiate a new request
+            const controller = new AbortController();
+            const entry = {
+                controller,
+                refCount: 1,
+                promise: null
+            };
+            this.activeRequests[cacheKey] = entry;
+
+            let abortHandler;
+            if (externalSignal) {
+                abortHandler = () => {
+                    entry.refCount--;
+                    if (entry.refCount === 0) {
+                        controller.abort();
+                    }
+                };
+                externalSignal.addEventListener('abort', abortHandler);
+            }
+
+            const fetchOptions = { ...options, signal: controller.signal };
+            entry.promise = this._executeFetch(url, fetchOptions);
+
+            try {
+                return await entry.promise;
+            } finally {
+                if (externalSignal && abortHandler) {
+                    externalSignal.removeEventListener('abort', abortHandler);
+                }
+                if (this.activeRequests[cacheKey] === entry) {
+                    delete this.activeRequests[cacheKey];
+                }
+            }
         },
 
         /** Convenience: GET request */
         get(url, params = {}) {
-            const qs = Object.keys(params).length
-                ? '?' + new URLSearchParams(params).toString()
+            const { signal, ...qsParams } = params || {};
+            const qs = Object.keys(qsParams).length
+                ? '?' + new URLSearchParams(qsParams).toString()
                 : '';
-            return this.fetch(url + qs, { method: 'GET' });
+            return this.fetch(url + qs, { method: 'GET', signal });
         },
 
         /** Convenience: POST request */
@@ -159,6 +287,11 @@
         /** Convenience: PUT request */
         put(url, body = {}) {
             return this.fetch(url, { method: 'PUT', body: JSON.stringify(body) });
+        },
+
+        /** Convenience: PATCH request */
+        patch(url, body = {}) {
+            return this.fetch(url, { method: 'PATCH', body: JSON.stringify(body) });
         },
 
         /** Convenience: DELETE request */

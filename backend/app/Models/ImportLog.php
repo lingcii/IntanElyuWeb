@@ -9,7 +9,7 @@ class ImportLog extends Model
     const UPDATED_AT = null;
 
     protected $fillable = [
-        'fare_upload_id', 'action', 'message', 'details'
+        'fare_upload_id', 'action', 'message', 'details', 'severity'
     ];
     
     public function upload()

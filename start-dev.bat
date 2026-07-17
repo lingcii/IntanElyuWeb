@@ -7,9 +7,6 @@ REM  Starts:
 REM    Backend  : http://127.0.0.1:8000  (Laravel — php artisan serve)
 REM    Frontend : http://localhost:8080  (PHP built-in server)
 REM
-REM  React (optional):
-REM    Open a third terminal and run:  cd React && npm run dev
-REM    React dev server → http://localhost:5173
 REM ============================================================
 
 echo.
@@ -29,9 +26,3 @@ echo     Backend  → http://127.0.0.1:8000
 echo     Frontend → http://localhost:8080
 echo     Login    → http://localhost:8080/login.php
 echo.
-echo  To also start the React app open a new terminal and run:
-echo     cd React
-echo     npm run dev
-echo     React → http://localhost:5173
-echo.
-pause

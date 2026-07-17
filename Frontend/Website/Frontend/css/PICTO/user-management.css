@@ -26,7 +26,7 @@
 /* ── KPI strip ───────────────────────────────────────────── */
 .um-kpi-strip {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(5, 1fr);
     gap: 12px;
     margin-bottom: 20px;
 }
@@ -130,9 +130,11 @@
 }
 .um-status-active   { background: #dcfce7; color: #15803d; }
 .um-status-inactive { background: #fee2e2; color: #b91c1c; }
+.um-status-pending  { background: #fef3c7; color: #d97706; }
 .um-status-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
 .um-status-active   .um-status-dot { background: #22c55e; }
 .um-status-inactive .um-status-dot { background: #ef4444; }
+.um-status-pending  .um-status-dot { background: #f59e0b; }
 
 /* Row actions */
 .um-row-actions { display: flex; gap: 6px; }
@@ -255,17 +257,21 @@
 }
 
 /* ── Confirm dialog ──────────────────────────────────────── */
+#saveConfirmModal {
+    z-index: 9100;  /* must be above userFormModal (9000) */
+}
 .um-confirm-icon {
     width: 56px; height: 56px;
     border-radius: 50%;
     display: flex; align-items: center; justify-content: center;
     font-size: 24px;
     margin: 0 auto 14px;
+    color: #fff;
 }
-.um-confirm-icon.warn  { background: #fef3c7; color: #d97706; }
-.um-confirm-icon.danger { background: #fee2e2; color: #dc2626; }
-.um-confirm-icon.info  { background: #dbeafe; color: #1d4ed8; }
-.um-confirm-text { text-align: center; color: var(--text-secondary); font-size: 14px; line-height: 1.5; }
+.um-confirm-icon.warn   { background: linear-gradient(135deg,#f59e0b,#d97706); }
+.um-confirm-icon.danger { background: linear-gradient(135deg,#ef4444,#dc2626); }
+.um-confirm-icon.info   { background: linear-gradient(135deg,#3b82f6,#1d4ed8); }
+.um-confirm-text { text-align: center; color: var(--text-secondary); font-size: 14px; line-height: 1.5; margin: 0; }
 .um-confirm-text strong { color: var(--text-primary); }
 
 /* ── Toast notifications ─────────────────────────────────── */
@@ -332,4 +338,19 @@
     .um-toolbar   { flex-direction: column; align-items: stretch; }
     .um-header-actions { width: 100%; }
     .um-pagination { flex-direction: column; align-items: flex-start; }
+}
+
+@keyframes slideFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.fd-new-row-animate {
+  animation: slideFadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }

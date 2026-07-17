@@ -1871,6 +1871,9 @@ h4 {
 }
 
 /* ── Photo Upload */
+label.sfm-upload-area {
+    display: block;
+}
 .sfm-upload-area {
     border: 2px dashed #cbd5e1;
     border-radius: 12px;
@@ -2125,3 +2128,220 @@ h4 {
 
 /* Leaflet z-index fix inside modal */
 .sfm-map-container .leaflet-container { z-index: 1; }
+
+@keyframes slideFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.spot-card.new-card-animate {
+  animation: slideFadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+
+/* Styling for LUPTO Pending Approval Cards */
+.pending-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 24px;
+    margin-bottom: 24px;
+}
+
+.pending-spot-card {
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+    display: flex;
+    flex-direction: column;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.pending-spot-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.05);
+}
+
+.pending-image-container {
+    position: relative;
+    height: 200px;
+    width: 100%;
+    background: #f3f4f6;
+    overflow: hidden;
+}
+
+.pending-image-container img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.pending-badge {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    background: #ff5722;
+    color: #ffffff;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 6px 12px;
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.pending-badge i {
+    font-size: 12px;
+}
+
+.pending-card-body {
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+}
+
+.pending-card-title {
+    font-size: 20px;
+    font-weight: 700;
+    color: #111827;
+    margin: 0 0 12px 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    height: 28px;
+}
+
+.pending-card-details {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 12px;
+    height: 74px; /* fixed height for 3 details items */
+}
+
+.pending-detail-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #64748b;
+    font-size: 14px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.pending-detail-item i {
+    width: 16px;
+    text-align: center;
+    color: #94a3b8;
+}
+
+.pending-card-description {
+    color: #475569;
+    font-size: 14px;
+    line-height: 1.5;
+    margin: 0 0 16px 0;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    height: 42px; /* 1.5 * 14px * 2 lines = 42px */
+}
+
+.pending-card-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 20px;
+    height: 30px; /* fixed height for chips row */
+    overflow: hidden;
+}
+
+.pending-tag-chip {
+    padding: 6px 12px;
+    border: 1px solid #e2e8f0;
+    background: #ffffff;
+    color: #334155;
+    font-size: 12px;
+    font-weight: 500;
+    border-radius: 8px;
+    text-transform: capitalize;
+    white-space: nowrap;
+}
+
+.pending-divider {
+    border: 0;
+    border-top: 1px solid #f1f5f9;
+    margin: 0 0 16px 0;
+}
+
+.pending-card-meta {
+    font-size: 12px;
+    color: #94a3b8;
+    margin-bottom: 20px;
+    line-height: 1.5;
+    height: 36px; /* fixed height for submitter meta */
+    overflow: hidden;
+}
+
+.pending-card-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: auto;
+}
+
+.pending-btn-approve {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px 16px;
+    background: #059669;
+    color: #ffffff;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.pending-btn-approve:hover {
+    background: #047857;
+}
+
+.pending-btn-reject {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px 16px;
+    background: #ffffff;
+    color: #dc2626;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.pending-btn-reject:hover {
+    background: #fef2f2;
+    border-color: #fca5a5;
+}

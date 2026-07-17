@@ -1,466 +1,286 @@
 /**
  * PICTO Analytics Dashboard API
- * Role: picto
- * Uses centralized API_CONFIG for real-time database fetching
+ * Role: picto — Province-wide view
  */
-
 'use strict';
+
+(function () {
+// Guard against duplicate execution on SPA re-navigation.
+if (window.__pitcoAnalyticsLoaded) {
+    if (typeof window.refreshAnalytics === 'function') window.refreshAnalytics();
+    return; // Stop — already running
+}
+window.__pitcoAnalyticsLoaded = true;
+
+// Expose immediately for state restoration and event handlers to avoid race conditions
+window.refreshAnalytics = refreshAnalytics;
+window.refreshAll = refreshAnalytics;
+window.onMonthFilterChange = onMonthFilterChange;
 
 const PA_API = window.API_CONFIG?.PITCO || 'http://localhost:8000/api/pitco';
 
-// Map legacy action strings to Laravel REST paths
 function paActionToUrl(action, params = {}) {
     const map = {
-        'get_summary':           `${PA_API}/summary`,
-        'get_top_municipalities':`${PA_API}/top-municipalities`,
-        'get_top_spots':         `${PA_API}/top-spots`,
-        'get_chart_data':        `${PA_API}/chart-data`,
-        'get_monthly_trend':     `${PA_API}/monthly-trend`,
-        'get_filter_options':    `${PA_API}/filter-options`,
-        'get_full':              `${PA_API}/full`,
+        'get_summary': `${PA_API}/analytics/summary`,
+        'get_top_municipalities': `${PA_API}/analytics/top-municipalities`,
+        'get_top_spots': `${PA_API}/analytics/top-spots`,
+        'get_chart_data': `${PA_API}/analytics/chart-data`,
+        'get_monthly_trend': `${PA_API}/analytics/monthly-trend`,
+        'get_filter_options': `${PA_API}/analytics/filter-options`,
+        'get_full': `${PA_API}/analytics/full`,
+        'export': `${PA_API}/analytics/export`,
     };
-    const base = map[action] || `${PA_API}/${action.replace(/_/g, '-')}`;
-    const qs   = Object.keys(params).length ? '?' + new URLSearchParams(params).toString() : '';
+    const base = map[action] || `${PA_API}/analytics/${action.replace(/_/g, '-')}`;
+    const qs = Object.keys(params).length ? '?' + new URLSearchParams(params).toString() : '';
     return base + qs;
 }
 
-// ── State 
-let _muniSort = 'total_visits';
-let _spotSort = 'visits';
-let _charts   = {};   // chart instances keyed by canvas id
+let _charts = {};
+let _autoRefreshTimer = null;
+let _allSpots = [];
+let _selectedCategoryTab = 'all';
+let _showAllMunis = false;
+let _muniChartData = [];
+let _trendCurVisits = [];
+let _trendPrevVisits = [];
+let _trendYear = new Date().getFullYear();
+let _trendCurrentYear = new Date().getFullYear();
+let _trendCurrentMonth = new Date().getMonth() + 1;
 
-// ── Boot ─
-document.addEventListener('DOMContentLoaded', () => {
+// Simple client-side cache mapping URL to response data
+const _apiCache = {};
+let _forceNextFetches = false;
+
+function _initAnalytics() {
     loadFilterOptions();
-    refreshAll();
-});
+    refreshAnalytics();
+    window.refreshAnalytics = refreshAnalytics;
+    window.refreshAll = refreshAnalytics;
+    startAutoRefresh();
+}
 
-// ── Core fetch using API_CONFIG
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', _initAnalytics);
+} else {
+    _initAnalytics();
+}
+
 async function apiFetch(action, params = {}) {
-    const url = paActionToUrl(action, params);
+    const paramsWithRefresh = _forceNextFetches ? { ...params, refresh: 1 } : params;
+    const url = paActionToUrl(action, paramsWithRefresh);
+
+    if (!_forceNextFetches && _apiCache[url]) {
+        const cached = _apiCache[url];
+        if (Date.now() - cached.timestamp < 600000) { // 10 minutes cache
+            return cached.data;
+        }
+    }
 
     try {
         const data = await window.API_CONFIG.fetch(url);
+        _apiCache[url] = {
+            data: data,
+            timestamp: Date.now()
+        };
         return data;
     } catch (e) {
         throw new Error('Network error: ' + e.message);
     }
 }
 
-// ── Refresh all sections 
-async function refreshAll() {
+async function refreshAnalytics(force = false) {
     const icon = document.getElementById('refreshIcon');
     if (icon) icon.classList.add('fa-spin');
 
-    await Promise.all([
-        loadSummary(),
-        loadTopMunicipalities(),
-        loadTopSpots(),
-        loadChartData(),
-        loadTrendChart(),
-    ]);
+    if (force) {
+        // Clear frontend cache
+        for (const key in _apiCache) {
+            delete _apiCache[key];
+        }
+        _forceNextFetches = true;
+    }
+
+    try {
+        await Promise.all([
+            loadSummary(),
+            loadChartData(),
+            loadTrendChart(),
+            loadTopSpots(),
+        ]);
+    } finally {
+        _forceNextFetches = false;
+    }
 
     if (icon) icon.classList.remove('fa-spin');
+
+    // Update timestamp
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const lastUpdatedEl = document.getElementById('lastUpdated');
+    if (lastUpdatedEl) {
+        lastUpdatedEl.textContent = `Last updated: ${timeStr}`;
+    }
+    updateScopeBadge();
 }
 
-// Refresh just the rankings (filter changes)
 async function refreshRankings() {
-    await Promise.all([
-        loadTopMunicipalities(),
-        loadTopSpots(),
-    ]);
+    await Promise.all([loadChartData(), loadTopSpots()]);
+    updateScopeBadge();
 }
 
-// ── Load filter dropdown options 
+function updateScopeBadge() {
+    const muniSelect = document.getElementById('filterMuni');
+    const badge = document.getElementById('scopeBadge');
+    if (!badge) return;
+    if (muniSelect && muniSelect.value) {
+        const selectedText = muniSelect.options[muniSelect.selectedIndex].text;
+        badge.innerHTML = `<i class="fas fa-map-marker-alt"></i> Viewing: ${selectedText}`;
+    } else {
+        badge.innerHTML = `<i class="fas fa-globe"></i> Viewing: Province-Wide`;
+    }
+}
+
 async function loadFilterOptions() {
     try {
         const data = await apiFetch('get_filter_options');
-        const sel  = document.getElementById('filterMuni');
+        const sel = document.getElementById('filterMuni');
         if (sel && data.municipalities) {
+            sel.innerHTML = '<option value="">All Municipalities</option>';
             data.municipalities.forEach(m => {
                 const opt = document.createElement('option');
-                opt.value       = m.id;
+                opt.value = m.id;
                 opt.textContent = m.name;
                 sel.appendChild(opt);
             });
         }
-    } catch (_) { /* non-critical */ }
+    } catch (_) { }
 }
 
 function clearFilters() {
-    ['filterMuni','filterCategory','filterStatus'].forEach(id => {
+    ['filterMuni', 'filterCategory', 'filterStatus'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.value = '';
     });
     refreshRankings();
 }
 
-// ── KPI Summary 
+function closeExportModal() {
+    const modal = document.getElementById('exportModal');
+    if (modal) modal.style.display = 'none';
+}
+
+function exportData(format) {
+    const modal = document.getElementById('exportModal');
+    if (modal) {
+        modal.style.display = 'flex';
+        modal.setAttribute('data-format', format);
+    } else {
+        triggerExport(format, 'full');
+    }
+}
+
+function triggerExport(format, type) {
+    closeExportModal();
+    const year = document.getElementById('filterYear')?.value || new Date().getFullYear();
+    const url = paActionToUrl('export', { format, type, year });
+    window.open(url, '_blank');
+}
+
+function startAutoRefresh() {
+    if (_autoRefreshTimer) clearInterval(_autoRefreshTimer);
+    _autoRefreshTimer = setInterval(refreshAnalytics, 30000);
+}
+
+function stopAutoRefresh() {
+    if (_autoRefreshTimer) { clearInterval(_autoRefreshTimer); _autoRefreshTimer = null; }
+}
+
+function toggleAutoRefresh() {
+    const toggle = document.getElementById('autoRefreshToggle');
+    if (toggle && toggle.checked) {
+        startAutoRefresh();
+    } else {
+        stopAutoRefresh();
+    }
+}
+
+// ── KPI Summary
 async function loadSummary() {
     try {
         const data = await apiFetch('get_summary');
-        const s    = data.summary;
+        const s = data.summary;
+        setText('kpiSpots', fmtNum(s.total_spots));
+        setText('kpiMunisCount', fmtNum(s.total_municipalities));
+        setText('kpiVisists', fmtNum(s.total_users));
 
-        setText('kpiMunis',    fmtNum(s.total_municipalities));
-        setText('kpiSpots',    fmtNum(s.total_spots));
-        setText('kpiVisits',   fmtNum(s.total_visits));
-        setText('kpiUsers',    fmtNum(s.total_users));
-        setText('kpiApproved', fmtNum(s.approved_spots));
-        setText('kpiAnalytics',fmtNum(s.total_analytics_visits));
-        setText('kpiTopMuni',  s.most_visited_muni);
-        setText('kpiTopSpot',  s.most_visited_spot);
+        // Dynamic badges
+        setText('kpiSpotsBadge', `↗ +${s.new_spots_30d} new`);
+        setText('kpiVisitsBadge', `↗ +${s.new_users_30d} new`);
 
-    } catch (err) {
-        console.error('[PA] loadSummary:', err);
-    }
+        const momSign = s.visits_month_pct >= 0 ? '+' : '';
+        const momArrow = s.visits_month_pct >= 0 ? '↗' : '↘';
+        const prevMonth = s.visits_prev_month || 'Jun';
+        setText('kpiMonthlyVisitedBadge', `${momArrow} ${momSign}${s.visits_month_pct}% vs ${prevMonth}`);
+
+        // Card 4: Top Category
+        setText('kpiTopCategory', escHtml(s.top_category));
+        setText('kpiTopCategoryBadge', `${s.top_category_cnt} spots`);
+    } catch (err) { console.error('[PA] loadSummary:', err); }
 }
 
-// ── Top Municipalities 
-async function loadTopMunicipalities() {
-    const podium = document.getElementById('muniPodium');
-    const tbody  = document.getElementById('muniTableBody');
-
-    if (podium) podium.innerHTML = '<div class="pa-loading"><i class="fas fa-spinner fa-spin"></i></div>';
-    if (tbody)  tbody.innerHTML  = '<tr><td colspan="6" class="pa-loading"><i class="fas fa-spinner fa-spin"></i></td></tr>';
-
-    try {
-        const data = await apiFetch('get_top_municipalities', {
-            sort:        _muniSort,
-            category:    document.getElementById('filterCategory')?.value || '',
-            spot_status: document.getElementById('filterStatus')?.value   || '',
-            limit:       10,
-        });
-
-        const munis = data.municipalities || [];
-        const top3  = munis.slice(0, 3);
-        const rest  = munis.slice(3);
-
-        // Find max value for progress bars
-        const keyMap = {
-            total_visits: 'total_visits', total_spots: 'total_spots',
-            approved_spots: 'approved_spots', avg_rating: 'avg_rating'
-        };
-        const valKey = keyMap[_muniSort] || 'total_visits';
-        const maxVal = munis.reduce((m, r) => Math.max(m, parseFloat(r[valKey])||0), 1);
-
-        // Podium
-        if (podium) podium.innerHTML = top3.length
-            ? top3.map(m => buildMuniPodiumCard(m, valKey)).join('')
-            : '<div class="pa-empty"><i class="fas fa-city"></i><p>No data available.</p></div>';
-
-        // Table rows 4-10
-        if (tbody) tbody.innerHTML = rest.length
-            ? rest.map(m => buildMuniRow(m, valKey, maxVal)).join('')
-            : '<tr><td colspan="6" class="pa-empty"><p>No more entries.</p></td></tr>';
-
-    } catch (err) {
-        console.error('[PA] loadTopMunicipalities:', err);
-        if (podium) podium.innerHTML = `<div class="pa-empty"><i class="fas fa-exclamation-circle" style="color:#ef4444;"></i><p>${escHtml(err.message)}</p></div>`;
-        if (tbody)  tbody.innerHTML  = `<tr><td colspan="6" class="pa-empty"><p>${escHtml(err.message)}</p></td></tr>`;
-    }
-}
-
-function buildMuniPodiumCard(m, valKey) {
-    const medals  = {1:'🥇', 2:'🥈', 3:'🥉'};
-    const initials = getInitials(m.name);
-    const mainVal  = valKey === 'avg_rating'
-        ? parseFloat(m[valKey]).toFixed(1) + ' ★'
-        : fmtNum(m[valKey]);
-    const unitLabels = { total_visits:'Visits', total_spots:'Spots', approved_spots:'Approved', avg_rating:'Rating' };
-    const unit = unitLabels[valKey] || '';
-
-    return `
-    <div class="pa-podium-card rank-${m.rank}">
-        <div class="pa-medal">${medals[m.rank]||''}</div>
-        <div class="pa-podium-rank">${m.rank}</div>
-        <div class="pa-podium-avatar">${initials}</div>
-        <div class="pa-podium-name" title="${escHtml(m.name)}">${escHtml(m.name)}</div>
-        <div class="pa-podium-value">${mainVal}</div>
-        <div class="pa-podium-unit">${unit}</div>
-        <div class="pa-podium-stats">
-            <div class="pa-podium-stat-item">
-                <span class="pa-podium-stat-val">${fmtNum(m.total_spots)}</span>
-                <span class="pa-podium-stat-key">Spots</span>
-            </div>
-            <div class="pa-podium-stat-item">
-                <span class="pa-podium-stat-val">${fmtNum(m.total_visits)}</span>
-                <span class="pa-podium-stat-key">Visits</span>
-            </div>
-            <div class="pa-podium-stat-item">
-                <span class="pa-podium-stat-val">${parseFloat(m.avg_rating).toFixed(1)}</span>
-                <span class="pa-podium-stat-key">Rating</span>
-            </div>
-        </div>
-    </div>`;
-}
-
-function buildMuniRow(m, valKey, maxVal) {
-    const val = parseFloat(m[valKey]) || 0;
-    const pct = maxVal > 0 ? Math.round((val / maxVal) * 100) : 0;
-    const initials = getInitials(m.name);
-    const color    = getAvatarColor(m.id);
-
-    return `
-    <tr>
-        <td class="pa-rank-num">#${m.rank}</td>
-        <td>
-            <span class="pa-rank-avatar" style="background:${color};">${initials}</span>
-            <strong>${escHtml(m.name)}</strong>
-        </td>
-        <td>${fmtNum(m.total_spots)}</td>
-        <td>${fmtNum(m.approved_spots)}</td>
-        <td>
-            <div class="pa-progress-wrap">
-                <div class="pa-progress-track">
-                    <div class="pa-progress-fill" style="width:${pct}%;"></div>
-                </div>
-                <span class="pa-progress-val">${fmtNum(m.total_visits)}</span>
-            </div>
-        </td>
-        <td>${parseFloat(m.avg_rating).toFixed(1)} ★</td>
-    </tr>`;
-}
-
-function setMuniSort(btn, sort) {
-    _muniSort = sort;
-    document.querySelectorAll('#muniSortTabs .pa-sort-tab').forEach(t => t.classList.remove('active'));
-    btn.classList.add('active');
-    loadTopMunicipalities();
-}
-
-// ── Top Tourist Spots 
-async function loadTopSpots() {
-    const podium = document.getElementById('spotPodium');
-    const tbody  = document.getElementById('spotTableBody');
-
-    if (podium) podium.innerHTML = '<div class="pa-loading"><i class="fas fa-spinner fa-spin"></i></div>';
-    if (tbody)  tbody.innerHTML  = '<tr><td colspan="7" class="pa-loading"><i class="fas fa-spinner fa-spin"></i></td></tr>';
-
-    try {
-        const data = await apiFetch('get_top_spots', {
-            sort:            _spotSort,
-            municipality_id: document.getElementById('filterMuni')?.value     || '',
-            category:        document.getElementById('filterCategory')?.value || '',
-            spot_status:     document.getElementById('filterStatus')?.value   || '',
-            limit: 10,
-        });
-
-        const spots = data.spots || [];
-        const top3  = spots.slice(0, 3);
-        const rest  = spots.slice(3);
-        const maxVisits = spots.reduce((m, s) => Math.max(m, s.visits), 1);
-
-        if (podium) podium.innerHTML = top3.length
-            ? top3.map(s => buildSpotPodiumCard(s)).join('')
-            : '<div class="pa-empty"><i class="fas fa-map-pin"></i><p>No spots found.</p></div>';
-
-        if (tbody) tbody.innerHTML = rest.length
-            ? rest.map(s => buildSpotRow(s, maxVisits)).join('')
-            : '<tr><td colspan="7" class="pa-empty"><p>No more entries.</p></td></tr>';
-
-    } catch (err) {
-        console.error('[PA] loadTopSpots:', err);
-        if (podium) podium.innerHTML = `<div class="pa-empty"><i class="fas fa-exclamation-circle" style="color:#ef4444;"></i><p>${escHtml(err.message)}</p></div>`;
-        if (tbody)  tbody.innerHTML  = `<tr><td colspan="7" class="pa-empty"><p>${escHtml(err.message)}</p></td></tr>`;
-    }
-}
-
-function buildSpotPodiumCard(s) {
-    const medals = {1:'🥇', 2:'🥈', 3:'🥉'};
-    const photo  = s.photo_url
-        ? `<img src="${escHtml(s.photo_url)}" alt="${escHtml(s.name)}" style="width:60px;height:60px;border-radius:50%;object-fit:cover;margin:0 auto 10px;display:block;border:3px solid rgba(255,255,255,0.8);" onerror="this.style.display='none'">`
-        : `<div class="pa-podium-avatar">${getCatIcon(s.category)}</div>`;
-
-    const mainVal = _spotSort === 'rating'
-        ? `${parseFloat(s.rating).toFixed(1)} ★`
-        : fmtNum(s.visits);
-    const unit = _spotSort === 'rating' ? 'Rating' : 'Visits';
-
-    return `
-    <div class="pa-podium-card rank-${s.rank}">
-        <div class="pa-medal">${medals[s.rank]||''}</div>
-        <div class="pa-podium-rank">${s.rank}</div>
-        ${photo}
-        <div class="pa-podium-name" title="${escHtml(s.name)}">${escHtml(s.name)}</div>
-        <div class="pa-podium-meta">${escHtml(s.municipality_name)}</div>
-        <div class="pa-podium-value">${mainVal}</div>
-        <div class="pa-podium-unit">${unit}</div>
-        <div class="pa-podium-stats">
-            <div class="pa-podium-stat-item">
-                <span class="pa-podium-stat-val"><span class="pa-cat-badge pa-cat-${s.category}">${escHtml(s.category)}</span></span>
-                <span class="pa-podium-stat-key">Category</span>
-            </div>
-            <div class="pa-podium-stat-item">
-                <span class="pa-podium-stat-val">${parseFloat(s.rating).toFixed(1)} ★</span>
-                <span class="pa-podium-stat-key">Rating</span>
-            </div>
-        </div>
-    </div>`;
-}
-
-function buildSpotRow(s, maxVisits) {
-    const pct  = maxVisits > 0 ? Math.round((s.visits / maxVisits) * 100) : 0;
-    const photo = s.photo_url
-        ? `<img src="${escHtml(s.photo_url)}" alt="" style="width:32px;height:32px;border-radius:6px;object-fit:cover;vertical-align:middle;margin-right:8px;" onerror="this.style.display='none'">`
-        : `<span class="pa-spot-photo">${getCatIcon(s.category)}</span>`;
-
-    const clsSt = s.classification_status || '';
-    const statusBadge = clsSt
-        ? `<span class="pa-status-badge pa-status-${clsSt}">${clsSt}</span>`
-        : `<span class="pa-status-badge pa-status-${s.status}">${s.status}</span>`;
-
-    return `
-    <tr>
-        <td class="pa-rank-num">#${s.rank}</td>
-        <td>
-            ${photo}
-            <strong>${escHtml(s.name)}</strong>
-        </td>
-        <td style="font-size:13px; color:var(--text-secondary);">${escHtml(s.municipality_name)}</td>
-        <td><span class="pa-cat-badge pa-cat-${s.category}">${escHtml(s.category)}</span></td>
-        <td>${statusBadge}</td>
-        <td>
-            <div class="pa-progress-wrap">
-                <div class="pa-progress-track">
-                    <div class="pa-progress-fill" style="width:${pct}%;"></div>
-                </div>
-                <span class="pa-progress-val">${fmtNum(s.visits)}</span>
-            </div>
-        </td>
-        <td>${parseFloat(s.rating).toFixed(1)} ★</td>
-    </tr>`;
-}
-
-function setSpotSort(btn, sort) {
-    _spotSort = sort;
-    document.querySelectorAll('#spotSortTabs .pa-sort-tab').forEach(t => t.classList.remove('active'));
-    btn.classList.add('active');
-    loadTopSpots();
-}
-
-// ── Charts =
-const CHART_COLORS = [
-    '#185FA5','#22c55e','#f59e0b','#8b5cf6','#ef4444',
-    '#06b6d4','#ec4899','#84cc16','#f97316','#64748b',
-];
-const DONUT_COLORS = [
-    '#185FA5','#22c55e','#f59e0b','#8b5cf6','#ef4444',
-    '#06b6d4','#ec4899','#84cc16','#f97316','#94a3b8',
-];
-
-function destroyChart(id) {
-    if (_charts[id]) { _charts[id].destroy(); delete _charts[id]; }
-}
-
-function buildBarChart(id, labels, values, label, color = '#185FA5') {
-    destroyChart(id);
-    const ctx = document.getElementById(id);
-    if (!ctx) return;
-    _charts[id] = new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels,
-            datasets: [{
-                label,
-                data: values,
-                backgroundColor: CHART_COLORS.map(c => c + 'CC'),
-                borderColor:     CHART_COLORS,
-                borderWidth: 1,
-                borderRadius: 4,
-            }]
-        },
-        options: {
-            responsive: true, maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
-            scales: {
-                y: { beginAtZero: true, grid: { color: '#f1f5f9' },
-                     ticks: { font: { size: 11 } } },
-                x: { grid: { display: false },
-                     ticks: { font: { size: 10 }, maxRotation: 35 } }
-            }
-        }
-    });
-}
-
-function buildDonutChart(id, labels, values, title) {
-    destroyChart(id);
-    const ctx = document.getElementById(id);
-    if (!ctx) return;
-    _charts[id] = new Chart(ctx, {
-        type: 'doughnut',
-        data: {
-            labels,
-            datasets: [{ data: values, backgroundColor: DONUT_COLORS, borderWidth: 2, borderColor: '#fff' }]
-        },
-        options: {
-            responsive: true, maintainAspectRatio: false,
-            cutout: '62%',
-            plugins: {
-                legend: { position: 'right', labels: { font: { size: 11 }, boxWidth: 14, padding: 10 } },
-                title:  { display: false }
-            }
-        }
-    });
-}
-
-async function loadChartData() {
-    try {
-        const year = document.getElementById('filterYear')?.value || new Date().getFullYear();
-        const data = await apiFetch('get_chart_data', { year });
-
-        // Bar: spots by municipality
-        buildBarChart(
-            'spotsByMuniChart',
-            (data.spots_by_muni || []).map(r => r.name),
-            (data.spots_by_muni || []).map(r => r.spot_count),
-            'Tourist Spots'
-        );
-
-        // Bar: visits by municipality
-        buildBarChart(
-            'visitsByMuniChart',
-            (data.visits_by_muni || []).map(r => r.name),
-            (data.visits_by_muni || []).map(r => r.total_visits),
-            'Total Visits'
-        );
-
-        // Donut: category distribution
-        buildDonutChart(
-            'catDistChart',
-            (data.cat_dist || []).map(r => r.category),
-            (data.cat_dist || []).map(r => r.cnt),
-            'Categories'
-        );
-
-        // Donut: classification status
-        buildDonutChart(
-            'classDistChart',
-            (data.class_dist || []).map(r => r.cls || 'Unknown'),
-            (data.class_dist || []).map(r => r.cnt),
-            'Classification'
-        );
-
-    } catch (err) {
-        console.error('[PA] loadChartData:', err);
-    }
-}
-
+// ── Line Chart & Stats Calculations
 async function loadTrendChart() {
-    const year = parseInt(document.getElementById('trendYearSelect')?.value || new Date().getFullYear(), 10);
-    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-
+    const year = parseInt(document.getElementById('filterYear')?.value || new Date().getFullYear(), 10);
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     destroyChart('trendChart');
     const ctx = document.getElementById('trendChart');
     if (!ctx) return;
 
     try {
         const data = await apiFetch('get_monthly_trend', { year });
+        const currentYear = new Date().getFullYear();
+        const currentMonth = new Date().getMonth() + 1; // 1-12
 
-        // Build full 12-month arrays
-        const curVisits  = Array(12).fill(0);
+        const curVisits = Array(12).fill(0);
+        if (year === currentYear) {
+            for (let i = currentMonth; i < 12; i++) {
+                curVisits[i] = null;
+            }
+        }
         const prevVisits = Array(12).fill(0);
-        (data.current  || []).forEach(r => { curVisits[r.month  - 1] = parseInt(r.visits, 10); });
-        (data.previous || []).forEach(r => { prevVisits[r.month - 1] = parseInt(r.visits, 10); });
+
+        toArr(data.current).forEach(r => {
+            const idx = r.month - 1;
+            if (year === currentYear && r.month > currentMonth) {
+                curVisits[idx] = null;
+            } else {
+                curVisits[idx] = parseInt(r.visits, 10);
+            }
+        });
+        toArr(data.previous).forEach(r => { prevVisits[r.month - 1] = parseInt(r.visits, 10); });
+
+        // Store for month filter
+        _trendCurVisits = curVisits;
+        _trendPrevVisits = prevVisits;
+        _trendYear = year;
+        _trendCurrentYear = currentYear;
+        _trendCurrentMonth = currentMonth;
+
+        // Update monthly visited KPI
+        const activeMonthIndex = (year === currentYear) ? (currentMonth - 2 >= 0 ? currentMonth - 2 : 0) : 11;
+        const currentMonthVisits = curVisits[activeMonthIndex] || 0;
+        setText('kpiMonthlyVisited', fmtNum(currentMonthVisits));
+
+        // Initialize monthly visitors display
+        onMonthFilterChange();
+
+        if (checkEmptyState('trendChart', [...curVisits, ...prevVisits])) return;
+
+        // Create Chart Gradient (Light Theme adapted)
+        const chartCtx = ctx.getContext('2d');
+        const gradient = chartCtx.createLinearGradient(0, 0, 0, 240);
+        gradient.addColorStop(0, 'rgba(15, 44, 89, 0.15)');
+        gradient.addColorStop(1, 'rgba(15, 44, 89, 0.0)');
 
         _charts['trendChart'] = new Chart(ctx, {
             type: 'line',
@@ -470,84 +290,419 @@ async function loadTrendChart() {
                     {
                         label: `${year} Visits`,
                         data: curVisits,
-                        borderColor: '#185FA5',
-                        backgroundColor: 'rgba(24,95,165,0.1)',
-                        borderWidth: 2.5,
+                        borderColor: '#0F2C59',
+                        backgroundColor: gradient,
+                        borderWidth: 3,
                         tension: 0.35,
                         fill: true,
                         pointRadius: 4,
-                        pointHoverRadius: 6,
+                        pointBackgroundColor: '#0F2C59',
+                        pointBorderColor: '#ffffff',
+                        pointBorderWidth: 2,
+                        pointHoverRadius: 6
                     },
                     {
                         label: `${year - 1} Visits`,
                         data: prevVisits,
                         borderColor: '#94a3b8',
-                        backgroundColor: 'rgba(148,163,184,0.05)',
+                        backgroundColor: 'transparent',
                         borderWidth: 1.5,
                         borderDash: [5, 5],
                         tension: 0.35,
                         fill: false,
-                        pointRadius: 3,
+                        pointRadius: 0
                     }
                 ]
             },
             options: {
-                responsive: true, maintainAspectRatio: false,
+                responsive: true,
+                maintainAspectRatio: false,
                 interaction: { mode: 'index', intersect: false },
                 plugins: {
-                    legend: { position: 'top', labels: { font: { size: 12 }, boxWidth: 20 } },
+                    legend: {
+                        position: 'top',
+                        labels: { color: '#64748b', font: { size: 11 } }
+                    },
                     tooltip: {
                         callbacks: {
-                            label: ctx => ` ${ctx.dataset.label}: ${fmtNum(ctx.parsed.y)} visits`
+                            label: c => ` ${c.dataset.label}: ${c.parsed.y !== null ? fmtNum(c.parsed.y) : '—'} visits`
                         }
                     }
                 },
                 scales: {
-                    y: { beginAtZero: true, grid: { color: '#f1f5f9' },
-                         ticks: { font: { size: 11 }, callback: v => fmtNum(v) } },
-                    x: { grid: { display: false }, ticks: { font: { size: 11 } } }
+                    y: {
+                        beginAtZero: true,
+                        grid: { color: '#e2e8f0' },
+                        ticks: { color: '#64748b', font: { size: 10 }, callback: v => fmtK(v) }
+                    },
+                    x: {
+                        grid: { display: false },
+                        ticks: { color: '#64748b', font: { size: 11 } }
+                    }
                 }
             }
         });
+    } catch (err) { console.error('[PA] loadTrendChart:', err); }
+}
 
-    } catch (err) {
-        console.error('[PA] loadTrendChart:', err);
+function onMonthFilterChange() {
+    const sel = document.getElementById('filterMonth');
+    const display = document.getElementById('statMonthlyVisitors');
+    if (!display) return;
+
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const selectedMonth = sel ? sel.value : 'all';
+
+    if (selectedMonth === 'all') {
+        let total = 0;
+        _trendCurVisits.forEach(v => { if (v !== null) total += v; });
+        display.textContent = fmtNum(total) + ' visitors';
+    } else {
+        const monthIdx = parseInt(selectedMonth, 10) - 1;
+        const visits = _trendCurVisits[monthIdx];
+        const monthName = months[monthIdx];
+        if (visits !== null && visits !== undefined && visits > 0) {
+            display.textContent = monthName + ' - ' + fmtNum(visits) + ' visitors';
+        } else if (_trendYear === _trendCurrentYear && monthIdx >= _trendCurrentMonth) {
+            display.textContent = monthName + ' - Not yet available';
+        } else {
+            display.textContent = monthName + ' - 0 visitors';
+        }
     }
 }
 
-// ── Utilities 
-function getInitials(name) {
-    if (!name) return '?';
-    const p = name.trim().split(/\s+/);
-    return p.length === 1 ? p[0][0].toUpperCase() : (p[0][0] + p[p.length-1][0]).toUpperCase();
+// ── Chart Data Calculations (Categories, Classifications, Municipalities)
+async function loadChartData() {
+    try {
+        const year = document.getElementById('filterYear')?.value || new Date().getFullYear();
+        const category = document.getElementById('filterCategory')?.value || '';
+        const status = document.getElementById('filterStatus')?.value || '';
+        const data = await apiFetch('get_chart_data', { year, category, spot_status: status });
+
+        // 1. Classification Status Sidebar Card
+        buildClassificationStatus(toArr(data.class_dist));
+
+        // 2. Top Categories Progress Card
+        buildTopCategories(toArr(data.cat_dist));
+
+        // 3. Visitors by Municipality Horizontal Bar Chart
+        _muniChartData = toArr(data.visits_by_muni).sort((a, b) => b.total_visits - a.total_visits);
+        buildMuniVisitsChart();
+
+    } catch (err) { console.error('[PA] loadChartData:', err); }
 }
 
-function getAvatarColor(id) {
-    const palette = ['#185FA5','#1e8449','#b7950b','#7d3c98','#1a6688','#a04000','#1f618d','#196f3d','#6e2f8c','#2e86c1'];
-    return palette[(id || 0) % palette.length];
-}
+function buildClassificationStatus(classes) {
+    const container = document.getElementById('classificationList');
+    if (!container) return;
 
-function getCatIcon(cat) {
-    const icons = {
-        Beach:'🏖', Mountain:'⛰', Historical:'🏛', Waterfalls:'💧',
-        Adventure:'🏕', Farm:'🌾', Religious:'⛪', Other:'📍'
+    if (!classes || classes.length === 0) {
+        container.innerHTML = '<div class="chart-empty-state"><p>No classification data</p></div>';
+        return;
+    }
+
+    const mapping = {
+        'EXIST': { label: 'Existing', dot: 'green', fill: 'green' },
+        'EMERGE': { label: 'Emerging', dot: 'blue', fill: 'blue' },
+        'POTENTIAL': { label: 'Potential', dot: 'purple', fill: 'purple' }
     };
-    return icons[cat] || '📍';
+
+    const totalSpots = classes.reduce((sum, c) => sum + c.cnt, 0);
+
+    container.innerHTML = classes.map(c => {
+        const clsKey = (c.cls || '').toUpperCase();
+        const conf = mapping[clsKey] || { label: c.cls || 'Unknown', dot: 'yellow', fill: 'yellow' };
+        const pct = totalSpots > 0 ? Math.round((c.cnt / totalSpots) * 100) : 0;
+        const avgRate = c.avg_rating ? parseFloat(c.avg_rating).toFixed(1) : '0.0';
+
+        return `
+        <div class="pa-quality-item">
+            <div class="pa-quality-meta">
+                <span class="pa-quality-name">
+                    <span class="pa-quality-dot ${conf.dot}"></span>
+                    ${conf.label}
+                    <span class="pa-quality-trend">★ ${avgRate}</span>
+                </span>
+                <span>${c.cnt} spots (${pct}%)</span>
+            </div>
+            <div class="pa-quality-bar-track">
+                <div class="pa-quality-bar-fill ${conf.fill}" style="width: ${pct}%"></div>
+            </div>
+        </div>`;
+    }).join('');
 }
 
-function fmtNum(n) {
-    if (n === null || n === undefined) return '0';
-    return Number(n).toLocaleString('en-PH');
+function buildTopCategories(cats) {
+    const container = document.getElementById('categoryList');
+    if (!container) return;
+
+    if (!cats || cats.length === 0) {
+        container.innerHTML = '<div class="chart-empty-state"><p>No category data</p></div>';
+        return;
+    }
+
+    const colorMap = {
+        'Beach': 'beach',
+        'Nature': 'nature',
+        'Mountain': 'nature',
+        'Heritage': 'heritage',
+        'Historical': 'heritage',
+        'Cultural': 'cultural',
+        'Scenic': 'scenic',
+        'Waterfalls': 'scenic',
+        'Adventure': 'adventure',
+        'Farm': 'heritage',
+        'Religious': 'cultural',
+        'Other': 'other'
+    };
+
+    const topCats = cats.slice(0, 10);
+    const maxCount = Math.max(...topCats.map(c => c.cnt), 1);
+
+    container.innerHTML = topCats.map((c, i) => {
+        const rank = String(i + 1).padStart(2, '0');
+        const colorClass = colorMap[c.category] || 'other';
+        const pct = Math.round((c.cnt / maxCount) * 100);
+
+        return `
+        <div class="pa-cat-progress-row">
+            <span class="pa-cat-rank">${rank}</span>
+            <span class="pa-cat-name">
+                <span class="pa-quality-dot bg-${colorClass}"></span>
+                ${c.category}
+                <span class="pa-cat-count">${c.cnt} spots</span>
+            </span>
+            <div class="pa-cat-bar-container">
+                <div class="pa-cat-bar-fill bg-${colorClass}" style="width: ${pct}%"></div>
+            </div>
+        </div>`;
+    }).join('');
 }
 
-function setText(id, val) {
-    const el = document.getElementById(id);
-    if (el) el.textContent = val ?? '—';
+function buildMuniVisitsChart() {
+    destroyChart('muniVisitsChart');
+    const ctx = document.getElementById('muniVisitsChart');
+    if (!ctx) return;
+
+    const dataLength = _muniChartData.length;
+    const limit = _showAllMunis ? dataLength : 10;
+    const slicedData = _muniChartData.slice(0, limit);
+
+    const toggleBtn = document.getElementById('toggleMuniChart');
+    if (toggleBtn) {
+        toggleBtn.style.display = dataLength > 10 ? 'inline-block' : 'none';
+        toggleBtn.textContent = _showAllMunis ? 'Show Less' : `Show All (${dataLength - 10} more)`;
+    }
+
+    if (checkEmptyState('muniVisitsChart', slicedData.map(r => r.total_visits))) return;
+
+    const maxVisits = Math.max(...slicedData.map(r => r.total_visits), 1);
+
+    _charts['muniVisitsChart'] = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: slicedData.map(r => r.name),
+            datasets: [{
+                data: slicedData.map(r => r.total_visits),
+                backgroundColor: 'rgba(15, 44, 89, 0.8)',
+                borderColor: '#0F2C59',
+                borderWidth: 1,
+                borderRadius: 4
+            }]
+        },
+        options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function (context) {
+                            return ` Total Visits: ${context.raw.toLocaleString('en-PH')}`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    beginAtZero: true,
+                    grid: { color: '#e2e8f0' },
+                    ticks: { color: '#64748b', font: { size: 10 }, callback: v => fmtK(v) },
+                    suggestedMax: maxVisits * 1.25
+                },
+                y: {
+                    grid: { display: false },
+                    ticks: { color: '#64748b', font: { size: 11 } }
+                }
+            }
+        },
+        plugins: [{
+            id: 'valueLabels',
+            afterDatasetsDraw(chart) {
+                const { ctx } = chart;
+                ctx.save();
+                ctx.font = 'bold 11px sans-serif';
+                ctx.fillStyle = '#64748b';
+                ctx.textBaseline = 'middle';
+
+                chart.data.datasets.forEach((dataset, datasetIndex) => {
+                    const meta = chart.getDatasetMeta(datasetIndex);
+                    meta.data.forEach((bar, index) => {
+                        const value = dataset.data[index];
+                        const labelText = value.toLocaleString('en-PH');
+                        ctx.fillText(labelText, bar.x + 5, bar.y);
+                    });
+                });
+                ctx.restore();
+            }
+        }]
+    });
 }
 
-function escHtml(str) {
-    if (str == null) return '';
-    const d = document.createElement('div');
-    d.textContent = String(str);
-    return d.innerHTML;
+function toggleMuniChart() {
+    _showAllMunis = !_showAllMunis;
+    buildMuniVisitsChart();
 }
+
+// ── Top Tourist Spots Table
+async function loadTopSpots() {
+    const tbody = document.getElementById('spotTableBody');
+    if (tbody) tbody.innerHTML = '<tr><td colspan="7" class="pa-loading"><i class="fas fa-spinner fa-spin"></i></td></tr>';
+
+    try {
+        const muniId = document.getElementById('filterMuni')?.value || '';
+        const data = await apiFetch('get_top_spots', { municipality_id: muniId, limit: 12 });
+        _allSpots = Array.isArray(data.spots) ? data.spots : Object.values(data.spots || {});
+        renderSpotsTable();
+    } catch (err) {
+        console.error('[PA] loadTopSpots:', err);
+        if (tbody) tbody.innerHTML = `<tr><td colspan="7" class="pa-empty"><p>${escHtml(err.message)}</p></td></tr>`;
+    }
+}
+
+function renderSpotsTable() {
+    const tbody = document.getElementById('spotTableBody');
+    if (!tbody) return;
+
+    const filtered = _selectedCategoryTab === 'all'
+        ? _allSpots
+        : _allSpots.filter(s => (s.category || '').toLowerCase() === _selectedCategoryTab.toLowerCase());
+
+    if (filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="pa-empty"><p>No tourist spots found for this category.</p></td></tr>';
+        return;
+    }
+
+    const colorMap = {
+        'Beach': 'beach',
+        'Nature': 'nature',
+        'Mountain': 'nature',
+        'Heritage': 'heritage',
+        'Historical': 'heritage',
+        'Cultural': 'cultural',
+        'Scenic': 'scenic',
+        'Waterfalls': 'scenic',
+        'Adventure': 'adventure',
+        'Farm': 'heritage',
+        'Religious': 'cultural',
+        'Other': 'other'
+    };
+
+    tbody.innerHTML = filtered.map((s, i) => {
+        const rank = String(i + 1).padStart(2, '0');
+        const colorClass = colorMap[s.category] || 'other';
+        const rating = s.rating ? parseFloat(s.rating).toFixed(1) : '0.0';
+        const visits = s.visits ? fmtNum(s.visits) : '0';
+        const barangay = s.barangay ? escHtml(s.barangay) : '<span style="color:#94a3b8;font-style:italic;">—</span>';
+        const municipal = s.municipality?.name ? escHtml(s.municipality.name) : '<span style="color:#94a3b8;font-style:italic;">—</span>';
+
+        return `
+        <tr>
+            <td class="pa-rank-num">${rank}</td>
+            <td>
+                <div class="pa-spot-info-cell">
+                    <div class="pa-spot-meta">
+                        <span class="pa-spot-name">${escHtml(s.name)}</span>
+                    </div>
+                </div>
+            </td>
+            <td>${barangay}</td>
+            <td>${municipal}</td>
+            <td><span class="pa-cat-badge-pill ${colorClass}">${escHtml(s.category)}</span></td>
+            <td><strong>${visits}</strong></td>
+            <td><span style="color:#f59e0b;">★</span> ${rating}</td>
+        </tr>`;
+    }).join('');
+}
+
+function filterTableCategory(category) {
+    _selectedCategoryTab = category;
+
+    // Update active tab styles
+    const tabs = document.querySelectorAll('#categoryTabs .pa-cat-tab');
+    tabs.forEach(t => {
+        t.classList.remove('active');
+        if (t.getAttribute('data-category').toLowerCase() === category.toLowerCase()) {
+            t.classList.add('active');
+        }
+    });
+
+    renderSpotsTable();
+}
+
+// ── Utilities
+function destroyChart(id) { if (_charts[id]) { _charts[id].destroy(); delete _charts[id]; } }
+function checkEmptyState(canvasId, values) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return false;
+    const parent = canvas.parentNode;
+    if (!parent) return false;
+
+    const hasData = values && values.length > 0 && values.some(v => v !== null && v > 0);
+    let emptyEl = parent.querySelector('.chart-empty-state');
+    if (!hasData) {
+        if (!emptyEl) {
+            emptyEl = document.createElement('div');
+            emptyEl.className = 'chart-empty-state';
+            emptyEl.innerHTML = '<i class="fas fa-folder-open" style="font-size:24px; margin-bottom:8px; color:#64748b;"></i><p>No data yet for this filter</p>';
+            parent.appendChild(emptyEl);
+        }
+        canvas.style.display = 'none';
+        emptyEl.style.display = 'flex';
+        return true;
+    } else {
+        if (emptyEl) emptyEl.style.display = 'none';
+        canvas.style.display = 'block';
+        return false;
+    }
+}
+function toArr(v) { if (Array.isArray(v)) return v; if (v && typeof v === 'object') return Object.values(v); return []; }
+function fmtNum(n) { return Number(n || 0).toLocaleString('en-PH'); }
+function fmtK(n) {
+    if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
+    if (n >= 1000) return (n / 1000).toFixed(0) + 'K';
+    return n;
+}
+function setText(id, val) { const el = document.getElementById(id); if (el) el.innerHTML = val ?? '—'; }
+function escHtml(str) { if (str == null) return ''; const d = document.createElement('div'); d.textContent = String(str); return d.innerHTML; }
+
+function toggleExtraCategories() {
+    const panel = document.getElementById('extraCategoriesPanel');
+    const btn = document.getElementById('toggleCategoriesBtn');
+    const icon = document.getElementById('toggleCategoriesIcon');
+    if (!panel || !icon) return;
+
+    const isCollapsed = panel.style.width === '0px' || panel.style.width === '' || panel.style.width === '0';
+
+    if (isCollapsed) {
+        panel.style.width = panel.scrollWidth + 'px';
+        icon.className = 'fas fa-chevron-left';
+        if (btn) btn.title = 'Show fewer categories';
+    } else {
+        panel.style.width = '0';
+        icon.className = 'fas fa-chevron-right';
+        if (btn) btn.title = 'Show more categories';
+    }
+}
+})();

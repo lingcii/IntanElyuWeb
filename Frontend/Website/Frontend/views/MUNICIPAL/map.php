@@ -53,6 +53,8 @@ ob_start();
     <link rel="stylesheet" href="../../css/LUPTO/dashboard.css">
     <link rel="stylesheet" href="../../css/LUPTO/map-view.css">
     <link rel="stylesheet" href="../../css/MUNICIPAL/map.css">
+    <!-- Leaflet Map CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
     <!-- Inline styles for fullscreen map -->
  
 <?php
@@ -106,8 +108,7 @@ ob_start();
         </div>
     </div>
 
-    <!-- Leaflet Map Script -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <!-- Leaflet Map -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <!-- Data passed from PHP to the external JS file -->

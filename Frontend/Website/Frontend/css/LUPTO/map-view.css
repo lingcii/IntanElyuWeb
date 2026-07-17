@@ -841,3 +841,173 @@
         .popup-detail-btn:hover {
             background: #1D4ED8 !important;
         }
+
+        /* Controls Title Row */
+        .lupto-controls-title-row {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        /* Selected Municipality Badge */
+        .selected-muni-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: #EEF2FF;
+            border: 1px solid #2563EB;
+            color: #2563EB;
+            padding: 6px 12px 6px 14px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+            animation: fadeInUp 0.3s ease-out;
+        }
+
+        .selected-muni-badge i.fa-map-pin {
+            font-size: 12px;
+        }
+
+        .muni-deselect-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 22px;
+            height: 22px;
+            border: none;
+            background: rgba(37, 99, 235, 0.1);
+            color: #2563EB;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 10px;
+            transition: background 0.2s ease;
+            padding: 0;
+        }
+
+        .muni-deselect-btn:hover {
+            background: rgba(37, 99, 235, 0.25);
+        }
+
+        /* Spot Detail Tags */
+        .spot-detail-tags {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            margin-bottom: 12px;
+        }
+
+        .spot-detail-category-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            background: #EEF2FF;
+            color: #2563EB;
+            padding: 4px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .spot-detail-classification-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            background: #F0FDF4;
+            color: #16A34A;
+            padding: 4px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        /* Spot Detail Sections */
+        .spot-detail-section {
+            margin-bottom: 20px;
+        }
+
+        .spot-detail-section-title {
+            font-size: 13px;
+            font-weight: 700;
+            color: #1E293B;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .spot-detail-section-title i {
+            color: #2563EB;
+            font-size: 13px;
+        }
+
+        /* Enhanced Info Cards */
+        .info-card-icon {
+            font-size: 16px;
+            color: #2563EB;
+            margin-bottom: 6px;
+        }
+
+        .info-card-label {
+            font-size: 11px;
+            color: #6B7280;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .info-card-value {
+            font-size: 14px;
+            font-weight: 700;
+            color: #1E293B;
+        }
+
+        .spot-detail-coords {
+            font-size: 12px;
+            font-family: 'Courier New', Courier, monospace;
+        }
+
+        /* N/A Info Cards */
+        .info-card-na {
+            opacity: 0.6;
+        }
+
+        .info-card-value-na {
+            font-size: 12px;
+            font-weight: 400;
+            color: #9CA3AF;
+            font-style: italic;
+        }
+
+        .info-grid-na {
+            grid-template-columns: repeat(2, 1fr);
+        }
+
+        /* Google Maps Directions Button */
+        .directions-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            width: 100%;
+            padding: 12px 16px;
+            background: #2563EB;
+            color: #FFFFFF;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            text-decoration: none;
+            cursor: pointer;
+            transition: background 0.2s ease, transform 0.15s ease;
+        }
+
+        .directions-btn:hover {
+            background: #1D4ED8;
+            transform: translateY(-1px);
+            color: #FFFFFF;
+            text-decoration: none;
+        }

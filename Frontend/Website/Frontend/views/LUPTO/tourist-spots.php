@@ -1,51 +1,12 @@
 <?php
 require_once __DIR__ . '/../../session-bridge.php';
-// Check role
+require_once __DIR__ . '/../../laravel-api-bridge.php';
 if ($_SESSION['user_role'] !== 'lupto') {
     header('Location: ../../login.php');
     exit;
 }
 
 $pageTitle = 'LUPTO Tourist Spots';
-
-// ── Pull data from Laravel API ─────────────────────────────────────────────
-$laravelBase = 'http://127.0.0.1:8000/api';
-$cookieStr   = '';
-foreach ($_COOKIE as $name => $value) {
-    $cookieStr .= $name . '=' . urlencode($value) . '; ';
-}
-
-function lutoApiGet(string $url, string $cookieStr): array {
-    $ch = curl_init($url);
-    curl_setopt_array($ch, [
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_HTTPHEADER     => ['Accept: application/json', 'Cookie: ' . $cookieStr],
-        CURLOPT_TIMEOUT        => 10,
-        CURLOPT_SSL_VERIFYPEER => false,
-    ]);
-    $body = curl_exec($ch);
-    curl_close($ch);
-    if (!$body) return [];
-    $decoded = json_decode($body, true);
-    return is_array($decoded) ? $decoded : [];
-}
-
-$spotsResponse  = lutoApiGet("{$laravelBase}/tourist-spots", $cookieStr);
-$spots          = $spotsResponse['data'] ?? (isset($spotsResponse[0]) ? $spotsResponse : []);
-
-$muniResponse   = lutoApiGet("{$laravelBase}/municipalities", $cookieStr);
-$municipalities = $muniResponse['municipalities'] ?? $muniResponse['data'] ?? (isset($muniResponse[0]) ? $muniResponse : []);
-
-// Build spot counts per municipality for the map markers
-$muniSpotCounts = [];
-foreach ($spots as $s) {
-    $mName = $s['municipality_name'] ?? $s['municipality']['name'] ?? '';
-    if ($mName) $muniSpotCounts[$mName] = ($muniSpotCounts[$mName] ?? 0) + 1;
-}
-foreach ($municipalities as &$m) {
-    $m['spots'] = $muniSpotCounts[$m['name']] ?? 0;
-}
-unset($m);
 
 ob_start();
 ?>
@@ -63,38 +24,46 @@ $extraHeadContent = ob_get_clean();
 ob_start();
 ?>
   <!-- Summary Cards -->
-    <div class="lupto-kpi-grid">
-        <div class="lupto-kpi-card" data-kpi="total-municipalities">
-            <div class="lupto-kpi-info">
-                <h4>Total Municipalities</h4>
-                <span class="lupto-kpi-value">20</span>
-                <span class="lupto-kpi-trend trend-neutral"><i class="fas fa-minus"></i> No Change</span>
-            </div>
-            <div class="lupto-kpi-icon bg-blue"><i class="fas fa-city"></i></div>
-        </div>
+    <div class="lupto-kpi-grid" style="grid-template-columns: repeat(5, 1fr);">
         <div class="lupto-kpi-card" data-kpi="total-spots">
             <div class="lupto-kpi-info">
                 <h4>Total Tourist Spots</h4>
-                <span class="lupto-kpi-value"><?= count($spots) ?></span>
-                <span class="lupto-kpi-trend trend-up"><i class="fas fa-arrow-up"></i> +2 this week</span>
+                <span class="lupto-kpi-value"><i class="fas fa-spinner fa-spin" style="font-size:16px;color:#9CA3AF;"></i></span>
+                <span class="lupto-kpi-trend trend-neutral" id="kpi-trend-total"><i class="fas fa-layer-group"></i> All spots</span>
             </div>
-            <div class="lupto-kpi-icon bg-green"><i class="fas fa-compass"></i></div>
+            <div class="lupto-kpi-icon bg-blue"><i class="fas fa-map-location-dot"></i></div>
         </div>
         <div class="lupto-kpi-card" data-kpi="approved-spots">
             <div class="lupto-kpi-info">
-                <h4>Total Open Tourist Spots</h4>
-                <span class="lupto-kpi-value"><?= count(array_filter($spots, fn($s) => ($s['operation_status'] ?? $s['status'] ?? '') === 'open')) ?></span>
-                <span class="lupto-kpi-trend trend-up"><i class="fas fa-arrow-up"></i> +1 today</span>
+                <h4>Total Approved Tourist Spots</h4>
+                <span class="lupto-kpi-value"><i class="fas fa-spinner fa-spin" style="font-size:16px;color:#9CA3AF;"></i></span>
+                <span class="lupto-kpi-trend trend-up" id="kpi-trend-approved"><i class="fas fa-check"></i> Approved</span>
             </div>
-            <div class="lupto-kpi-icon bg-green"><i class="fas fa-check-circle"></i></div>
+            <div class="lupto-kpi-icon bg-green"><i class="fas fa-circle-check"></i></div>
         </div>
         <div class="lupto-kpi-card" data-kpi="pending-spots">
             <div class="lupto-kpi-info">
-                <h4>Total Closed Tourist Spots</h4>
-                <span class="lupto-kpi-value"><?= count(array_filter($spots, fn($s) => ($s['operation_status'] ?? $s['status'] ?? '') === 'closed')) ?></span>
-                <span class="lupto-kpi-trend trend-down"><i class="fas fa-arrow-down"></i> -3 this week</span>
+                <h4>Total Pending Tourist Spots</h4>
+                <span class="lupto-kpi-value"><i class="fas fa-spinner fa-spin" style="font-size:16px;color:#9CA3AF;"></i></span>
+                <span class="lupto-kpi-trend trend-neutral" id="kpi-trend-pending"><i class="fas fa-clock"></i> Pending</span>
             </div>
-            <div class="lupto-kpi-icon bg-orange"><i class="fas fa-hourglass-half"></i></div>
+            <div class="lupto-kpi-icon" style="background: linear-gradient(135deg, #FEF3C7, #FDE68A); color: #F59E0B;"><i class="fas fa-hourglass-half"></i></div>
+        </div>
+        <div class="lupto-kpi-card" data-kpi="declined-spots">
+            <div class="lupto-kpi-info">
+                <h4>Total Declined Tourist Spots</h4>
+                <span class="lupto-kpi-value"><i class="fas fa-spinner fa-spin" style="font-size:16px;color:#9CA3AF;"></i></span>
+                <span class="lupto-kpi-trend trend-down" id="kpi-trend-declined"><i class="fas fa-times"></i> Rejected</span>
+            </div>
+            <div class="lupto-kpi-icon bg-red" style="background: linear-gradient(135deg, #FEE2E2, #FECACA); color: #DC2626;"><i class="fas fa-circle-xmark"></i></div>
+        </div>
+        <div class="lupto-kpi-card" data-kpi="most-visited-category">
+            <div class="lupto-kpi-info">
+                <h4>Most Visited Category</h4>
+                <span class="lupto-kpi-value" style="font-size: 20px;"><i class="fas fa-spinner fa-spin" style="font-size:16px;color:#9CA3AF;"></i></span>
+                <span class="lupto-kpi-trend trend-up" id="kpi-trend-category"><i class="fas fa-crown"></i> Top category</span>
+            </div>
+            <div class="lupto-kpi-icon bg-gold" style="background: linear-gradient(135deg, #FEF3C7, #FDE68A); color: #D97706;"><i class="fas fa-trophy"></i></div>
         </div>
     </div>
 
@@ -122,10 +91,8 @@ ob_start();
         <div class="map-wrapper">
             <div id="lupto-map" class="lupto-dedicated-map"></div>
             
-            <!-- Overlay -->
             <div class="sidebar-overlay" id="sidebarOverlay"></div>
             
-            <!-- Sidebar -->
             <div class="sidebar-container" id="sidebarContainer" role="dialog" aria-labelledby="sidebarTitle">
                 <div class="sidebar-header">
                     <div class="sidebar-header-left">
@@ -139,17 +106,75 @@ ob_start();
                     </button>
                 </div>
                 <div class="sidebar-content" id="sidebarContent">
-                    <!-- Content will be dynamically populated -->
                 </div>
             </div>
         </div>
     </div>
 
+
+<!-- Approve Confirmation Modal -->
+<div class="modal" id="approveConfirmModal" style="z-index: 10003;">
+    <div class="modal-content" style="max-width: 440px; border-radius: 16px; overflow: hidden;">
+        <div style="background: #ECFDF5; padding: 28px 28px 16px 28px; text-align: center;">
+            <div style="width: 56px; height: 56px; background: linear-gradient(135deg, #10B981, #059669); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 12px; box-shadow: 0 4px 14px rgba(16,185,129,0.35);">
+                <i class="fas fa-check" style="color: white; font-size: 24px;"></i>
+            </div>
+            <h3 style="margin: 0; font-size: 18px; font-weight: 700; color: #065F46;">Approve Tourist Spot</h3>
+        </div>
+        <div style="padding: 20px 28px 28px 28px;">
+            <p style="text-align: center; color: #4B5563; margin: 0 0 24px 0; font-size: 14px; line-height: 1.6;">
+                Are you sure you want to approve this tourist spot? It will be made visible to tourists.
+            </p>
+            <input type="hidden" id="approveSpotId" value="">
+            <div style="display: flex; gap: 12px;">
+                <button class="btn btn-outline" id="cancelApproveBtn" style="flex: 1; justify-content: center;">
+                    <i class="fas fa-times" style="margin-right: 6px;"></i> No
+                </button>
+                <button class="btn btn-primary" id="confirmApproveBtn" style="flex: 1; justify-content: center; background: linear-gradient(135deg, #10B981, #059669); border-color: #10B981;">
+                    <i class="fas fa-check" id="approveBtnIcon" style="margin-right: 6px;"></i>
+                    <i class="fas fa-circle-notch fa-spin" id="approveBtnSpinner" style="display:none; margin-right:6px;"></i>
+                    <span id="approveBtnLabel">Yes, Approve</span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Decline Reason Modal -->
+<div class="modal" id="declineModal" style="z-index: 10003;">
+    <div class="modal-content" style="max-width: 460px; border-radius: 16px; overflow: hidden;">
+        <div style="background: #FEF2F2; padding: 24px 28px 16px 28px; text-align: center;">
+            <div style="width: 52px; height: 52px; background: #DC2626; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 10px;">
+                <i class="fas fa-times" style="color: white; font-size: 22px;"></i>
+            </div>
+            <h3 style="margin: 0; font-size: 17px; font-weight: 700; color: #991B1B;">Decline Submission</h3>
+        </div>
+        <div style="padding: 20px 28px 28px 28px;">
+            <label style="display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:8px;">
+                Reason for Rejection <span style="color:#DC2626;">*</span>
+            </label>
+            <textarea id="declineReason" class="sfm-textarea" rows="3" maxlength="500"
+                      placeholder="Provide a reason for declining this submission..." 
+                      style="width:100%;min-height:80px;"></textarea>
+            <div class="sfm-char-count"><span id="declineReasonCount">0</span>/500</div>
+            <input type="hidden" id="declineSpotId" value="">
+            <div style="display: flex; gap: 12px; margin-top: 20px;">
+                <button class="btn btn-outline" id="cancelDeclineBtn" style="flex: 1; justify-content: center;">
+                    <i class="fas fa-times" style="margin-right:6px;"></i> Cancel
+                </button>
+                <button class="btn btn-primary" id="confirmDeclineBtn" style="flex: 1; justify-content: center; background: #DC2626; border-color: #DC2626;">
+                    <i class="fas fa-check" id="declineBtnIcon" style="margin-right:6px;"></i>
+                    <i class="fas fa-circle-notch fa-spin" id="declineBtnSpinner" style="display:none;margin-right:6px;"></i>
+                    <span id="declineBtnLabel">Submit</span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- -- Filter Bar -->
 <div class="filter-bar">
-    <!-- Left: filter fields -->
     <div class="filter-bar-inner">
-        <!-- Search -->
         <div class="filter-field filter-field-search">
             <label class="filter-label"><i class="fas fa-search"></i> Search</label>
             <div class="filter-input-wrap">
@@ -158,19 +183,13 @@ ob_start();
             </div>
         </div>
     </div>
-    <!-- Right: Municipality, Category, Status, count + view toggle -->
     <div class="filter-bar-right">
-        <!-- Municipality -->
         <div class="filter-field">
             <label class="filter-label"><i class="fas fa-map-marker-alt"></i> Municipality</label>
             <select id="filterMunicipality" class="filter-select">
                 <option value="">All Municipalities</option>
-                <?php foreach ($municipalities as $muni): ?>
-                    <option value="<?= htmlspecialchars($muni['name']); ?>"><?= htmlspecialchars($muni['name']); ?></option>
-                <?php endforeach; ?>
             </select>
         </div>
-        <!-- Category Multi-Select Dropdown -->
         <div class="filter-field" style="position:relative;">
             <label class="filter-label"><i class="fas fa-tag"></i> Category</label>
             <div id="catFilterBtn" class="filter-select" style="cursor:pointer;user-select:none;display:flex;align-items:center;justify-content:space-between;gap:6px;min-width:140px;" onclick="toggleCatDropdown(event)">
@@ -189,7 +208,6 @@ ob_start();
                 <button onclick="clearCatFilter()" style="width:100%;background:none;border:none;padding:7px 14px;text-align:left;font-size:12px;color:#6B7280;cursor:pointer;" onmouseenter="this.style.color='#2563EB'" onmouseleave="this.style.color='#6B7280'"><i class="fas fa-times-circle"></i> Clear selection</button>
             </div>
         </div>
-        <!-- Status -->
         <div class="filter-field">
             <label class="filter-label"><i class="fas fa-circle-dot"></i> Status</label>
             <select id="filterStatus" class="filter-select">
@@ -199,13 +217,23 @@ ob_start();
                 <option value="EMERGING">EMERGING</option>
             </select>
         </div>
-        <span class="filter-count"><span id="spotCount"><?= count($spots); ?></span> tourist spot(s)</span>
+        <div class="filter-field">
+            <label class="filter-label"><i class="fas fa-sort"></i> Sort By</label>
+            <select id="sortSpots" class="filter-select">
+                <option value="">Default (Pending First)</option>
+                <option value="points_desc">Highest Points</option>
+                <option value="points_asc">Lowest Points</option>
+            </select>
+        </div>
+        <span class="filter-count"><span id="spotCount">0</span> tourist spot(s)</span>
         <div class="view-toggle">
             <button class="active" id="viewCards" title="Card View"><i class="fas fa-th"></i></button>
             <button id="viewTable" title="Table View"><i class="fas fa-list"></i></button>
         </div>
     </div>
 </div>
+
+
 
 <!-- -- Spot Detail Modal  -->
 <div class="modal" id="spotModal">
@@ -225,7 +253,6 @@ ob_start();
 <!-- Add / Edit Spot Modal -->
 <div class="modal" id="spotFormModal">
     <div class="modal-content spot-form-modal-content">
-        <!-- Modal Header -->
         <div class="sfm-header">
             <div class="sfm-header-left">
                 <div class="sfm-header-icon"><i class="fas fa-map-marked-alt"></i></div>
@@ -244,27 +271,70 @@ ob_start();
                 <input type="hidden" id="spotId" value="">
                 <input type="hidden" id="municipalityId" value="">
 
-                <!-- ── SECTION: Media -->
+                <div class="sfm-section">
+                    <div class="sfm-section-label">
+                        <i class="fas fa-map-marker-alt"></i> Location
+                    </div>
+                   
+                    <div class="sfm-map-container">
+                        <div id="modalMap" style="height:100%;width:100%;"></div>
+                        <div class="sfm-map-hint">
+                            <i class="fas fa-hand-pointer"></i> Click map or drag pin to set location
+                        </div>
+                    </div>
+
+                    <div class="sfm-field">
+                        <label class="sfm-label" for="spotMunicipality">
+                            Municipality <span class="sfm-required">*</span>
+                        </label>
+                        <select id="spotMunicipality" class="sfm-select" required>
+                            <option value="">— Select Municipality —</option>
+                        </select>
+                    </div>
+
+                    <div class="sfm-location-row">
+                        <div class="sfm-location-barangay">
+                            <label class="sfm-label" for="spotBarangay">Barangay</label>
+                            <select id="spotBarangay" class="sfm-select">
+                                <option value="">— Select Barangay —</option>
+                            </select>
+                        </div>
+                        <div class="sfm-location-coord">
+                            <label class="sfm-label" for="spotLatitude">
+                                <i class="fas fa-globe" style="color:#6B7280;margin-right:3px;"></i> Latitude
+                            </label>
+                            <input type="number" id="spotLatitude" class="sfm-input" step="any"
+                                   placeholder="e.g., 16.3278">
+                        </div>
+                        <div class="sfm-location-coord">
+                            <label class="sfm-label" for="spotLongitude">
+                                <i class="fas fa-map" style="color:#6B7280;margin-right:3px;"></i> Longitude
+                            </label>
+                            <input type="number" id="spotLongitude" class="sfm-input" step="any"
+                                   placeholder="e.g., 120.3663">
+                        </div>
+                    </div>
+                    
+                </div>
+
                 <div class="sfm-section">
                     <div class="sfm-section-label">
                         <i class="fas fa-images"></i> Photo Upload
                     </div>
-                    <div id="imageUploadArea" class="sfm-upload-area">
+                    <label id="imageUploadArea" class="sfm-upload-area">
                         <div class="sfm-upload-icon"><i class="fas fa-cloud-upload-alt"></i></div>
                         <p class="sfm-upload-title">Click or drag to upload</p>
                         <p class="sfm-upload-sub">JPEG / PNG &middot; Max 5MB per file</p>
-                        <input type="file" id="spotImages" accept="image/jpeg,image/png" multiple style="display:none;">
-                    </div>
+                        <input type="file" id="spotImages" accept="image/jpeg,image/png,image/jpg,.jpg,.jpeg,.png" multiple hidden>
+                    </label>
                     <div id="imagePreviews" class="sfm-image-previews"></div>
                 </div>
 
-                <!-- ── SECTION: Basic Info -->
                 <div class="sfm-section">
                     <div class="sfm-section-label">
                         <i class="fas fa-info-circle"></i> Basic Information
                     </div>
 
-                    <!-- Title -->
                     <div class="sfm-field">
                         <label class="sfm-label" for="spotName">
                             Spot Name <span class="sfm-required">*</span>
@@ -274,7 +344,6 @@ ob_start();
                         <div class="sfm-char-count"><span id="nameCharCount">0</span>/100</div>
                     </div>
 
-                    <!-- Category Multi-Select Dropdown in Form -->
                     <div class="sfm-field">
                         <label class="sfm-label">
                             Categories <span class="sfm-required">*</span>
@@ -338,47 +407,81 @@ ob_start();
                             <span class="sfm-selected-label">Selected:</span>
                             <span id="selectedCatsList"></span>
                         </div>
-                    </div>
-
-                    <!-- Status -->
-                    <div class="sfm-field">
-                        <label class="sfm-label" for="spotClassification">
-                            Classification Status <span class="sfm-required">*</span>
-                        </label>
-                        <select id="spotClassification" class="sfm-select" required>
-                            <option value="">— Select Status —</option>
-                            <option value="EXISTING">EXISTING</option>
-                            <option value="EMERGING">EMERGING</option>
-                            <option value="POTENTIAL">POTENTIAL</option>
-                        </select>
+                        <div style="display: flex; gap: 16px;">
+                            <div class="sfm-field" style="flex: 1; margin-bottom: 0;">
+                                <label class="sfm-label" for="spotClassification">
+                                    Classification Status <span class="sfm-required">*</span>
+                                </label>
+                                <select id="spotClassification" class="sfm-select" required>
+                                    <option value="">— Select Status —</option>
+                                    <option value="EXISTING">Existing</option>
+                                    <option value="EMERGING">Emerging</option>
+                                    <option value="POTENTIAL">Potential</option>
+                                </select>
+                            </div>
+                            <div class="sfm-field" style="flex: 1; margin-bottom: 0;">
+                                <label class="sfm-label" for="spotPoints">
+                                    Points <span class="sfm-required">*</span>
+                                </label>
+                                 <input type="number" id="spotPoints" class="sfm-input" readonly style="background-color: #F3F4F6; cursor: not-allowed;" placeholder="Points automatically assigned">
+                            </div>
+                        </div>
                     </div>
                 </div>
 
-                <!-- ── SECTION: Details -->
                 <div class="sfm-section">
                     <div class="sfm-section-label">
                         <i class="fas fa-align-left"></i> Spot Details
                     </div>
 
-                    <!-- Entrance Fee -->
                     <div class="sfm-field">
                         <label class="sfm-label">
-                            Entrance Fee <span class="sfm-required">*</span>
+                            Fee Types
                         </label>
-                        <div class="sfm-fee-row">
-                            <label class="sfm-checkbox-label">
-                                <input type="checkbox" id="isFree">
-                                <span>Free Entry</span>
-                            </label>
-                            <div class="sfm-fee-input-wrap">
-                                <span class="sfm-fee-prefix">₱</span>
-                                <input type="number" id="spotFee" class="sfm-input sfm-fee-input"
-                                       min="0" step="0.01" value="0" placeholder="0.00">
+                        <div class="sfm-fee-dropdown-wrap" style="position:relative; width:100%;">
+                            <div id="feeTypesBtn" class="sfm-select" style="cursor:pointer;user-select:none;display:flex;align-items:center;justify-content:space-between;gap:6px;min-height:38px;padding:8px 12px;border:1px solid #E5E7EB;border-radius:8px;background:#fff;" onclick="toggleFeeTypesDropdown(event)">
+                                <span id="feeTypesLabel" style="color:#9CA3AF;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">No Fees</span>
+                                <i class="fas fa-chevron-down" style="font-size:12px;color:#9CA3AF;transition:transform .2s;" id="feeTypesChevron"></i>
                             </div>
+                            <div id="feeTypesDropdown" style="display:none;position:absolute;top:100%;left:0;z-index:9999;background:#fff;border:1px solid #E5E7EB;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.12);padding:8px 0;width:100%;max-height:240px;overflow-y:auto;margin-top:4px;">
+                                <div style="padding:4px 14px;font-size:11px;color:#9CA3AF;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Select fee types</div>
+                                <label style="display:flex;align-items:center;gap:10px;padding:8px 14px;cursor:pointer;transition:background .15s;font-size:14px;" onmouseenter="this.style.background='#F8FAFC'" onmouseleave="this.style.background='transparent'">
+                                    <input type="checkbox" class="fee-type-chk" value="entrance" onchange="onFeeTypeChange()" style="accent-color:#2563EB;width:15px;height:15px;cursor:pointer;">
+                                    <i class="fas fa-ticket-alt" style="width:18px;text-align:center;color:#4B5563;font-size:13px;"></i>
+                                    <span>Entrance Fee</span>
+                                </label>
+                                <label style="display:flex;align-items:center;gap:10px;padding:8px 14px;cursor:pointer;transition:background .15s;font-size:14px;" onmouseenter="this.style.background='#F8FAFC'" onmouseleave="this.style.background='transparent'">
+                                    <input type="checkbox" class="fee-type-chk" value="environmental" onchange="onFeeTypeChange()" style="accent-color:#2563EB;width:15px;height:15px;cursor:pointer;">
+                                    <i class="fas fa-leaf" style="width:18px;text-align:center;color:#4B5563;font-size:13px;"></i>
+                                    <span>Environmental Fee</span>
+                                </label>
+                            </div>
+                        </div>
+                        <input type="hidden" id="feeTypes" value="">
+                    </div>
+
+                    <div class="sfm-field" id="entranceFeeField" style="display:none;">
+                        <label class="sfm-label" for="spotFee">
+                            Entrance Fee Amount <span class="sfm-required">*</span>
+                        </label>
+                        <div class="sfm-fee-input-wrap">
+                            <span class="sfm-fee-prefix">₱</span>
+                            <input type="number" id="spotFee" class="sfm-input sfm-fee-input"
+                                   min="0" step="0.01" value="0" placeholder="0.00">
                         </div>
                     </div>
 
-                    <!-- Opening + Closing Time -->
+                    <div class="sfm-field" id="environmentalFeeField" style="display:none;">
+                        <label class="sfm-label" for="environmentalFee">
+                            Environmental Fee Amount <span class="sfm-required">*</span>
+                        </label>
+                        <div class="sfm-fee-input-wrap">
+                            <span class="sfm-fee-prefix">₱</span>
+                            <input type="number" id="environmentalFee" class="sfm-input sfm-fee-input"
+                                   min="0" step="0.01" value="0" placeholder="0.00">
+                        </div>
+                    </div>
+
                     <div class="sfm-two-col">
                         <div class="sfm-field">
                             <label class="sfm-label" for="spotOpeningTime">
@@ -394,7 +497,6 @@ ob_start();
                         </div>
                     </div>
 
-                    <!-- Under Maintenance -->
                     <div class="sfm-field" id="maintenance-field">
                         <label class="sfm-maintenance-toggle">
                             <input type="checkbox" id="spotIsMaintenance">
@@ -404,7 +506,6 @@ ob_start();
                         </label>
                     </div>
 
-                    <!-- Description -->
                     <div class="sfm-field">
                         <label class="sfm-label" for="spotDescription">
                             Description <span class="sfm-required">*</span>
@@ -416,68 +517,14 @@ ob_start();
                     </div>
                 </div>
 
-                <!-- ── SECTION: Location -->
-                <div class="sfm-section">
-                    <div class="sfm-section-label">
-                        <i class="fas fa-map-marker-alt"></i> Location
-                    </div>
-                  
-                    <!-- Mini Leaflet Map -->
-                    <div class="sfm-map-container">
-                        <div id="modalMap" style="height:100%;width:100%;"></div>
-                        <div class="sfm-map-hint">
-                            <i class="fas fa-hand-pointer"></i> Click map or drag pin to set location
-                        </div>
-                    </div>
-
-                       <!-- Municipality -->
-                    <div class="sfm-field">
-                        <label class="sfm-label" for="spotMunicipality">
-                            Municipality <span class="sfm-required">*</span>
-                        </label>
-                        <select id="spotMunicipality" class="sfm-select" required>
-                            <option value="">— Select Municipality —</option>
-                            <?php foreach ($municipalities as $muni): ?>
-                                <option value="<?= $muni['id'] ?>"><?= htmlspecialchars($muni['name']) ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-
-                    <!-- Barangay + Lat + Lng inline row -->
-                    <div class="sfm-location-row">
-                        <div class="sfm-location-barangay">
-                            <label class="sfm-label" for="spotBarangay">Barangay</label>
-                            <select id="spotBarangay" class="sfm-select">
-                                <option value="">— Select Barangay —</option>
-                            </select>
-                        </div>
-                        <div class="sfm-location-coord">
-                            <label class="sfm-label" for="spotLatitude">
-                                <i class="fas fa-globe" style="color:#6B7280;margin-right:3px;"></i> Latitude
-                            </label>
-                            <input type="number" id="spotLatitude" class="sfm-input" step="any"
-                                   placeholder="e.g., 16.3278">
-                        </div>
-                        <div class="sfm-location-coord">
-                            <label class="sfm-label" for="spotLongitude">
-                                <i class="fas fa-map" style="color:#6B7280;margin-right:3px;"></i> Longitude
-                            </label>
-                            <input type="number" id="spotLongitude" class="sfm-input" step="any"
-                                   placeholder="e.g., 120.3663">
-                        </div>
-                    </div>
-                    
-                </div>
-
-                
-
-                <!-- Footer Actions -->
                 <div class="sfm-footer">
                     <button type="button" class="sfm-btn-cancel" data-action="close-form-modal">
                         <i class="fas fa-times"></i> Cancel
                     </button>
-                    <button type="submit" class="sfm-btn-save">
-                        <i class="fas fa-check-circle"></i> Save Spot
+                    <button type="submit" class="sfm-btn-save" id="saveSpotBtn">
+                        <i class="fas fa-check-circle" id="saveSpotIcon"></i>
+                        <i class="fas fa-circle-notch fa-spin" id="saveSpotSpinner" style="display:none;"></i>
+                        <span id="saveSpotLabel">Save Spot</span>
                     </button>
                 </div>
             </form>
@@ -485,78 +532,12 @@ ob_start();
     </div>
 </div>
 
-<!-- -- Cards Grid-->
+<!-- -- Cards Grid (populated by JS) -->
 <div class="cards-grid" id="cardsView">
-<?php 
-foreach ($spots as $spot):
-    $desc = substr($spot['description'] ?? '', 0, 100);
-    $status = htmlspecialchars($spot['classification_status'] ?? '');
-?>
-    <div class="spot-card" 
-         data-spot-id="<?= $spot['id']; ?>" 
-         data-municipality="<?= htmlspecialchars($spot['municipality_name']); ?>" 
-         data-category="<?= htmlspecialchars($spot['category']); ?>" 
-         data-status="<?= $status; ?>" 
-         data-name="<?= htmlspecialchars(strtolower($spot['name'])); ?>">
-        <div class="spot-image">
-            <?php if (!empty($spot['photo_url'])): ?>
-                <img src="<?= htmlspecialchars($spot['photo_url']); ?>"
-                     alt="<?= htmlspecialchars($spot['name']); ?>"
-                     style="width:100%;height:100%;object-fit:cover;display:block;"
-                     onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
-                <div class="spot-image-placeholder" style="display:none;">
-                    <i class="fas fa-image"></i><span>Image unavailable</span>
-                </div>
-            <?php else: ?>
-                <div class="spot-image-placeholder">
-                    <i class="fas fa-image"></i><span>No image yet</span>
-                </div>
-            <?php endif; ?>
-        </div>
-        <div class="card-actions-dropdown">
-            <button class="dropdown-toggle" id="card-dropdown-<?= $spot['id']; ?>">
-                <i class="fas fa-ellipsis-v"></i>
-            </button>
-            <div class="dropdown-menu" id="card-menu-<?= $spot['id']; ?>">
-                <button class="dropdown-item" data-action="view-spot" data-spot-id="<?= $spot['id']; ?>">
-                    <i class="fas fa-eye" style="color:#3B82F6;"></i> View All Fields
-                </button>
-                <button class="dropdown-item" data-action="edit-spot" data-spot-id="<?= $spot['id']; ?>">
-                    <i class="fas fa-edit" style="color:#F59E0B;"></i> Edit
-                </button>
-            </div>
-        </div>
-        <div class="spot-body">
-            <h3><?= htmlspecialchars($spot['name']); ?></h3>
-            <div class="muni"><i class="fas fa-map-marker-alt"></i> <?= htmlspecialchars($spot['municipality_name']); ?>, La Union</div>
-            <div class="tags">
-                <?php foreach (array_filter(array_map('trim', explode(',', $spot['category'] ?? 'Other'))) as $cat): ?>
-                    <span class="tag" style="background:#DBEAFE;color:#2563EB;"><?= htmlspecialchars($cat); ?></span>
-                <?php endforeach; ?>
-                <span class="tag" style="background:#F8FAFC;color:#4B5563;">&#x20B1;<?= number_format($spot['entrance_fee']); ?> per person</span>
-                <?php if ($spot['classification_status'] ?? null): ?>
-                    <span class="tag" style="background:<?php
-                        echo match($spot['classification_status']) {
-                            'EXIST' => '#10B981',
-                            'POTENTIAL' => '#F59E0B',
-                            'EMERGE' => '#8B5CF6',
-                            default => '#9CA3AF'
-                        };
-                    ?>;color:<?php
-                        echo match($spot['classification_status']) {
-                            'POTENTIAL' => '#1E293B',
-                            default => '#FFFFFF'
-                        };
-                    ?>;"><?php 
-                        $statusMap = ['EXIST' => 'EXISTING', 'EMERGE' => 'EMERGING', 'POTENTIAL' => 'POTENTIAL'];
-                        echo htmlspecialchars($statusMap[$spot['classification_status']] ?? $spot['classification_status']); 
-                    ?></span>
-                <?php endif; ?>
-            </div>
-            <p><?= htmlspecialchars($desc); ?><?= strlen($spot['description'] ?? '') > 100 ? '...' : ''; ?></p>
-        </div>
+    <div style="text-align:center;padding:40px;color:#9CA3AF;grid-column:1/-1;">
+        <i class="fas fa-spinner fa-spin" style="font-size:24px;"></i>
+        <p style="margin-top:12px;">Loading tourist spots...</p>
     </div>
-<?php endforeach; ?>
 </div>
 
 <!-- -- Table View -->
@@ -568,64 +549,15 @@ foreach ($spots as $spot):
                 <th>Spot Name</th>
                 <th>Municipality</th>
                 <th>Category</th>
-                <th>Status</th>
+                <th>Classification</th>
+                <th>Points</th>
+                <th>Approval Status</th>
                 <th>Entry Fee</th>
                 <th>Submitted On</th>
                 <th style="text-align:right;">Actions</th>
             </tr>
         </thead>
-        <tbody>
-        <?php foreach ($spots as $spot): ?>
-            <tr data-spot-id="<?= $spot['id']; ?>" 
-                data-municipality="<?= htmlspecialchars($spot['municipality_name']); ?>" 
-                data-category="<?= htmlspecialchars($spot['category']); ?>" 
-                data-status="<?= htmlspecialchars($spot['classification_status'] ?? ''); ?>" 
-                data-name="<?= htmlspecialchars(strtolower($spot['name'])); ?>">
-                <td style="font-family:'Courier New',monospace;color:#6B7280;">TS-<?= str_pad($spot['id'], 4, '0', STR_PAD_LEFT); ?></td>
-                <td><strong><?= htmlspecialchars($spot['name']); ?></strong></td>
-                <td><?= htmlspecialchars($spot['municipality_name']); ?></td>
-                <td><?php
-                    $cats = array_filter(array_map('trim', explode(',', $spot['category'] ?? 'Other')));
-                    echo implode(' ', array_map(fn($c) => '<span class="tag" style="background:#DBEAFE;color:#2563EB;font-size:11px;">' . htmlspecialchars($c) . '</span>', $cats));
-                ?></td>
-                <td><?php if ($spot['classification_status'] ?? null): ?>
-                    <span class="tag" style="background:<?php
-                        echo match($spot['classification_status']) {
-                            'EXIST' => '#10B981',
-                            'POTENTIAL' => '#F59E0B',
-                            'EMERGE' => '#8B5CF6',
-                            default => '#9CA3AF'
-                        };
-                    ?>;color:<?php
-                        echo match($spot['classification_status']) {
-                            'POTENTIAL' => '#1E293B',
-                            default => '#FFFFFF'
-                        };
-                    ?>;"><?php 
-                        $statusMap = ['EXIST' => 'EXISTING', 'EMERGE' => 'EMERGING', 'POTENTIAL' => 'POTENTIAL'];
-                        echo htmlspecialchars($statusMap[$spot['classification_status']] ?? $spot['classification_status']); 
-                    ?></span>
-                <?php endif; ?></td>
-                <td>&#x20B1;<?= number_format($spot['entrance_fee']); ?></td>
-                <td><?= date('M j, Y', strtotime($spot['created_at'])); ?></td>
-                <td style="text-align:right;">
-                    <div class="table-actions-dropdown">
-                        <button class="dropdown-toggle" id="tbl-dropdown-<?= $spot['id']; ?>">
-                            <i class="fas fa-ellipsis-v"></i>
-                        </button>
-                        <div class="dropdown-menu" id="tbl-menu-<?= $spot['id']; ?>">
-                            <button class="dropdown-item" data-action="view-spot" data-spot-id="<?= $spot['id']; ?>">
-                                <i class="fas fa-eye" style="color:#3B82F6;"></i> View All Fields
-                            </button>
-                            <button class="dropdown-item" data-action="edit-spot" data-spot-id="<?= $spot['id']; ?>">
-                                <i class="fas fa-edit" style="color:#F59E0B;"></i> Edit
-                            </button>
-                        </div>
-                    </div>
-                </td>
-            </tr>
-        <?php endforeach; ?>
-        </tbody>
+        <tbody></tbody>
     </table>
 </div>
 
@@ -645,7 +577,9 @@ foreach ($spots as $spot):
                     <i class="fas fa-times" style="margin-right: 6px;"></i> No
                 </button>
                 <button class="btn btn-primary" id="saveConfirmBtn" data-action="confirm-save-spot" style="flex: 1; justify-content: center;">
-                    <i class="fas fa-check" style="margin-right: 6px;"></i> Yes
+                    <i class="fas fa-check" id="confirmBtnIcon" style="margin-right: 6px;"></i>
+                    <i class="fas fa-circle-notch fa-spin" id="confirmBtnSpinner" style="display:none; margin-right:6px;"></i>
+                    <span id="confirmBtnLabel">Yes, Save</span>
                 </button>
             </div>
         </div>
@@ -653,28 +587,26 @@ foreach ($spots as $spot):
 </div>
 
 <!-- -- Scripts -->
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin="" defer></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js" defer></script>
 
 <script>
-    // Pass data from PHP to JavaScript — must be defined before map-view-api.js runs
-    window.touristSpotsData = <?= json_encode($spots) ?>;
-    window.municipalitiesData = <?= json_encode($municipalities) ?>;
+    window.touristSpotsData = [];
+    window.municipalitiesData = [];
+    window.TOURIST_SPOT_UPLOAD_URL = new URL('../../api/upload-spot-image.php', window.location.href).href;
+    window.userRole = 'lupto';
+    window.currentUserName = '<?= htmlspecialchars($_SESSION["user_name"] ?? "") ?>';
 </script>
+<script src="../../scripts/la-union-boundaries.js?v=<?= time() ?>"></script>
 <script src="../../scripts/functions/LUPTO/map-view-api.js?v=<?= time() ?>"></script>
 
 <script type="module">
 import { initializeAll } from '../../scripts/functions/LUPTO/tourist-spots-api.js?v=<?= time() ?>';
 
-// -- Data injected from PHP
-const spotsData = <?= json_encode($spots) ?>;
-const municipalData = <?= json_encode($municipalities) ?>;
-
-// -- Initialize Everything (Event Listeners for Add Spot, etc.)
-initializeAll(spotsData, municipalData);
+initializeAll();
 </script>
 
-<!-- Multi-category filter helpers (classic script) -->
+<!-- Multi-category filter helpers -->
 <script>
 function getSelectedCats() {
     return Array.from(document.querySelectorAll('.cat-filter-chk:checked')).map(c => c.value);
@@ -730,4 +662,3 @@ if (is_ajax_request()) {
     exit;
 }
 include '../../components/sections.php';
-?>

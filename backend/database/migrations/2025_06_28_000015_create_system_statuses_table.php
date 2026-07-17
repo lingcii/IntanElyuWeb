@@ -10,11 +10,10 @@ return new class extends Migration
     {
         Schema::create('system_statuses', function (Blueprint $table) {
             $table->id();
-            $table->string('key')->unique();
-            $table->text('value')->nullable();
-            $table->string('type')->default('string');
-            $table->string('description')->nullable();
-            $table->timestamps();
+            $table->string('service_name', 100);
+            $table->enum('status', ['online', 'warning', 'offline'])->default('online');
+            $table->string('uptime', 50)->default('99.9%');
+            $table->timestamp('last_checked')->useCurrent();
         });
     }
 

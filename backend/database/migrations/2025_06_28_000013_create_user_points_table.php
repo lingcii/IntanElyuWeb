@@ -11,11 +11,12 @@ return new class extends Migration
         Schema::create('user_points', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('user_id');
-            $table->integer('points');
-            $table->string('source');
-            $table->text('description')->nullable();
-            $table->timestamps();
-            
+            $table->integer('total_points')->default(0);
+            $table->integer('completed_activities')->default(0);
+            $table->timestamp('last_activity_date')->nullable();
+            $table->timestamp('points_since')->useCurrent()->comment('tie-breaking: earlier achiever wins');
+            $table->timestamp('updated_at')->useCurrent()->useCurrentOnUpdate();
+
             $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
         });
     }

@@ -13,7 +13,10 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        // CORS — allow the React dev server (port 5173) and same origin
+        // Trust all reverse proxies for Railway load balancer SSL termination (HTTPS)
+        $middleware->trustProxies(at: '*');
+
+        // CORS - allow the React dev server (port 5173) and same origin
         $middleware->api(prepend: [
             \Illuminate\Http\Middleware\HandleCors::class,
             \Illuminate\Session\Middleware\StartSession::class,
@@ -21,8 +24,9 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // Alias for role-based access
         $middleware->alias([
-            'role' => \App\Http\Middleware\RoleMiddleware::class,
+            'role'         => \App\Http\Middleware\RoleMiddleware::class,
             'auth.session' => \App\Http\Middleware\AuthenticateSession::class,
+            'tourist.auth' => \App\Http\Middleware\TouristAuthenticate::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

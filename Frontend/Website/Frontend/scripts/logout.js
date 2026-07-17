@@ -1,7 +1,7 @@
 /**
  * logout.js
- * Handles the logout flow: calls the Laravel API to invalidate the session,
- * then redirects to login.php to destroy the PHP session as well.
+ * Handles the logout flow: shows a confirmation modal first, then calls the Laravel API to invalidate the session,
+ * then redirects to logout.php to destroy the PHP session as well.
  */
 (function () {
     'use strict';
@@ -42,10 +42,56 @@
             window.location.href = getLoginUrl();
         }
     }
+    
+    // Show logout confirmation modal
+function showLogoutConfirmation() {
+    const modal = document.getElementById('logoutConfirmModal');
+    if (modal) {
+        modal.classList.add('active');
+    } else {
+        // Fallback to native confirm if modal not found
+        if (confirm('Are you sure you want to logout?')) {
+            doLogout();
+        }
+    }
+}
+    // Hide logout confirmation modal
+    function hideLogoutConfirmation() {
+        const modal = document.getElementById('logoutConfirmModal');
+        if (modal) {
+            modal.classList.remove('active');
+        }
+    }
+    
+    // Bind modal events
+    function bindModalEvents() {
+        const cancelBtn = document.getElementById('cancelLogoutBtn');
+        const confirmBtn = document.getElementById('confirmLogoutBtn');
+        const modal = document.getElementById('logoutConfirmModal');
+        
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', hideLogoutConfirmation);
+        }
+        
+        if (confirmBtn) {
+            confirmBtn.addEventListener('click', function() {
+                hideLogoutConfirmation();
+                doLogout();
+            });
+        }
+        
+        if (modal) {
+            modal.addEventListener('click', function(e) {
+                if (e.target.id === 'logoutConfirmModal') {
+                    hideLogoutConfirmation();
+                }
+            });
+        }
+    }
 
     /**
      * Attach the logout handler to every element that links to logout.php.
-     * This intercepts sidebar/header logout links so the API call fires first.
+     * This intercepts sidebar/header logout links to show confirmation first.
      */
     function bindLogoutLinks() {
         document.querySelectorAll('a[href*="logout.php"]').forEach(function (link) {
@@ -55,21 +101,32 @@
 
             link.addEventListener('click', function (e) {
                 e.preventDefault();
-                doLogout();
+                showLogoutConfirmation();
             });
         });
     }
 
+    // Initialize everything
+    function init() {
+        bindLogoutLinks();
+        bindModalEvents();
+    }
+
     // Bind immediately for links already in the DOM
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', bindLogoutLinks);
+        document.addEventListener('DOMContentLoaded', init);
     } else {
-        bindLogoutLinks();
+        init();
     }
 
     // Re-bind after SPA tab loads inject new DOM nodes
-    document.addEventListener('tabshow', bindLogoutLinks, true);
+    document.addEventListener('tabshow', function() {
+        bindLogoutLinks();
+        bindModalEvents();
+    }, true);
 
     // Expose globally so it can be called directly if needed
     window.doLogout = doLogout;
+    window.showLogoutConfirmation = showLogoutConfirmation;
+    window.hideLogoutConfirmation = hideLogoutConfirmation;
 })();

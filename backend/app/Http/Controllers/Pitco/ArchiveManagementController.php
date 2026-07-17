@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\FareGuide;
 use App\Models\FareMatrix;
 use Illuminate\Http\JsonResponse;
+use App\Services\CacheInvalidationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -95,6 +96,8 @@ class ArchiveManagementController extends Controller
             'status'          => 'draft',
         ]);
 
+        CacheInvalidationService::invalidateAll();
+
         return response()->json([
             'success'  => true,
             'guide_id' => $id,
@@ -112,6 +115,8 @@ class ArchiveManagementController extends Controller
             FareMatrix::where('fare_guide_id', $id)->delete();
             FareGuide::where('id', $id)->delete();
         });
+
+        CacheInvalidationService::invalidateAll();
 
         return response()->json(['success' => true, 'guide_id' => $id]);
     }

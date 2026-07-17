@@ -5,9 +5,6 @@
 #  Starts:
 #    Backend  : http://127.0.0.1:8000  (Laravel)
 #    Frontend : http://localhost:8080  (PHP built-in server)
-#
-#  React (optional, run separately):
-#    cd React; npm run dev   →  http://localhost:5173
 # ============================================================
 
 $root = Split-Path -Parent $MyInvocation.MyCommand.Definition
@@ -27,7 +24,4 @@ Write-Host ""
 Write-Host "  Backend  →  http://127.0.0.1:8000"
 Write-Host "  Frontend →  http://localhost:8080"
 Write-Host "  Login    →  http://localhost:8080/login.php"
-Write-Host ""
-Write-Host "  To also start React:"
-Write-Host "    cd React; npm run dev   →  http://localhost:5173" -ForegroundColor Yellow
 Write-Host ""

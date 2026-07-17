@@ -2,6 +2,7 @@
  * PICTO Transportation Fare Management — Redesigned API
  * Role: picto (full access)
  */
+(function() {
 'use strict';
 
 const FD_API = (window.API_CONFIG?.PITCO ?? 'http://localhost:8000/api/pitco') + '/fare-data';
@@ -39,6 +40,29 @@ document.addEventListener('DOMContentLoaded', () => {
     fd_refreshAll();
 });
 
+// ── SPA tab-show re-render ────────────────────────────────────────────────────
+// When the SPA router shows this tab again (without reloading), re-render cards
+// from the cached _allGuides so the grid is never empty. If data is stale, kick
+// off a background refresh too.
+document.addEventListener('tabshow', (e) => {
+    // Only react if the event came from our own tab wrapper or a child of it
+    const targetEl = e.target;
+    const isOurTab = targetEl.id === 'spa-tab-fare-data.php' ||
+                     targetEl.closest?.('#spa-tab-fare-data\\.php') !== null;
+    if (!isOurTab) return;
+
+    if (_allGuides.length > 0) {
+        // Data is already loaded — just re-render immediately
+        fd_filterGuides();
+        fd_updateActiveBadges(_allGuides);
+    }
+
+    // If data is stale (or empty), do a background force refresh
+    if (_allGuides.length === 0 || (Date.now() - _lastRefresh) > REFRESH_TTL) {
+        fd_refreshAll(true);
+    }
+});
+
 // ── Core fetch ────────────────────────────────────────────────────────────────
 async function fdFetch(action, params = {}) {
     const url = fdActionToUrl(action, params);
@@ -72,6 +96,7 @@ async function fd_refreshAll(force = false) {
 
     const icon = document.getElementById('refreshIcon');
     if (icon) icon.classList.add('fa-spin');
+    fd_renderStatsSkeletons();
     await Promise.all([fd_loadStats(), fd_loadGuides()]);
     _lastRefresh = Date.now();
     if (icon) icon.classList.remove('fa-spin');
@@ -81,9 +106,26 @@ async function fd_refreshAll(force = false) {
 async function fd_loadStats() {
     try {
         const d = await fdFetch('get_stats');
-        fd_setText('statGuides',  d.total_guides);
-        fd_setText('statActive',  d.active_guides);
-        fd_setText('statEntries', d.total_entries);
+        const animate = typeof window.animateKpiValue === 'function';
+
+        if (animate) {
+            window.animateKpiValue(document.getElementById('statGuides'), d.total_guides || 0);
+            window.animateKpiValue(document.getElementById('statActive'), d.active_guides || 0);
+            window.animateKpiValue(document.getElementById('statArchived'), d.archived_guides || 0);
+            window.animateKpiValue(document.getElementById('statMunicipalities'), d.municipalities_count || 0);
+            window.animateKpiValue(document.getElementById('statEntries'), d.total_routes || 0);
+            window.animateKpiValue(document.getElementById('statTypes'), d.transportation_types || 0);
+            window.animateKpiValue(document.getElementById('statLastUpdated'), d.last_updated_count || 0);
+        } else {
+            fd_setText('statGuides',  d.total_guides);
+            fd_setText('statActive',  d.active_guides);
+            fd_setText('statArchived', d.archived_guides);
+            fd_setText('statMunicipalities', d.municipalities_count);
+            fd_setText('statEntries', d.total_routes);
+            fd_setText('statTypes', d.transportation_types);
+            fd_setText('statLastUpdated', d.last_updated_count);
+        }
+
         fd_setText('statLowest',  d.lowest_fare  != null ? '₱' + Number(d.lowest_fare).toFixed(2)  : '—');
         fd_setText('statHighest', d.highest_fare != null ? '₱' + Number(d.highest_fare).toFixed(2) : '—');
         fd_setText('statAvg',     d.avg_fare     != null ? '₱' + Number(d.avg_fare).toFixed(2)     : '—');
@@ -95,7 +137,24 @@ async function fd_loadGuides() {
     fd_renderSkeletons();
     try {
         const d = await fdFetch('get_fare_guides');
-        _allGuides = d.fare_guides || [];
+        _allGuides = Array.isArray(d.fare_guides) ? d.fare_guides : [];
+
+        // Dynamically populate vehicle type filter options
+        const vehicleFilter = document.getElementById('fdVehicleFilter');
+        if (vehicleFilter) {
+            const activeVal = vehicleFilter.value;
+            const distinctTypes = [...new Set(_allGuides.map(g => g.vehicle_type).filter(Boolean))];
+            distinctTypes.sort();
+
+            let html = '<option value="">All Vehicle Types</option>';
+            distinctTypes.forEach(type => {
+                const label = type.replace(/_/g, ' ');
+                html += `<option value="${type}">${label}</option>`;
+            });
+            vehicleFilter.innerHTML = html;
+            vehicleFilter.value = activeVal;
+        }
+
         fd_updateActiveBadges(_allGuides);
         fd_filterGuides();
 
@@ -114,6 +173,7 @@ async function fd_loadGuides() {
 
 function fd_updateActiveBadges(guides) {
     const strip  = document.getElementById('fdBadgeStrip');
+    if (!Array.isArray(guides)) { if (strip) strip.style.display = 'none'; return; }
     const active = guides.find(g => g.status === 'active');
     if (active && strip) {
         strip.style.display = 'flex';
@@ -132,6 +192,7 @@ function fd_debouncedFilter() {
 }
 
 function fd_filterGuides() {
+    if (!Array.isArray(_allGuides)) return;
     const search  = (document.getElementById('fdSearchInput')?.value   || '').toLowerCase().trim();
     const vehicle = document.getElementById('fdVehicleFilter')?.value  || '';
     const status  = document.getElementById('fdStatusFilter')?.value   || '';
@@ -178,14 +239,16 @@ function fd_renderCards(guides) {
         return;
     }
 
-    grid.innerHTML = guides.map(g => fd_buildCard(g)).join('');
+    const previousIds = new Set(Array.from(grid.querySelectorAll('.fd-fare-card')).map(card => card.dataset.guideId));
+
+    grid.innerHTML = guides.map(g => fd_buildCard(g, previousIds)).join('');
 }
 
 // Store guides by id for safe lookup from event delegation
 const _guideMap    = {};
 const _matrixCache = {}; // guideId → fare_matrices array
 
-function fd_buildCard(g) {
+function fd_buildCard(g, previousIds = new Set()) {
     // Cache guide data by id so we can look it up safely on click
     _guideMap[g.id] = g;
 
@@ -217,18 +280,26 @@ function fd_buildCard(g) {
 
     // Use data-guide-id — never embed title in onclick to avoid XSS/HTML-break
     // Active/draft guides show Archive button; archived guides show Activate button
-    const actionBtn = g.status === 'archived'
-        ? `<button class="btn-gov fd-btn-activate"
-               onclick="event.stopPropagation(); fd_confirmSync(${g.id}, 'active')">
+    const actionItem = g.status === 'archived'
+        ? `<button class="fd-dropdown-item btn-activate" onclick="event.stopPropagation(); fd_confirmSync(${g.id}, 'active'); fd_closeAllDropdowns()">
                <i class="fas fa-check-circle"></i> Activate
            </button>`
-        : `<button class="btn-gov btn-gov-secondary fd-btn-archive"
-               onclick="event.stopPropagation(); fd_confirmSync(${g.id}, 'archived')">
+        : `<button class="fd-dropdown-item btn-archive" onclick="event.stopPropagation(); fd_confirmSync(${g.id}, 'archived'); fd_closeAllDropdowns()">
                <i class="fas fa-archive"></i> Archive
            </button>`;
 
+    const editItem = `<button class="fd-dropdown-item" onclick="event.stopPropagation(); fd_openEditModal(${g.id}); fd_closeAllDropdowns()">
+               <i class="fas fa-edit"></i> Edit
+           </button>`;
+    const deleteItem = `<button class="fd-dropdown-item btn-delete" onclick="event.stopPropagation(); fd_confirmDelete(${g.id}); fd_closeAllDropdowns()">
+               <i class="fas fa-trash"></i> Delete
+           </button>`;
+
+    const isNew = previousIds.size > 0 && !previousIds.has(String(g.id));
+    const animateClass = isNew ? ' new-card-animate' : '';
+
     return `
-    <div class="fd-fare-card" data-guide-id="${g.id}">
+    <div class="fd-fare-card${animateClass}" data-guide-id="${g.id}">
         <div class="fd-fare-card-stripe ${stripeClass}"></div>
         <div class="fd-fare-card-body">
             <div class="fd-card-vehicle-row">
@@ -248,8 +319,15 @@ function fd_buildCard(g) {
             <span class="fd-card-status ${statusClass}">
                 <i class="fas ${statusIcon}"></i> ${fd_escHtml(g.status)}
             </span>
-            <div>
-                ${actionBtn}
+            <div class="fd-dropdown-wrap">
+                <button class="fd-dropdown-trigger" onclick="event.stopPropagation(); fd_toggleDropdown(${g.id})" title="Actions">
+                    <i class="fas fa-ellipsis-v"></i>
+                </button>
+                <div class="fd-dropdown-menu" id="fd-dropdown-${g.id}">
+                    ${actionItem}
+                    ${editItem}
+                    ${deleteItem}
+                </div>
             </div>
         </div>
     </div>`;
@@ -283,7 +361,16 @@ async function fd_viewMatrix(guideId, title, shouldScroll = false) {
         return;
     }
 
-    if (tbody) tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;padding:32px;color:var(--text-muted);"><i class="fas fa-spinner fa-spin"></i> Loading…</td></tr>`;
+    if (tbody) {
+        tbody.innerHTML = Array(4).fill(`
+            <tr>
+                <td><div class="fd-skeleton" style="height:18px;width:70px;margin:2px 0;"></div></td>
+                <td><div class="fd-skeleton" style="height:18px;width:80px;margin:2px 0;"></div></td>
+                <td><div class="fd-skeleton" style="height:18px;width:80px;margin:2px 0;"></div></td>
+                <td><div class="fd-skeleton" style="height:18px;width:100px;margin:2px 0;"></div></td>
+            </tr>
+        `).join('');
+    }
 
     try {
         const data = await fdFetch('get_fare_matrices', { guide_id: guideId });
@@ -364,8 +451,8 @@ function fd_initUploadZone() {
 }
 
 async function fd_handleUpload(file) {
-    if (!file.name.toLowerCase().endsWith('.pdf') && file.type !== 'application/pdf') {
-        fd_toast('error', 'Please select a PDF file.'); return;
+    if (!file.name.toLowerCase().endsWith('.csv') && file.type !== 'text/csv') {
+        fd_toast('error', 'Please select a CSV file.'); return;
     }
     if (file.size > 20 * 1024 * 1024) {
         fd_toast('error', 'File exceeds 20 MB limit.'); return;
@@ -377,11 +464,17 @@ async function fd_handleUpload(file) {
 
     fd_setProgress(true, 'Uploading…', 30);
     const formData = new FormData();
-    formData.append('pdf_file', file);
+    formData.append('csv_file', file);
+
+
 
     try {
         const resp = await fetch(fdActionToUrl('upload_pdf'), { method: 'POST', body: formData, credentials: 'include' });
-        fd_setProgress(true, 'Processing PDF…', 70);
+        if (!resp.ok) {
+            const errText = await resp.text();
+            throw new Error(`Server error (HTTP ${resp.status}): ${errText.slice(0, 150)}`);
+        }
+        fd_setProgress(true, 'Processing CSV…', 70);
         const result = await resp.json();
         fd_setProgress(true, 'Saving data…', 90);
         await new Promise(r => setTimeout(r, 400));
@@ -401,8 +494,11 @@ async function fd_handleUpload(file) {
                 </div>
             </div>`;
             fd_showResult(html);
-            fd_toast('success', 'PDF uploaded and activated successfully.');
+            fd_toast('success', 'CSV uploaded and activated successfully.');
             fd_refreshAll(true);
+            if (typeof window.notifyFareDataChanged === 'function') {
+                window.notifyFareDataChanged();
+            }
             fd_switchTab('browse');
         } else {
             fd_showResult(`<div style="background:#fee2e2;border:1px solid #fca5a5;border-radius:10px;padding:16px;">
@@ -503,17 +599,23 @@ async function fd_showLogs(uploadId, type) {
                 </tr></thead>
                 <tbody>${items.map(e => `<tr style="border-bottom:1px solid var(--border);">
                     <td style="padding:8px 12px;">${e.row_number||'—'}</td>
-                    <td style="padding:8px 12px;">${fd_escHtml(e.field_name||'—')}</td>
-                    <td style="padding:8px 12px;color:#dc2626;">${fd_escHtml(e.error_message)}</td>
+                    <td style="padding:8px 12px;">${fd_escHtml(e.field_name||e.field||'—')}</td>
+                    <td style="padding:8px 12px;color:#dc2626;">${fd_escHtml(e.error_message||e.error)}</td>
                     <td style="padding:8px 12px;font-family:monospace;font-size:12px;">${fd_escHtml(e.invalid_value||'—')}</td>
                 </tr>`).join('')}</tbody></table>`;
         } else {
             const sev = { error:'#dc2626', warning:'#b45309', info:'#1d4ed8' };
-            body.innerHTML = items.map(l => `<div style="padding:10px 16px;border-bottom:1px solid var(--border);color:${sev[l.severity]||'#475569'};">
+            body.innerHTML = items.map(l => {
+                const msg = l.message || l.action || '';
+                const isErr = msg.toLowerCase().includes('error') || msg.toLowerCase().includes('failed');
+                const isWarn = msg.toLowerCase().includes('warning');
+                const color = isErr ? '#dc2626' : isWarn ? '#b45309' : sev[l.severity] || '#475569';
+                return `<div style="padding:10px 16px;border-bottom:1px solid var(--border);color:${color};">
                 <strong style="font-size:13px;">${fd_escHtml(l.action)}</strong>
                 <span style="font-size:11px;color:var(--text-muted);margin-left:8px;">${fd_fmtDate(l.created_at)}</span>
                 <div style="font-size:12px;color:var(--text-secondary);margin-top:3px;">${fd_escHtml(l.details)}</div>
-            </div>`).join('');
+            </div>`;
+            }).join('');
         }
     } catch (e) {
         if (body) body.innerHTML = `<div style="padding:24px;text-align:center;color:#dc2626;">${fd_escHtml(e.message)}</div>`;
@@ -593,6 +695,9 @@ async function fd_doSync(guideId, status) {
             : 'Fare guide archived. View it in Archive Management.');
         delete _matrixCache[guideId]; // invalidate cached matrix for this guide
         fd_refreshAll(true);
+        if (typeof window.notifyFareDataChanged === 'function') {
+            window.notifyFareDataChanged();
+        }
     } catch (e) {
         fd_toast('error', e.message);
     } finally {
@@ -650,6 +755,16 @@ function fd_toast(type, message) {
 }
 
 // ── Skeleton & empty helpers ──────────────────────────────────────────────────
+function fd_renderStatsSkeletons() {
+    const ids = ['statGuides', 'statActive', 'statArchived', 'statTypes', 'statLastUpdated', 'statLowest', 'statHighest', 'statAvg'];
+    ids.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.innerHTML = `<div class="fd-skeleton" style="height:26px;width:52px;display:inline-block;vertical-align:middle;"></div>`;
+        }
+    });
+}
+
 function fd_renderSkeletons() {
     const grid = document.getElementById('fdCardsGrid');
     if (!grid) return;
@@ -690,3 +805,239 @@ function fd_setText(id, val) {
     const el = document.getElementById(id);
     if (el) el.textContent = val ?? '—';
 }
+
+function fd_openAddModal() {
+    document.getElementById('aeGuideId').value = '';
+    document.getElementById('aeTitle').value = '';
+    document.getElementById('aeVehicleType').value = 'PUB_Aircon';
+    document.getElementById('aeRegion').value = 'La Union';
+    document.getElementById('aeEffectiveDate').value = new Date().toISOString().split('T')[0];
+    document.getElementById('aeRowsBody').innerHTML = '';
+    document.getElementById('fdAddEditTitle').innerHTML = '<i class="fas fa-plus"></i> Add Fare Matrix';
+    ae_addRow();
+    document.getElementById('fdAddEditModal').classList.add('fd-open');
+}
+
+async function fd_openEditModal(guideId) {
+    const g = _guideMap[guideId];
+    if (!g) return;
+
+    document.getElementById('aeGuideId').value = g.id;
+    document.getElementById('aeTitle').value = g.title;
+    document.getElementById('aeVehicleType').value = g.vehicle_type;
+    document.getElementById('aeRegion').value = g.region;
+    document.getElementById('aeEffectiveDate').value = g.effective_date ? g.effective_date.split('T')[0] : '';
+    document.getElementById('fdAddEditTitle').innerHTML = '<i class="fas fa-edit"></i> Edit Fare Matrix';
+
+    const tbody = document.getElementById('aeRowsBody');
+    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:12px;">Loading matrix...</td></tr>';
+    document.getElementById('fdAddEditModal').classList.add('fd-open');
+
+    try {
+        const url = fdActionToUrl('get_fare_matrices', { guide_id: g.id });
+        const resp = await fetch(url, { credentials: 'include' });
+        const data = await resp.json();
+        const rows = data.fare_matrices || [];
+        tbody.innerHTML = '';
+        if (rows.length === 0) {
+            ae_addRow();
+        } else {
+            rows.forEach(r => {
+                ae_addRow(r.distance_km, r.regular_fare, r.discounted_fare);
+            });
+        }
+    } catch (e) {
+        fd_toast('error', 'Failed to load matrices: ' + e.message);
+        tbody.innerHTML = '';
+        ae_addRow();
+    }
+}
+
+function fd_closeAddEdit() {
+    document.getElementById('fdAddEditModal').classList.remove('fd-open');
+}
+
+function ae_addRow(distance = '', regular = '', discounted = '') {
+    const tbody = document.getElementById('aeRowsBody');
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+        <td style="padding:4px;"><input type="number" step="0.1" required class="fd-input ae-dist" style="width:100%;padding:4px;border:1px solid var(--border);border-radius:4px;" value="${distance}" placeholder="e.g. 1.0"></td>
+        <td style="padding:4px;"><input type="number" step="0.01" required class="fd-input ae-regular" style="width:100%;padding:4px;border:1px solid var(--border);border-radius:4px;" value="${regular}" placeholder="e.g. 15.00"></td>
+        <td style="padding:4px;"><input type="number" step="0.01" class="fd-input ae-discount" style="width:100%;padding:4px;border:1px solid var(--border);border-radius:4px;" value="${discounted}" placeholder="e.g. 12.00"></td>
+        <td style="padding:4px;text-align:center;"><button type="button" class="btn-gov" style="padding:4px 8px;background:#ef4444;border-color:#ef4444;color:white;" onclick="this.closest('tr').remove()"><i class="fas fa-trash-alt"></i></button></td>
+    `;
+    tbody.appendChild(tr);
+}
+
+async function fd_saveManual(event) {
+    event.preventDefault();
+    const saveBtn = document.getElementById('aeSaveBtn');
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+
+    const guideId = document.getElementById('aeGuideId').value;
+    const title = document.getElementById('aeTitle').value;
+    const vehicleType = document.getElementById('aeVehicleType').value;
+    const region = document.getElementById('aeRegion').value;
+    const effectiveDate = document.getElementById('aeEffectiveDate').value;
+
+    const fares = Array.from(document.querySelectorAll('#aeRowsBody tr')).map(tr => {
+        const dist = tr.querySelector('.ae-dist').value;
+        const reg = tr.querySelector('.ae-regular').value;
+        const disc = tr.querySelector('.ae-discount').value;
+        return {
+            distance_km: parseFloat(dist),
+            regular_fare: parseFloat(reg),
+            discounted_fare: disc ? parseFloat(disc) : null
+        };
+    });
+
+    if (fares.length === 0) {
+        fd_toast('error', 'Please add at least one row to the fare matrix.');
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = 'Save';
+        return;
+    }
+
+    const payload = {
+        title,
+        vehicle_type: vehicleType,
+        region,
+        effective_date: effectiveDate,
+        fares
+    };
+
+    const isEdit = !!guideId;
+    const url = isEdit ? `${FD_API}/${guideId}` : `${FD_API}`;
+    const method = isEdit ? 'PUT' : 'POST';
+
+    try {
+        const resp = await fetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify(payload)
+        });
+        const result = await resp.json();
+        if (result.error) throw new Error(result.error);
+
+        fd_toast('success', isEdit ? 'Fare matrix updated successfully.' : 'Fare matrix created successfully.');
+        fd_closeAddEdit();
+        delete _matrixCache[guideId];
+        fd_refreshAll(true);
+        if (typeof window.notifyFareDataChanged === 'function') {
+            window.notifyFareDataChanged();
+        }
+    } catch (e) {
+        fd_toast('error', e.message);
+    } finally {
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = 'Save';
+    }
+}
+
+function fd_confirmDelete(guideId) {
+    const g = _guideMap[guideId];
+    if (!g) return;
+
+    const modal = document.getElementById('fdConfirmModal');
+    if (!modal) {
+        if (confirm(`Are you sure you want to permanently delete "${g.title}"?`)) {
+            fd_doDelete(guideId);
+        }
+        return;
+    }
+
+    document.getElementById('fdConfirmIcon').textContent = '🗑️';
+    document.getElementById('fdConfirmTitle').innerHTML = '<i class="fas fa-trash-alt" style="color:#ef4444;"></i> Delete Fare Matrix';
+    document.getElementById('fdConfirmText').innerHTML = `Are you sure you want to permanently delete <strong>"${fd_escHtml(g.title)}"</strong>?<br><span style="font-size:12px;color:#64748b;">This action cannot be undone and will delete all associated fare matrix rows.</span>`;
+
+    const okBtn = document.getElementById('fdConfirmOkBtn');
+    if (okBtn) {
+        okBtn.textContent = 'Yes, Delete';
+        okBtn.style.background = '#ef4444';
+        okBtn.style.borderColor = '#ef4444';
+        okBtn.style.color = '#fff';
+        okBtn.disabled = false;
+    }
+
+    _confirmCb = () => fd_doDelete(guideId);
+    modal.classList.add('fd-open');
+}
+
+async function fd_doDelete(guideId) {
+    const okBtn = document.getElementById('fdConfirmOkBtn');
+    if (okBtn) {
+        okBtn.disabled = true;
+        okBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Deleting...';
+    }
+    try {
+        const resp = await fetch(`${FD_API}/${guideId}`, {
+            method: 'DELETE',
+            credentials: 'include'
+        });
+        const result = await resp.json();
+        if (result.error) throw new Error(result.error);
+
+        fd_toast('success', 'Fare guide and matrix deleted successfully.');
+        delete _matrixCache[guideId];
+        fd_refreshAll(true);
+        if (typeof window.notifyFareDataChanged === 'function') {
+            window.notifyFareDataChanged();
+        }
+    } catch (e) {
+        fd_toast('error', e.message);
+    } finally {
+        fd_closeConfirm();
+    }
+}
+
+function fd_toggleDropdown(id) {
+    const activeMenu = document.getElementById(`fd-dropdown-${id}`);
+    if (!activeMenu) return;
+    const wasOpen = activeMenu.classList.contains('show');
+    fd_closeAllDropdowns();
+    if (!wasOpen) {
+        activeMenu.classList.add('show');
+    }
+}
+
+function fd_closeAllDropdowns() {
+    document.querySelectorAll('.fd-dropdown-menu.show').forEach(menu => {
+        menu.classList.remove('show');
+    });
+}
+
+document.addEventListener('click', () => {
+    fd_closeAllDropdowns();
+});
+
+// ── Global visibility ─────────────────────────────────────────────────────
+window.fd_refreshAll      = fd_refreshAll;
+window.fd_switchTab       = fd_switchTab;
+window.fd_debouncedFilter = fd_debouncedFilter;
+window.fd_filterGuides    = fd_filterGuides;
+window.fd_clearFilters    = fd_clearFilters;
+window.fd_exportMatrix    = fd_exportMatrix;
+window.fd_closeMatrix     = fd_closeMatrix;
+window.fd_confirmOk       = fd_confirmOk;
+window.fd_closeConfirm    = fd_closeConfirm;
+window.fd_closeLogs       = fd_closeLogs;
+window.fd_confirmSync     = fd_confirmSync;
+window.fd_showLogs        = fd_showLogs;
+window.fd_viewMatrix      = fd_viewMatrix;
+window.fd_loadHistory     = fd_loadHistory;
+window.fd_toast           = fd_toast;
+window.fd_openAddModal    = fd_openAddModal;
+window.fd_openEditModal   = fd_openEditModal;
+window.fd_closeAddEdit    = fd_closeAddEdit;
+window.ae_addRow          = ae_addRow;
+window.fd_saveManual      = fd_saveManual;
+window.fd_confirmDelete   = fd_confirmDelete;
+window.fd_toggleDropdown   = fd_toggleDropdown;
+window.fd_closeAllDropdowns = fd_closeAllDropdowns;
+window.softRefreshFareData = async function() {
+    await fd_refreshAll(true);
+};
+
+})();

@@ -2,9 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\ActivityAction;
 use App\Models\User;
+use App\Services\ActivityLogService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 
 class ProfileController extends Controller
@@ -34,6 +37,16 @@ class ProfileController extends Controller
         $request->session()->put('user_name',  $user->name);
         $request->session()->put('user_email', $user->email);
 
+        ActivityLogService::log(
+            ActivityAction::PROFILE_UPDATED,
+            'Settings',
+            'Profile updated for "' . $user->name . '"',
+            ['name' => $user->getOriginal('name'), 'email' => $user->getOriginal('email')],
+            ['name' => $request->name, 'email' => $request->email],
+            $request
+        );
+        Cache::forget('activity_stats');
+
         return response()->json(['success' => true, 'message' => 'Profile updated.']);
     }
 
@@ -52,6 +65,16 @@ class ProfileController extends Controller
         }
 
         $user->update(['password' => Hash::make($request->new_password)]);
+
+        ActivityLogService::log(
+            ActivityAction::PASSWORD_CHANGED,
+            'Settings',
+            'Password changed for "' . $user->name . '"',
+            null,
+            null,
+            $request
+        );
+        Cache::forget('activity_stats');
 
         return response()->json(['success' => true, 'message' => 'Password updated successfully.']);
     }

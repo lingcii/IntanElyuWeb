@@ -398,6 +398,9 @@ async function am_doRestore() {
         am_closeRestore();
         am_toast('success', d.message || 'Fare guide restored successfully.');
         am_refresh();
+        if (typeof window.notifyFareDataChanged === 'function') {
+            window.notifyFareDataChanged();
+        }
     } catch (e) {
         am_toast('error', e.message);
     } finally {
@@ -429,6 +432,9 @@ async function am_doDelete() {
         am_closeDelete();
         am_toast('success', 'Fare guide permanently deleted.');
         am_refresh();
+        if (typeof window.notifyFareDataChanged === 'function') {
+            window.notifyFareDataChanged();
+        }
     } catch (e) {
         am_toast('error', e.message);
     } finally {

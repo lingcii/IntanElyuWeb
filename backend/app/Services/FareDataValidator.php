@@ -116,6 +116,11 @@ class FareDataValidator
 
     private function addError(?int $rowNumber, string $fieldName, string $errorType, string $errorMessage, mixed $invalidValue = null): void
     {
+        $composedError = "{$errorType}: {$errorMessage}";
+        if ($invalidValue !== null) {
+            $composedError .= ' (value: ' . (is_scalar($invalidValue) ? $invalidValue : json_encode($invalidValue)) . ')';
+        }
+
         $this->errors[] = [
             'row_number'    => $rowNumber,
             'field_name'    => $fieldName,
@@ -128,10 +133,8 @@ class FareDataValidator
             ValidationError::create([
                 'fare_upload_id' => $this->uploadId,
                 'row_number'     => $rowNumber,
-                'field_name'     => $fieldName,
-                'error_type'     => $errorType,
-                'error_message'  => $errorMessage,
-                'invalid_value'  => $invalidValue,
+                'field'          => $fieldName,
+                'error'          => $composedError,
             ]);
         } catch (Exception) {}
     }

@@ -1,4 +1,4 @@
-// LUPTO Municipal Map View
+﻿// LUPTO Municipal Map View
 // Expects two globals to be defined by an inline <script> in the PHP page before this file loads:
 //   window.municipalityData -> the municipality row (object)
 //   window.touristSpotsData -> the raw spots array (with images) from the DB
@@ -16,7 +16,9 @@ document.addEventListener('DOMContentLoaded', function() {
         'POTENTIAL': 'POTENTIAL'
     };
 
-    const touristSpots = window.touristSpotsData.map(spot => {
+    let touristSpots = window.touristSpotsData
+        .filter(spot => spot.status === 'approved')
+        .map(spot => {
         let normalizedImages = [];
         if (spot.images && spot.images.length > 0) {
             normalizedImages = spot.images;
@@ -36,7 +38,7 @@ document.addEventListener('DOMContentLoaded', function() {
             image: 'municipality',
             images: normalizedImages,
             openingHours: spot.opening_time && spot.closing_time ? `${spot.opening_time.substring(0, 5)} - ${spot.closing_time.substring(0, 5)}` : 'Contact for details',
-            admissionFee: spot.entrance_fee > 0 ? '₱' + spot.entrance_fee : 'Free',
+            admissionFee: (() => { const ft = Array.isArray(spot.fee_types) ? spot.fee_types : []; if (!ft || ft.length === 0) return 'Free'; let p = []; if (ft.includes('entrance') && Number(spot.entrance_fee||0) > 0) p.push('₱'+spot.entrance_fee); if (ft.includes('environmental') && Number(spot.environmental_fee||0) > 0) p.push('EF:₱'+spot.environmental_fee); return p.length ? p.join(' | ') : 'Free'; })(),
             rating: spot.rating || 0,
             isMaintenance: spot.is_maintenance == 1,
             classification_status: statusMap[spot.classification_status] || spot.classification_status,
@@ -51,6 +53,46 @@ document.addEventListener('DOMContentLoaded', function() {
     let currentBaseLayer = 'street';
     let currentMapLayer = null;
     let satelliteLabelsLayer = null;
+
+    window.refreshMunicipalMap = function() {
+        void 0;
+        const rawSpots = Array.isArray(window.touristSpotsData) ? window.touristSpotsData : [];
+        touristSpots = rawSpots
+            .filter(spot => spot.status === 'approved')
+            .map(spot => {
+                let normalizedImages = [];
+                if (spot.images && spot.images.length > 0) {
+                    normalizedImages = spot.images;
+                } else if (spot.photo_url) {
+                    normalizedImages = [{ photo_url: spot.photo_url }];
+                }
+                return {
+                    id: spot.id,
+                    name: spot.name,
+                    municipality: spot.municipality_name,
+                    lat: spot.latitude || municipality.latitude,
+                    lng: spot.longitude || municipality.longitude,
+                    description: spot.description || 'No description available.',
+                    history: '',
+                    geography: '',
+                    category: spot.category,
+                    image: 'municipality',
+                    images: normalizedImages,
+                    openingHours: spot.opening_time && spot.closing_time ? `${spot.opening_time.substring(0, 5)} - ${spot.closing_time.substring(0, 5)}` : 'Contact for details',
+                    admissionFee: (() => { const ft = Array.isArray(spot.fee_types) ? spot.fee_types : []; if (!ft || ft.length === 0) return 'Free'; let p = []; if (ft.includes('entrance') && Number(spot.entrance_fee||0) > 0) p.push('₱'+spot.entrance_fee); if (ft.includes('environmental') && Number(spot.environmental_fee||0) > 0) p.push('EF:₱'+spot.environmental_fee); return p.length ? p.join(' | ') : 'Free'; })(),
+                    rating: spot.rating || 0,
+                    isMaintenance: spot.is_maintenance == 1,
+                    classification_status: statusMap[spot.classification_status] || spot.classification_status,
+                    amenities: [],
+                    reviews: []
+                };
+            });
+
+        if (map) {
+            addSpotMarkers();
+        }
+    };
+
     const fallbackLat = 16.3278;
     const fallbackLng = 120.3663;
     const muniLat = municipality.latitude || fallbackLat;
@@ -103,7 +145,7 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('lupto-map')._leaflet_map = map;
 
         // Initialize cluster group
-        markerCluster = L.markerClusterGroup();
+        markerCluster = L.featureGroup();
         map.addLayer(markerCluster);
 
         // Add spot markers
@@ -144,8 +186,8 @@ document.addEventListener('DOMContentLoaded', function() {
         } else if (upper === 'POTENTIAL') {
             bg = '#FFFBEB'; color = '#D97706'; status = 'POTENTIAL';
         }
-        return `<div style="display: inline-flex; align-items: center; gap: 4px; background: ${bg}; color: ${color}; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 600; text-transform: uppercase;">
-            <i class="fas fa-tag"></i> ${status}
+        return `<div style="display: inline-flex; align-items: center; gap: 3px; background: ${bg}; color: ${color}; padding: 1.5px 5px; border-radius: 4px; font-size: 9px; font-weight: 600; text-transform: uppercase;">
+            <i class="fas fa-tag" style="font-size: 8px;"></i> ${status}
         </div>`;
     }
 
@@ -156,6 +198,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         spotMarkers.forEach(marker => map.removeLayer(marker));
         spotMarkers = [];
+        activeSpotMarker = null;
 
         // Progressive rendering of spots in chunks
         let index = 0;
@@ -169,39 +212,40 @@ document.addEventListener('DOMContentLoaded', function() {
                     html: `<div class="spot-marker" style="background:${iconColor}; width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; color:white; font-weight:bold; border:3px solid white; box-shadow:0 2px 8px rgba(0,0,0,0.3);"><i class="fas fa-${getCategoryIcon(spot.category)}" style="font-size:16px;"></i></div>`,
                     className: 'spot-marker-icon',
                     iconSize: [32, 32],
-                    iconAnchor: [16, 32]
+                    iconAnchor: [16, 32],
+                    popupAnchor: [0, -32]
                 });
 
                 const marker = L.marker([spot.lat, spot.lng], { icon: icon, spotData: spot });
 
                 // Build rich popup content (lazy images)
                 const hasImage = spot.images && spot.images.length > 0;
-                const shortDesc = spot.description && spot.description.length > 80 
-                    ? spot.description.substring(0, 80) + '...' 
+                const shortDesc = spot.description && spot.description.length > 60 
+                    ? spot.description.substring(0, 60) + '...' 
                     : spot.description || 'No description available.';
                 const popupHtml = `
-                    <div class="map-popup-card" style="font-family: inherit; width: 220px; padding: 4px;">
-                        ${hasImage ? `<img data-src="${spot.images[0].photo_url}" class="popup-lazy-img" style="width:100%; height:110px; object-fit:cover; border-radius:6px; margin-bottom:8px; background:#F3F4F6;" alt="${spot.name}">` : ''}
-                        <h4 style="margin: 0 0 4px 0; font-size: 14px; font-weight: 700; color: #1E293B;">${spot.name}</h4>
-                        <div style="display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 8px;">
-                            <div style="display: inline-flex; align-items: center; gap: 4px; background: #EEF2FF; color: #2563EB; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 600; text-transform: uppercase;">
-                                <i class="fas fa-${getCategoryIcon(spot.category)}"></i> ${spot.category}
+                    <div class="map-popup-card" style="font-family: inherit; width: 180px; padding: 2px;">
+                        ${hasImage ? `<img data-src="${spot.images[0].photo_url}" class="popup-lazy-img" style="width:100%; height:80px; object-fit:cover; border-radius:6px; margin-bottom:6px; background:#F3F4F6;" alt="${spot.name}">` : ''}
+                        <h4 style="margin: 0 0 2px 0; font-size: 12.5px; font-weight: 700; color: #1E293B;">${spot.name}</h4>
+                        <div style="display: flex; gap: 3px; flex-wrap: wrap; margin-bottom: 6px;">
+                            <div style="display: inline-flex; align-items: center; gap: 3px; background: #EEF2FF; color: #2563EB; padding: 1.5px 5px; border-radius: 4px; font-size: 9px; font-weight: 600; text-transform: uppercase;">
+                                <i class="fas fa-${getCategoryIcon(spot.category)}" style="font-size: 8px;"></i> ${spot.category}
                             </div>
                             ${getClassificationBadge(spot.classification_status)}
                         </div>
-                        <p style="margin: 0 0 8px 0; font-size: 12px; color: #4B5563; line-height: 1.4;">${shortDesc}</p>
-                        <div style="font-size: 12px; color: #4B5563; margin-bottom: 8px; line-height: 1.4;">
+                        <p style="margin: 0 0 6px 0; font-size: 11px; color: #4B5563; line-height: 1.3;">${shortDesc}</p>
+                        <div style="font-size: 10.5px; color: #4B5563; margin-bottom: 6px; line-height: 1.3;">
                             <i class="fas fa-ticket-alt" style="margin-right: 4px; color: #6B7280;"></i> ${spot.admissionFee}<br>
                             <i class="fas fa-clock" style="margin-right: 4px; color: #6B7280;"></i> ${spot.openingHours}
                         </div>
-                        <button class="popup-detail-btn" onclick="window.viewSpotDetailsFromMap(${spot.id})" style="width: 100%; padding: 6px; background: #2563EB; color: white; border: none; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; transition: background 0.2s;">
+                        <button class="popup-detail-btn" onclick="window.viewSpotDetailsFromMap(${spot.id})" style="width: 100%; padding: 4px 6px; background: #2563EB; color: white; border: none; border-radius: 6px; font-size: 11px; font-weight: 600; cursor: pointer; transition: background 0.2s;">
                             <i class="fas fa-info-circle"></i> View Full Details
                         </button>
                     </div>
                 `;
 
                 marker.bindPopup(popupHtml, {
-                    maxWidth: 260,
+                    maxWidth: 200,
                     className: 'custom-map-popup'
                 });
 
@@ -250,7 +294,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     L.marker([userLocation.lat, userLocation.lng], { icon: userIcon }).addTo(map);
                 },
                 () => {
-                    console.log('Geolocation not available');
+                    void 0;
                 }
             );
         }
@@ -275,124 +319,50 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function getCategoryColor(categoryStr) {
+        if (window.MapMarkersConfig && typeof window.MapMarkersConfig.getCategoryColor === 'function') {
+            return window.MapMarkersConfig.getCategoryColor(categoryStr);
+        }
         if (!categoryStr) return '#6B7280';
         const categories = categoryStr.split(',').map(c => c.trim().toLowerCase());
-        
-        const blue = '#0EA5E9';
-        const cyan = '#06B6D4';
-        const green = '#22C55E';
-        const purple = '#8B5CF6';
-        const amber = '#F59E0B';
-        const pink = '#EC4899';
-        const gold = '#D97706';
-        
+        const blue = '#0EA5E9'; const cyan = '#06B6D4'; const green = '#22C55E';
+        const purple = '#8B5CF6'; const amber = '#F59E0B'; const pink = '#EC4899'; const gold = '#D97706';
         const mapping = {
-            'beach': blue,
-            'beaches': blue,
-            'island': blue,
-            'marine sanctuary': blue,
-            'hot spring': blue,
-            'cold spring': blue,
-            
-            'waterfall': cyan,
-            'waterfalls': cyan,
-            'river': cyan,
-            'lake': cyan,
-            
-            'forest': green,
-            'nature park': green,
-            'wildlife sanctuary': green,
-            'farm': green,
-            'eco-tourism': green,
-            'garden': green,
-            'park': green,
-            
-            'mountain': purple,
-            'mountains': purple,
-            'mountains & hiking': purple,
-            'cave': purple,
-            'volcano': purple,
-            'hiking': purple,
-            'camping': purple,
-            'viewpoint': purple,
-            'binoculars': purple,
-            
-            'historical': amber,
-            'cultural heritage': amber,
-            'museum': amber,
-            'monument': amber,
-            'landmark': amber,
-            
-            'religious': gold,
-            'church': gold,
-            
-            'adventure': pink,
-            'recreation': pink,
-            'food destination': pink,
-            'food & dining': pink,
-            'shopping': pink,
-            'festival venue': pink,
-            'resort': pink,
-            'resorts': pink
+            'beach': blue, 'beaches': blue, 'island': blue, 'marine sanctuary': blue, 'hot spring': blue, 'cold spring': blue,
+            'waterfall': cyan, 'waterfalls': cyan, 'river': cyan, 'lake': cyan,
+            'forest': green, 'nature park': green, 'wildlife sanctuary': green, 'farm': green,
+            'eco-tourism': green, 'garden': green, 'park': green,
+            'mountain': purple, 'mountains': purple, 'cave': purple, 'volcano': purple,
+            'hiking': purple, 'camping': purple, 'viewpoint': purple, 'binoculars': purple,
+            'historical': amber, 'cultural heritage': amber, 'museum': amber, 'monument': amber, 'landmark': amber,
+            'religious': gold, 'church': gold,
+            'adventure': pink, 'recreation': pink, 'food destination': pink,
+            'shopping': pink, 'festival venue': pink, 'resort': pink, 'resorts': pink
         };
-        
-        for (const cat of categories) {
-            if (mapping[cat]) {
-                return mapping[cat];
-            }
-        }
+        for (const cat of categories) { if (mapping[cat]) return mapping[cat]; }
         return '#6B7280';
     }
 
     function getCategoryIcon(categoryStr) {
+        if (window.MapMarkersConfig && typeof window.MapMarkersConfig.getCategoryIcon === 'function') {
+            return window.MapMarkersConfig.getCategoryIcon(categoryStr);
+        }
         if (!categoryStr) return 'map-marker-alt';
         const categories = categoryStr.split(',').map(c => c.trim().toLowerCase());
         const mapping = {
-            'beach': 'umbrella-beach',
-            'beaches': 'umbrella-beach',
-            'mountain': 'mountain',
-            'mountains': 'mountain',
-            'mountains & hiking': 'mountain',
-            'waterfall': 'water',
-            'waterfalls': 'water',
-            'river': 'water',
-            'lake': 'water',
-            'island': 'umbrella-beach',
-            'cave': 'mountain',
-            'volcano': 'mountain',
-            'forest': 'tree',
-            'nature park': 'tree',
-            'marine sanctuary': 'fish',
-            'wildlife sanctuary': 'paw',
-            'historical': 'landmark',
-            'cultural heritage': 'landmark',
-            'religious': 'church',
-            'museum': 'museum',
-            'monument': 'monument',
-            'landmark': 'landmark',
-            'viewpoint': 'binoculars',
-            'adventure': 'hiking',
-            'hiking': 'hiking',
-            'camping': 'campground',
-            'farm': 'seedling',
-            'eco-tourism': 'leaf',
-            'garden': 'seedling',
-            'park': 'tree',
-            'recreation': 'bicycle',
-            'hot spring': 'hot-tub-person',
-            'cold spring': 'snowflake',
-            'food destination': 'utensils',
-            'shopping': 'shopping-cart',
-            'festival venue': 'masks-theater',
-            'resort': 'hotel',
-            'resorts': 'hotel',
-            'other': 'star'
+            'beach': 'umbrella-beach', 'beaches': 'umbrella-beach',
+            'mountain': 'mountain', 'mountains': 'mountain',
+            'waterfall': 'water', 'waterfalls': 'water', 'river': 'water', 'lake': 'water',
+            'island': 'umbrella-beach', 'cave': 'mountain', 'volcano': 'mountain',
+            'forest': 'tree', 'nature park': 'tree', 'marine sanctuary': 'fish', 'wildlife sanctuary': 'paw',
+            'historical': 'landmark', 'cultural heritage': 'landmark', 'religious': 'church',
+            'museum': 'museum', 'monument': 'monument', 'landmark': 'landmark', 'viewpoint': 'binoculars',
+            'adventure': 'hiking', 'hiking': 'hiking', 'camping': 'campground', 'farm': 'seedling',
+            'eco-tourism': 'leaf', 'garden': 'seedling', 'park': 'tree', 'recreation': 'bicycle',
+            'hot spring': 'hot-tub-person', 'cold spring': 'snowflake',
+            'food destination': 'utensils', 'shopping': 'shopping-cart',
+            'festival venue': 'masks-theater', 'resort': 'hotel', 'resorts': 'hotel', 'other': 'star'
         };
-        for (const cat of categories) {
-            if (mapping[cat]) {
-                return mapping[cat];
-            }
-        }
+        for (const cat of categories) { if (mapping[cat]) return mapping[cat]; }
         return 'map-marker-alt';
     }
 

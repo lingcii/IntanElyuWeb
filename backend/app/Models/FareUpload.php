@@ -9,7 +9,7 @@ class FareUpload extends Model
     const UPDATED_AT = null;
 
     protected $fillable = [
-        'file_name', 'file_path', 'file_size', 'file_type',
+        'file_name', 'file_path', 'file_size', 'mime_type', 'file_type',
         'uploaded_by', 'status', 'total_records', 'valid_records',
         'invalid_records', 'fare_guide_id'
     ];

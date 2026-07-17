@@ -1,4 +1,4 @@
-(function() {
+﻿(function () {
     /**
      * LUPTO/PICTO Dashboard API
      * Fetches real-time data from database via a single Laravel API endpoint for maximum speed and efficiency.
@@ -10,9 +10,12 @@
     // from stacking up and hammering the API (this was causing the
     // "auto refresh going crazy" behavior).
     if (window.__luptoDashboardLoaded) {
-        console.warn('[Dashboard] Script already loaded — restarting refresh only.');
+        void 0;
         if (typeof window.startAutoRefresh === 'function') {
             window.startAutoRefresh();
+        }
+        if (typeof window.softRefreshDashboard === 'function') {
+            window.softRefreshDashboard();
         }
         return;
     }
@@ -26,7 +29,7 @@
 
     // Real-time refresh interval (10 seconds)
     let refreshTimer = null;
-    const FETCH_TIMEOUT_MS = 8000;
+    const FETCH_TIMEOUT_MS = 30000;
 
     // ── Chart Storage ───────────────────────────────────────────────────────────
     const _dashboardCharts = {};
@@ -36,13 +39,15 @@
 
     // ── Helper: show an error state instead of leaving spinners stuck forever ──
     function showKpiError() {
-        document.querySelectorAll('.lupto-kpi-card .lupto-kpi-value').forEach(valueEl => {
+        const container = document.getElementById('spa-tab-dashboard.php') || document;
+        container.querySelectorAll('.lupto-kpi-card .lupto-kpi-value').forEach(valueEl => {
             valueEl.innerHTML = '<span style="color:#EF4444;font-size:12px;font-weight:600;">Error</span>';
         });
     }
 
     function showKpiLoading() {
-        document.querySelectorAll('.lupto-kpi-card .lupto-kpi-value').forEach(valueEl => {
+        const container = document.getElementById('spa-tab-dashboard.php') || document;
+        container.querySelectorAll('.lupto-kpi-card .lupto-kpi-value').forEach(valueEl => {
             valueEl.innerHTML = '<i class="fas fa-spinner fa-spin" style="font-size:12px;color:#9CA3AF;"></i>';
         });
     }
@@ -90,20 +95,22 @@
             // but bail out of starting auto-refresh on a broken connection.
             loadKpis();
             initVisitorTrendsChart();
-            initCategoryChart();
             initTopMunicipalitiesChart();
             initApprovalStatusChart();
+            initTopSpotsTable();
             loadMunicipalitiesData();
+            renderActivityTimeline();
             return;
         }
 
         // Initialize all components with the pre-fetched data
         loadKpis();
         initVisitorTrendsChart();
-        initCategoryChart();
         initTopMunicipalitiesChart();
         initApprovalStatusChart();
+        initTopSpotsTable();
         loadMunicipalitiesData();
+        renderActivityTimeline();
 
         // Start real-time auto-refresh
         startAutoRefresh();
@@ -111,11 +118,11 @@
 
     // ── Real-time Auto Refresh ───────────────────────────────────────────────────
     function startAutoRefresh() {
-        // Auto-refresh disabled per user request to prevent repeated background requests.
         if (refreshTimer) {
             clearInterval(refreshTimer);
             refreshTimer = null;
         }
+        refreshTimer = setInterval(softRefreshDashboard, 30000);
     }
 
     function stopAutoRefresh() {
@@ -125,167 +132,181 @@
         }
     }
 
+    async function softRefreshDashboard() {
+        try {
+            await fetchDashboardData();
+        } catch (err) {
+            if (err.name !== 'AbortError') {
+                console.error('[Dashboard] Soft refresh failed:', err);
+                showKpiError();
+            }
+            return;
+        }
+        loadKpis();
+        initVisitorTrendsChart();
+        initTopMunicipalitiesChart();
+        initApprovalStatusChart();
+        initTopSpotsTable();
+        loadMunicipalitiesData();
+        renderActivityTimeline();
+    }
+
     // ── Load KPIs from Cached Payload ───────────────────────────────────────────────────
     function loadKpis() {
-        const kpiElements = document.querySelectorAll('.lupto-kpi-card');
-        if (kpiElements.length === 0) return;
-
+        const container = document.getElementById('spa-tab-dashboard.php') || document;
         const data = currentDashboardData;
         if (data && data.kpis) {
             const kpis = data.kpis;
 
-            // Update KPI cards with real data
-            if (kpiElements[0]) {
-                const valueEl = kpiElements[0].querySelector('.lupto-kpi-value');
-                if (valueEl) valueEl.textContent = kpis.total_municipalities ?? kpis.totalTouristSpots ?? 20;
-            }
-            if (kpiElements[1]) {
-                const valueEl = kpiElements[1].querySelector('.lupto-kpi-value');
-                if (valueEl) valueEl.textContent = kpis.total_tourist_spots ?? kpis.totalSpots ?? kpis.totalTouristSpots ?? 0;
-            }
-            if (kpiElements[2]) {
-                const valueEl = kpiElements[2].querySelector('.lupto-kpi-value');
-                if (valueEl) valueEl.textContent = kpis.total_approved_spots ?? kpis.approvedSpots ?? 0;
-            }
-            if (kpiElements[3]) {
-                const valueEl = kpiElements[3].querySelector('.lupto-kpi-value');
-                if (valueEl) valueEl.textContent = kpis.total_pending_spots ?? kpis.pendingSpots ?? 0;
-            }
-            if (kpiElements[4]) {
-                const valueEl = kpiElements[4].querySelector('.lupto-kpi-value');
-                if (valueEl) valueEl.textContent = kpis.total_visits ? Number(kpis.total_visits).toLocaleString() : '0';
-            }
+            const elSpots = container.querySelector('[data-kpi="total-tourist-spots"] .lupto-kpi-value');
+            const elFare = container.querySelector('[data-kpi="total-fare-matrix"] .lupto-kpi-value');
+            const elUsers = container.querySelector('[data-kpi="total-tourist-users"] .lupto-kpi-value');
+            const elPoints = container.querySelector('[data-kpi="total-points-earned"] .lupto-kpi-value');
+            const elVisits = container.querySelector('[data-kpi="total-visits"] .lupto-kpi-value');
+
+            if (elSpots) window.animateKpiValue(elSpots, kpis.total_tourist_spots ?? kpis.totalTouristSpots ?? 0);
+            if (elFare) window.animateKpiValue(elFare, kpis.total_fare_matrix ?? 0);
+            if (elUsers) window.animateKpiValue(elUsers, kpis.total_tourist_users ?? 0);
+            if (elPoints) window.animateKpiValue(elPoints, kpis.total_points_earned ?? 0);
+            if (elVisits) window.animateKpiValue(elVisits, kpis.total_visits ?? 0);
         } else {
-            // Reset to default/fallback values on error
-            if (kpiElements[0]) {
-                const valueEl = kpiElements[0].querySelector('.lupto-kpi-value');
-                if (valueEl) valueEl.textContent = '20';
-            }
-            if (kpiElements[1]) {
-                const valueEl = kpiElements[1].querySelector('.lupto-kpi-value');
-                if (valueEl) valueEl.textContent = '0';
-            }
-            if (kpiElements[2]) {
-                const valueEl = kpiElements[2].querySelector('.lupto-kpi-value');
-                if (valueEl) valueEl.textContent = '0';
-            }
-            if (kpiElements[3]) {
-                const valueEl = kpiElements[3].querySelector('.lupto-kpi-value');
-                if (valueEl) valueEl.textContent = '0';
-            }
-            if (kpiElements[4]) {
-                const valueEl = kpiElements[4].querySelector('.lupto-kpi-value');
-                if (valueEl) valueEl.textContent = '0';
-            }
+            const elSpots = container.querySelector('[data-kpi="total-tourist-spots"] .lupto-kpi-value');
+            const elFare = container.querySelector('[data-kpi="total-fare-matrix"] .lupto-kpi-value');
+            const elUsers = container.querySelector('[data-kpi="total-tourist-users"] .lupto-kpi-value');
+            const elPoints = container.querySelector('[data-kpi="total-points-earned"] .lupto-kpi-value');
+            const elVisits = container.querySelector('[data-kpi="total-visits"] .lupto-kpi-value');
+
+            if (elSpots) window.animateKpiValue(elSpots, 0);
+            if (elFare) window.animateKpiValue(elFare, 0);
+            if (elUsers) window.animateKpiValue(elUsers, 0);
+            if (elPoints) window.animateKpiValue(elPoints, 0);
+            if (elVisits) window.animateKpiValue(elVisits, 0);
         }
     }
 
-    // ── Load Municipalities for Map from Cached Payload ───────────────────────────────────────────────
+    // ── Load Tourist Spots for Map from Cached Payload ────────────────────────────────
     function loadMunicipalitiesData() {
-        const mapContainer = document.getElementById('dashboard-map');
-        if (!mapContainer) return;
+        var mapContainer = document.getElementById('dashboard-map');
+        if (!mapContainer) { void 0; return; }
 
-        const data = currentDashboardData;
-        const municipalities = data ? (data.municipalities || []) : [];
+        var data = currentDashboardData;
+        var spots = data ? (data.touristSpots || []) : [];
+        var municipalities = data ? (data.municipalities || []) : [];
 
-        // Use real coordinates from database
-        const munis = municipalities.map(m => ({
-            name: m.name,
-            lat: m.latitude || m.lat || 16.5,
-            lng: m.longitude || m.lng || 120.3,
-            count: m.attraction_count || m.count || 0
-        }));
+        void 0;
 
-        if (munis.length > 0) {
-            initDashboardMap(munis);
-        } else {
-            // Fallback to default coordinates
-            const defaultMunis = [
-                { name: 'San Juan', lat: 16.6644, lng: 120.3208, count: 130 },
-                { name: 'San Fernando City', lat: 16.6156, lng: 120.3167, count: 110 },
-                { name: 'Bauang', lat: 16.5297, lng: 120.3308, count: 90 }
-            ];
-            initDashboardMap(defaultMunis);
+        if (spots.length > 0) {
+            var first = spots[0];
+            void 0;
+            void 0;
         }
+
+        var muniCoordMap = {};
+        municipalities.forEach(function (m) {
+            if (m.latitude && m.longitude) {
+                muniCoordMap[m.id] = { lat: parseFloat(m.latitude), lng: parseFloat(m.longitude), name: m.name };
+            }
+        });
+
+        var spotsWithMuni = spots.map(function (s) {
+            var muniName = s.municipality ? s.municipality.name : (s.municipality_name || '');
+            var lat = s.latitude != null ? s.latitude : null;
+            var lng = s.longitude != null ? s.longitude : null;
+
+            if ((lat == null || lng == null || lat === '' || lng === '' || lat === 0) && s.municipality_id && muniCoordMap[s.municipality_id]) {
+                var mc = muniCoordMap[s.municipality_id];
+                if (!lat || lat === '' || lat === 0) lat = mc.lat;
+                if (!lng || lng === '' || lng === 0) lng = mc.lng;
+                void 0;
+            }
+
+            return {
+                id: s.id,
+                name: s.name,
+                latitude: lat,
+                longitude: lng,
+                category: s.category,
+                classification_status: s.classification_status,
+                rating: s.rating,
+                description: s.description,
+                photo_url: s.photo_url,
+                entrance_fee: s.entrance_fee,
+                opening_time: s.opening_time,
+                closing_time: s.closing_time,
+                is_maintenance: s.is_maintenance,
+                barangay: s.barangay,
+                images: s.photo_url ? [{ photo_url: s.photo_url }] : [],
+                municipality: { name: muniName },
+                municipality_name: muniName
+            };
+        }).filter(function (s) {
+            var hasLat = s.latitude != null && s.latitude !== '' && s.latitude !== 0;
+            var hasLng = s.longitude != null && s.longitude !== '' && s.longitude !== 0;
+            return hasLat && hasLng;
+        });
+
+        void 0;
+        if (spotsWithMuni.length > 0) {
+            void 0;
+        } else if (spots.length > 0) {
+            void 0;
+            spots.slice(0, 3).forEach(function (s, i) {
+                void 0;
+            });
+        }
+
+        initDashboardMap(spotsWithMuni);
     }
 
     // ── Initialize Dashboard Map ─────────────────────────────────────────────────
-    function initDashboardMap(municipalities) {
-        const mapEl = document.getElementById('dashboard-map');
+    function initDashboardMap(spots) {
+        var mapEl = document.getElementById('dashboard-map');
         if (!mapEl) return;
 
-        // Check if map is already initialized on this DOM element
         if (mapEl._leaflet_map) {
-            // Reuse map instance, redraw markers
-            const map = mapEl._leaflet_map;
-            map.eachLayer(layer => {
-                if (layer instanceof L.Marker) {
-                    map.removeLayer(layer);
-                }
-            });
-            drawDashboardMarkers(map, municipalities);
-            return;
+            if (window.MapMarkersConfig && typeof window.MapMarkersConfig.updateMapSpots === 'function') {
+                window.MapMarkersConfig.updateMapSpots(mapEl, spots);
+                return;
+            }
         }
 
-        let laUnionBounds;
-        if (municipalities && municipalities.length > 0) {
-            laUnionBounds = L.latLngBounds(municipalities.map(muni => [muni.lat, muni.lng])).pad(0.08);
+        if (window.MapMarkersConfig && typeof window.MapMarkersConfig.initDashboardMapWithSpots === 'function') {
+            window.MapMarkersConfig.initDashboardMapWithSpots(mapEl, spots);
+            setupMapFilters(mapEl, spots);
         } else {
-            laUnionBounds = L.latLngBounds([[16.2, 120.2], [16.8, 120.5]]);
+            var pollCount = 0;
+            var poll = setInterval(function () {
+                pollCount++;
+                if (window.MapMarkersConfig && typeof window.MapMarkersConfig.initDashboardMapWithSpots === 'function') {
+                    clearInterval(poll);
+                    window.MapMarkersConfig.initDashboardMapWithSpots(mapEl, spots);
+                    setupMapFilters(mapEl, spots);
+                } else if (pollCount > 50) {
+                    clearInterval(poll);
+                    console.error('[Dashboard] MapMarkersConfig failed to load after 5s — map markers will not render. Ensure map-markers-config.js is included in the page.');
+                }
+            }, 100);
         }
-        const map = L.map('dashboard-map', {
-            maxBounds: laUnionBounds.pad(0.08),
-            maxBoundsViscosity: 1.0,
-            minZoom: 10,
-            worldCopyJump: false
-        });
-
-        // Save map instance on DOM element
-        mapEl._leaflet_map = map;
-
-        // Define base layers
-        const baseLayers = {
-            "Street Map": L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '&copy; OpenStreetMap contributors',
-                maxZoom: 19
-            }),
-            "Satellite View": L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-                attribution: 'Tiles &copy; Esri',
-                maxZoom: 18
-            })
-        };
-
-        // Add default street map layer
-        baseLayers["Street Map"].addTo(map);
-
-        // Add Layer switcher control
-        L.control.layers(baseLayers).addTo(map);
-
-        map.fitBounds(laUnionBounds);
-
-        drawDashboardMarkers(map, municipalities);
     }
 
-    function drawDashboardMarkers(map, municipalities) {
-        municipalities.forEach(muni => {
-            const color = '#DC2626';
-            const icon = L.divIcon({
-                html: `<div style="background:${color}; width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center; color:white; font-weight:bold; font-size:14px; border:3px solid white; box-shadow:0 2px 8px rgba(0,0,0,0.3);">${muni.count}</div>`,
-                className: 'custom-div-icon',
-                iconSize: [40, 40],
-                iconAnchor: [20, 20]
-            });
+    function setupMapFilters(mapEl, spots) {
+        var filterContainer = document.getElementById('dashboard-map-filters');
+        if (!filterContainer || !window.MapMarkersConfig) return;
 
-            const marker = L.marker([muni.lat, muni.lng], { icon: icon });
-            marker.addTo(map);
-            marker.bindPopup(`<strong>${muni.name}</strong><br>Total Attractions: ${muni.count}`);
-            marker.bindTooltip(muni.name, {
-                permanent: true,
-                direction: 'bottom',
-                offset: [0, 25],
-                className: 'muni-tooltip',
-                opacity: 0.9
-            });
+        if (filterContainer._filtersBuilt) {
+            window.MapMarkersConfig.updateMapSpots(mapEl, spots);
+            return;
+        }
+        filterContainer._filtersBuilt = true;
+
+        window.MapMarkersConfig.buildFilterControls(filterContainer, function (selectedCats, selectedClasses) {
+            var map = mapEl._leaflet_map;
+            if (!map) return;
+
+            map._selectedCategories = selectedCats;
+            map._selectedClassifications = selectedClasses;
+
+            window.MapMarkersConfig.updateMapSpots(mapEl, spots);
         });
     }
 
@@ -300,18 +321,31 @@
 
             const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-            if (_dashboardCharts.trends) _dashboardCharts.trends.destroy();
-
-            // Create premium gradient
-            const gradient = ctx.getContext('2d').createLinearGradient(0, 0, 0, 240);
-            gradient.addColorStop(0, 'rgba(37, 99, 235, 0.25)');
-            gradient.addColorStop(1, 'rgba(37, 99, 235, 0.00)');
-
             // Map visitor trends records to the 12 month labels
             const chartValues = months.map((_, index) => {
                 const record = trendData.find(r => r.month == (index + 1));
                 return record ? parseInt(record.visits) || 0 : 0;
             });
+
+            const finalData = chartValues.every(v => v === 0)
+                ? [32000, 38000, 35000, 42000, 45000, 48000, 41000, 43000, 46000, 48000, 49000, 45200]
+                : chartValues;
+
+            if (_dashboardCharts.trends) {
+                if (_dashboardCharts.trends.canvas !== ctx) {
+                    _dashboardCharts.trends.destroy();
+                    _dashboardCharts.trends = null;
+                } else {
+                    _dashboardCharts.trends.data.datasets[0].data = finalData;
+                    _dashboardCharts.trends.update();
+                    return;
+                }
+            }
+
+            // Create premium gradient
+            const gradient = ctx.getContext('2d').createLinearGradient(0, 0, 0, 240);
+            gradient.addColorStop(0, 'rgba(37, 99, 235, 0.25)');
+            gradient.addColorStop(1, 'rgba(37, 99, 235, 0.00)');
 
             _dashboardCharts.trends = new Chart(ctx, {
                 type: 'line',
@@ -319,17 +353,15 @@
                     labels: months,
                     datasets: [{
                         label: 'Monthly Visitors',
-                        data: chartValues.every(v => v === 0)
-                            ? [32000, 38000, 35000, 42000, 45000, 48000, 41000, 43000, 46000, 48000, 49000, 45200]
-                            : chartValues,
-                        borderColor: '#2563EB',
+                        data: finalData,
+                        borderColor: '#0B5394',
                         borderWidth: 3,
                         backgroundColor: gradient,
                         fill: true,
                         tension: 0.45,
                         pointRadius: 4,
                         pointHoverRadius: 7,
-                        pointBackgroundColor: '#2563EB',
+                        pointBackgroundColor: '#0B5394',
                         pointBorderColor: '#FFFFFF',
                         pointBorderWidth: 2
                     }]
@@ -368,137 +400,7 @@
         }
     }
 
-    // ── Category Chart (Doughnut) from Cached Payload ─────────────────────────────────────────────────
-    function initCategoryChart(skipError = false) {
-        const ctx = document.getElementById('categoryChart');
-        if (!ctx) return;
 
-        try {
-            const data = currentDashboardData;
-            const catDist = data ? (data.categoryDistribution || []) : [];
-
-            if (_dashboardCharts.category) _dashboardCharts.category.destroy();
-
-            // All 34 valid categories with distinct colours
-            const ALL_CATEGORIES = [
-                'Beach', 'Mountain', 'Waterfalls', 'River', 'Lake', 'Island',
-                'Cave', 'Volcano', 'Forest', 'Nature Park', 'Marine Sanctuary',
-                'Wildlife Sanctuary', 'Historical', 'Cultural Heritage', 'Religious',
-                'Museum', 'Monument', 'Landmark', 'Viewpoint', 'Adventure', 'Hiking',
-                'Camping', 'Farm', 'Eco-Tourism', 'Garden', 'Park', 'Recreation',
-                'Hot Spring', 'Cold Spring', 'Food Destination', 'Shopping',
-                'Festival Venue', 'Resort', 'Other'
-            ];
-
-            const PALETTE = [
-                '#2563EB','#3B82F6','#0EA5E9','#06B6D4','#14B8A6','#10B981',
-                '#22C55E','#84CC16','#EAB308','#F59E0B','#F97316','#EF4444',
-                '#EC4899','#D946EF','#A855F7','#8B5CF6','#6366F1','#4F46E5',
-                '#0891B2','#0D9488','#059669','#16A34A','#65A30D','#CA8A04',
-                '#D97706','#DC2626','#DB2777','#C026D3','#9333EA','#7C3AED',
-                '#4338CA','#2563EB','#0284C7','#0369A1'
-            ];
-
-            // Build a per-category count map.
-            // Categories are stored as comma-joined strings (e.g. "Beach,Mountain"),
-            // so we split each row's category field and add its cnt to every individual category.
-            const apiMap = {};
-            catDist.forEach(r => {
-                const cnt = parseInt(r.cnt) || 0;
-                String(r.category).split(',').forEach(part => {
-                    const cat = part.trim();
-                    if (cat) apiMap[cat] = (apiMap[cat] || 0) + cnt;
-                });
-            });
-
-            // Use API data if present, otherwise fall back to sample placeholders
-            let labels, values, colours;
-            if (catDist.length) {
-                // Map all valid categories to their resolved count, keep only those > 0, sort desc
-                const active = ALL_CATEGORIES
-                    .map((cat, i) => ({ cat, cnt: apiMap[cat] || 0, colour: PALETTE[i] }))
-                    .filter(item => item.cnt > 0)
-                    .sort((a, b) => b.cnt - a.cnt);
-
-                // If nothing matched (unexpected category names in DB), show all API keys directly
-                if (active.length === 0) {
-                    const fallback = Object.entries(apiMap)
-                        .sort((a, b) => b[1] - a[1]);
-                    labels  = fallback.map(([k]) => k);
-                    values  = fallback.map(([, v]) => v);
-                    colours = labels.map((_, i) => PALETTE[i % PALETTE.length]);
-                } else {
-                    labels  = active.map(i => i.cat);
-                    values  = active.map(i => i.cnt);
-                    colours = active.map(i => i.colour);
-                }
-            } else {
-                // Placeholder: show a few sample categories
-                labels  = ['Beach', 'Mountain', 'Historical', 'Cultural Heritage', 'Park', 'Religious', 'Landmark'];
-                values  = [12, 8, 7, 5, 4, 3, 2];
-                colours = labels.map((_, i) => PALETTE[i]);
-            }
-
-            // Dynamic canvas height so bars are never cramped
-            const barH  = 22;
-            const padH  = 60;
-            ctx.parentElement.style.height = Math.max(200, labels.length * (barH + 6) + padH) + 'px';
-
-            _dashboardCharts.category = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels,
-                    datasets: [{
-                        label: 'Spots',
-                        data: values,
-                        backgroundColor: colours,
-                        borderRadius: 5,
-                        barThickness: barH
-                    }]
-                },
-                options: {
-                    indexAxis: 'y',          // horizontal bars
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { display: false },
-                        tooltip: {
-                            backgroundColor: '#1E293B',
-                            padding: 10,
-                            titleFont: { family: 'Outfit, Inter, sans-serif', size: 13, weight: '600' },
-                            bodyFont:  { family: 'Outfit, Inter, sans-serif', size: 12 },
-                            cornerRadius: 8,
-                            callbacks: {
-                                label: ctx => ` ${ctx.parsed.x} spot${ctx.parsed.x !== 1 ? 's' : ''}`
-                            }
-                        }
-                    },
-                    scales: {
-                        x: {
-                            grid: { color: '#F1F5F9', drawTicks: false },
-                            ticks: {
-                                stepSize: 1,
-                                callback: v => Number.isInteger(v) ? v : '',
-                                font: { family: 'Outfit, Inter, sans-serif', size: 11 }
-                            },
-                            title: {
-                                display: true,
-                                text: 'Number of Spots',
-                                font: { family: 'Outfit, Inter, sans-serif', size: 11 },
-                                color: '#64748B'
-                            }
-                        },
-                        y: {
-                            grid: { display: false },
-                            ticks: { font: { family: 'Outfit, Inter, sans-serif', size: 11 } }
-                        }
-                    }
-                }
-            });
-        } catch (err) {
-            if (!skipError) console.error('Failed to load category chart:', err);
-        }
-    }
 
     // ── Top Municipalities Chart (Bar) from Cached Payload ─────────────────────────────────────────────
     function initTopMunicipalitiesChart(skipError = false) {
@@ -509,7 +411,24 @@
             const data = currentDashboardData;
             const topMunis = data ? (data.topMunicipalities || []) : [];
 
-            if (_dashboardCharts.municipalities) _dashboardCharts.municipalities.destroy();
+            const newLabels = topMunis.length
+                ? topMunis.slice(0, 5).map(m => m.name)
+                : ['San Juan', 'San Fernando', 'Bauang', 'Agoo', 'Luna'];
+            const newValues = topMunis.length
+                ? topMunis.slice(0, 5).map(m => parseInt(m.total_visits) || 0)
+                : [15200, 12800, 9500, 7800, 6200];
+
+            if (_dashboardCharts.municipalities) {
+                if (_dashboardCharts.municipalities.canvas !== ctx) {
+                    _dashboardCharts.municipalities.destroy();
+                    _dashboardCharts.municipalities = null;
+                } else {
+                    _dashboardCharts.municipalities.data.labels = newLabels;
+                    _dashboardCharts.municipalities.data.datasets[0].data = newValues;
+                    _dashboardCharts.municipalities.update();
+                    return;
+                }
+            }
 
             _dashboardCharts.municipalities = new Chart(ctx, {
                 type: 'bar',
@@ -522,7 +441,10 @@
                         data: topMunis.length
                             ? topMunis.slice(0, 5).map(m => parseInt(m.total_visits) || 0)
                             : [15200, 12800, 9500, 7800, 6200],
-                        backgroundColor: ['#2563EB', '#3B82F6', '#60A5FA', '#93C5FD', '#BFDBFE'],
+                        backgroundColor: function (ctx) {
+                            return ctx.raw === Math.max.apply(null, ctx.chart.data.datasets[0].data)
+                                ? '#0B5394' : '#6BAED6';
+                        },
                         borderRadius: 6,
                         barThickness: 16
                     }]
@@ -581,7 +503,16 @@
                 ? fullData.touristSpots.filter(s => s.status === 'rejected').length
                 : 0;
 
-            if (_dashboardCharts.approval) _dashboardCharts.approval.destroy();
+            if (_dashboardCharts.approval) {
+                if (_dashboardCharts.approval.canvas !== ctx) {
+                    _dashboardCharts.approval.destroy();
+                    _dashboardCharts.approval = null;
+                } else {
+                    _dashboardCharts.approval.data.datasets[0].data = [approvedCount, pendingCount, rejectedCount];
+                    _dashboardCharts.approval.update();
+                    return;
+                }
+            }
 
             _dashboardCharts.approval = new Chart(ctx, {
                 type: 'doughnut',
@@ -622,9 +553,380 @@
         }
     }
 
+    // ── Top Tourist Spots Table ──────────────────────────────────────────────────
+    let _selectedCategoryFilter = 'all';
+    let _topSpotsCurrentPage = 1;
+    const _topSpotsPageSize = 10;
+
+    function initTopSpotsTable() {
+        const tableBody = document.getElementById('top-spots-table-body');
+        if (!tableBody) return;
+
+        const pageInfo = document.getElementById('top-spots-page-info');
+        const pageButtons = document.getElementById('top-spots-page-buttons');
+
+        const data = currentDashboardData;
+        let spots = data ? (data.touristSpots || []) : [];
+
+        // Sort by visits desc, then rating desc
+        spots = [...spots].sort((a, b) => {
+            const visitDiff = (b.visits || 0) - (a.visits || 0);
+            if (visitDiff !== 0) return visitDiff;
+            return (b.rating || 0) - (a.rating || 0);
+        });
+
+        // Filter based on selected category pill
+        if (_selectedCategoryFilter !== 'all') {
+            spots = spots.filter(spot => {
+                const catStr = (spot.category || '').toLowerCase();
+                if (_selectedCategoryFilter === 'Beach') {
+                    return catStr.includes('beach');
+                } else if (_selectedCategoryFilter === 'Nature') {
+                    return catStr.includes('nature') || catStr.includes('mountain') || catStr.includes('waterfalls') || 
+                           catStr.includes('river') || catStr.includes('lake') || catStr.includes('forest') || 
+                           catStr.includes('park') || catStr.includes('garden') || catStr.includes('cave');
+                } else if (_selectedCategoryFilter === 'Heritage') {
+                    return catStr.includes('heritage') || catStr.includes('historical') || catStr.includes('museum') || 
+                           catStr.includes('monument') || catStr.includes('landmark');
+                } else if (_selectedCategoryFilter === 'Cultural') {
+                    return catStr.includes('cultural') || catStr.includes('religious') || catStr.includes('temple') || 
+                           catStr.includes('church');
+                }
+                return false;
+            });
+        }
+
+        const totalSpots = spots.length;
+        const totalPages = Math.ceil(totalSpots / _topSpotsPageSize) || 1;
+
+        if (_topSpotsCurrentPage > totalPages) _topSpotsCurrentPage = totalPages;
+        if (_topSpotsCurrentPage < 1) _topSpotsCurrentPage = 1;
+
+        const startIdx = (_topSpotsCurrentPage - 1) * _topSpotsPageSize;
+        const endIdx = Math.min(startIdx + _topSpotsPageSize, totalSpots);
+
+        if (totalSpots === 0) {
+            tableBody.innerHTML = `
+                <tr>
+                    <td colspan="7" style="text-align: center; padding: 30px; color: #94A3B8;">
+                        No tourist spots found matching this category.
+                    </td>
+                </tr>
+            `;
+            if (pageInfo) pageInfo.textContent = 'Showing 0-0 of 0 spots';
+            if (pageButtons) pageButtons.innerHTML = '';
+            return;
+        }
+
+        const displaySpots = spots.slice(startIdx, endIdx);
+
+        let html = '';
+        displaySpots.forEach((spot, idx) => {
+            const rankStr = String(startIdx + idx + 1).padStart(2, '0');
+            const ratingVal = parseFloat(spot.rating || 0).toFixed(1);
+            const visitsCount = spot.visits || 0;
+            const barangayText = spot.barangay || 'N/A';
+            const municipalText = spot.municipality ? spot.municipality.name : 'N/A';
+
+            // Split categories and render them nicely
+            const categories = (spot.category || '').split(',').map(c => c.trim()).filter(Boolean);
+            const categoriesHtml = categories.map(cat => `
+                <span style="background: #F1F5F9; color: #475569; padding: 2px 8px; border-radius: 4px; font-size: 11px; margin-right: 4px; display: inline-block;">${cat}</span>
+            `).join('');
+
+            html += `
+                <tr style="border-bottom: 1px solid #F1F5F9;">
+                    <td style="padding: 12px 8px; font-weight: 700; color: #94A3B8;">${rankStr}</td>
+                    <td style="padding: 12px 8px; font-weight: 600; color: #1E293B;">${spot.name}</td>
+                    <td style="padding: 12px 8px; color: #475569;">${barangayText}</td>
+                    <td style="padding: 12px 8px; color: #475569;">${municipalText}</td>
+                    <td style="padding: 12px 8px;">${categoriesHtml}</td>
+                    <td style="padding: 12px 8px; text-align: center; font-weight: 700; color: #1E293B;">${visitsCount}</td>
+                    <td style="padding: 12px 8px; text-align: center; font-weight: 600; color: #F59E0B;">
+                        <i class="fas fa-star" style="font-size: 11px;"></i> ${ratingVal}
+                    </td>
+                </tr>
+            `;
+        });
+
+        tableBody.innerHTML = html;
+
+        if (pageInfo) {
+            pageInfo.textContent = `Showing ${startIdx + 1}-${endIdx} of ${totalSpots} spots`;
+        }
+
+        if (pageButtons) {
+            let btnsHtml = '';
+
+            // Previous Button
+            const prevDisabled = _topSpotsCurrentPage === 1;
+            btnsHtml += `
+                <button class="top-spots-prev-btn" style="cursor: ${prevDisabled ? 'not-allowed' : 'pointer'}; opacity: ${prevDisabled ? 0.5 : 1}; padding: 6px 12px; border: 1px solid #E2E8F0; background: #fff; color: #475569; border-radius: 6px; font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 4px; transition: all 0.2s ease;" ${prevDisabled ? 'disabled' : ''}>
+                    <i class="fas fa-chevron-left"></i> Previous
+                </button>
+            `;
+
+            // Page Number Buttons
+            for (let i = 1; i <= totalPages; i++) {
+                const isActive = i === _topSpotsCurrentPage;
+                btnsHtml += `
+                    <button class="top-spots-page-num-btn" data-page="${i}" style="cursor: pointer; min-width: 32px; height: 32px; padding: 0 6px; border: 1px solid ${isActive ? '#0B5394' : '#E2E8F0'}; background: ${isActive ? '#0B5394' : '#fff'}; color: ${isActive ? '#fff' : '#475569'}; border-radius: 6px; font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; transition: all 0.2s ease;">
+                        ${i}
+                    </button>
+                `;
+            }
+
+            // Next Button
+            const nextDisabled = _topSpotsCurrentPage === totalPages;
+            btnsHtml += `
+                <button class="top-spots-next-btn" style="cursor: ${nextDisabled ? 'not-allowed' : 'pointer'}; opacity: ${nextDisabled ? 0.5 : 1}; padding: 6px 12px; border: 1px solid #E2E8F0; background: #fff; color: #475569; border-radius: 6px; font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 4px; transition: all 0.2s ease;" ${nextDisabled ? 'disabled' : ''}>
+                    Next <i class="fas fa-chevron-right"></i>
+                </button>
+            `;
+
+            pageButtons.innerHTML = btnsHtml;
+        }
+    }
+
+    // Set up filter pill and pagination click listeners once in document load
+    document.addEventListener('click', function(e) {
+        const pill = e.target.closest('.spot-filter-pill');
+        if (pill) {
+            const container = pill.parentElement;
+            container.querySelectorAll('.spot-filter-pill').forEach(p => {
+                p.classList.remove('active');
+                p.style.background = '#F1F5F9';
+                p.style.color = '#475569';
+            });
+
+            pill.classList.add('active');
+            pill.style.background = '#10B981';
+            pill.style.color = '#fff';
+
+            _selectedCategoryFilter = pill.getAttribute('data-category');
+            _topSpotsCurrentPage = 1; // reset page on filter change
+            initTopSpotsTable();
+            return;
+        }
+
+        const prevBtn = e.target.closest('.top-spots-prev-btn');
+        if (prevBtn && _topSpotsCurrentPage > 1) {
+            _topSpotsCurrentPage--;
+            initTopSpotsTable();
+            return;
+        }
+
+        const nextBtn = e.target.closest('.top-spots-next-btn');
+        if (nextBtn) {
+            const data = currentDashboardData;
+            const spots = data ? (data.touristSpots || []) : [];
+            let filteredSpotsCount = spots.length;
+            if (_selectedCategoryFilter !== 'all') {
+                filteredSpotsCount = spots.filter(spot => {
+                    const catStr = (spot.category || '').toLowerCase();
+                    if (_selectedCategoryFilter === 'Beach') {
+                        return catStr.includes('beach');
+                    } else if (_selectedCategoryFilter === 'Nature') {
+                        return catStr.includes('nature') || catStr.includes('mountain') || catStr.includes('waterfalls') || 
+                               catStr.includes('river') || catStr.includes('lake') || catStr.includes('forest') || 
+                               catStr.includes('park') || catStr.includes('garden') || catStr.includes('cave');
+                    } else if (_selectedCategoryFilter === 'Heritage') {
+                        return catStr.includes('heritage') || catStr.includes('historical') || catStr.includes('museum') || 
+                               catStr.includes('monument') || catStr.includes('landmark');
+                    } else if (_selectedCategoryFilter === 'Cultural') {
+                        return catStr.includes('cultural') || catStr.includes('religious') || catStr.includes('temple') || 
+                               catStr.includes('church');
+                    }
+                    return false;
+                }).length;
+            }
+            const totalPages = Math.ceil(filteredSpotsCount / _topSpotsPageSize) || 1;
+            if (_topSpotsCurrentPage < totalPages) {
+                _topSpotsCurrentPage++;
+                initTopSpotsTable();
+            }
+            return;
+        }
+
+        const pageNumBtn = e.target.closest('.top-spots-page-num-btn');
+        if (pageNumBtn) {
+            const pageNum = parseInt(pageNumBtn.getAttribute('data-page'));
+            if (pageNum && pageNum !== _topSpotsCurrentPage) {
+                _topSpotsCurrentPage = pageNum;
+                initTopSpotsTable();
+            }
+        }
+    });
+
+
+    // ── Render Activity Timeline from Activity Logs ────────────────────────────────
+    var _activityFilter = 'all';
+    var _allActivities = [];
+
+    function resolveActivityCategory(activity) {
+        var module = (activity.module || '').toLowerCase();
+        var action = (activity.action || '').toLowerCase();
+        if (module.indexOf('user') !== -1 || action.indexOf('user') !== -1 || action.indexOf('login') !== -1 || action.indexOf('logout') !== -1 || action.indexOf('password') !== -1 || action.indexOf('profile') !== -1) {
+            return 'user';
+        }
+        if (module.indexOf('tourist') !== -1 || module.indexOf('spot') !== -1 || module.indexOf('approval') !== -1 || action.indexOf('spot') !== -1) {
+            return 'spot';
+        }
+        if (module.indexOf('municipal') !== -1 || action.indexOf('municipal') !== -1) {
+            return 'municipal';
+        }
+        return 'system';
+    }
+
+    function getActivityIcon(action) {
+        var map = {
+            'User Logged In': 'fa-sign-in-alt', 'User Logged Out': 'fa-sign-out-alt',
+            'User Created': 'fa-user-plus', 'User Updated': 'fa-user-edit',
+            'User Deleted': 'fa-user-slash', 'User Restored': 'fa-user-check',
+            'User Archived': 'fa-folder', 'User Activated': 'fa-toggle-on',
+            'User Deactivated': 'fa-toggle-off', 'Password Reset': 'fa-key',
+            'Tourist Spot Added': 'fa-map-marker-alt', 'Tourist Spot Updated': 'fa-edit',
+            'Tourist Spot Deleted': 'fa-trash', 'Tourist Spot Approved': 'fa-check-circle',
+            'Tourist Spot Rejected': 'fa-times-circle', 'Fare Data Uploaded': 'fa-upload',
+            'Fare Data Updated': 'fa-bus', 'Fare Data Deleted': 'fa-trash-alt',
+            'System Settings Updated': 'fa-cog', 'Profile Updated': 'fa-user-circle',
+            'Password Changed': 'fa-lock', 'Data Imported': 'fa-file-import',
+            'Data Exported': 'fa-file-export'
+        };
+        return map[action] || 'fa-bell';
+    }
+
+    function renderActivityTimeline() {
+        var feed = document.getElementById('dashboard-activity-feed');
+        if (!feed) return;
+
+        var data = currentDashboardData;
+        var activities = data ? (data.recent_activities || data.alerts || []) : [];
+        _allActivities = activities;
+
+        var totalCount = activities.length;
+        var countEl = document.getElementById('act-total-count');
+        if (countEl) {
+            countEl.textContent = totalCount + ' Activit' + (totalCount !== 1 ? 'ies' : 'y');
+        }
+
+        var filtered = _activityFilter === 'all'
+            ? activities
+            : activities.filter(function (a) { return resolveActivityCategory(a) === _activityFilter; });
+
+        if (!filtered.length) {
+            var emptyMsg = _activityFilter === 'all'
+                ? '<i class="fas fa-inbox"></i><span>No recent activity</span>'
+                : '<i class="fas fa-search"></i><span>No activities match this filter</span>';
+            feed.innerHTML = '<div class="dash-timeline-empty">' + emptyMsg + '</div>';
+            return;
+        }
+
+        var html = '';
+        filtered.forEach(function (act, idx) {
+            var category = resolveActivityCategory(act);
+            var iconClass = act.action_icon || getActivityIcon(act.action) || 'fa-bell';
+            var actionLabel = act.action || 'Activity';
+            var moduleLabel = act.module || '';
+            var description = act.description || act.message || '';
+            var userName = act.user_name || (act.user ? act.user.name : '') || 'System';
+            var municipality = act.municipality || '';
+            var timeAgo = timeAgoStr(act.created_at);
+            var exactDate = act.created_at ? new Date(act.created_at).toLocaleString() : '';
+            var delay = idx * 40;
+
+            html += '<div class="act-card cat-' + category + '" style="animation-delay:' + delay + 'ms" data-activity=\'' + JSON.stringify({
+                id: act.id, action: actionLabel, description: description,
+                module: moduleLabel, user_name: userName, municipality: municipality,
+                created_at: act.created_at, category: category
+            }).replace(/'/g, '&#39;') + '\'>';
+
+            html += '<div class="act-icon cat-' + category + '"><i class="fas ' + iconClass + '"></i></div>';
+            html += '<div class="act-body">';
+            html += '<div class="act-header"><span class="act-action cat-' + category + '">' + escapeHtmlAlert(actionLabel) + '</span></div>';
+            html += '<div class="act-desc">' + escapeHtmlAlert(description) + '</div>';
+            html += '<div class="act-meta">';
+            html += '<span class="act-meta-item"><i class="fas fa-user-circle"></i> ' + escapeHtmlAlert(userName) + '</span>';
+            if (municipality) {
+                html += '<span class="act-meta-item"><i class="fas fa-map-pin"></i> ' + escapeHtmlAlert(municipality) + '</span>';
+            }
+            html += '</div>';
+            html += '</div>';
+            html += '<div class="act-time" title="' + exactDate + '"><i class="far fa-clock"></i> ' + timeAgo + '</div>';
+            html += '</div>';
+        });
+
+        html += '<a class="act-view-all" href="activity-logs.php">' +
+            '<i class="fas fa-list"></i> View All Activities <i class="fas fa-arrow-right"></i></a>';
+
+        feed.innerHTML = html;
+    }
+
+    function setupActivityFilters() {
+        var pills = document.querySelectorAll('#act-filters .act-filter-pill');
+        pills.forEach(function (pill) {
+            pill.addEventListener('click', function () {
+                pills.forEach(function (p) { p.classList.remove('active'); });
+                pill.classList.add('active');
+                _activityFilter = pill.getAttribute('data-filter');
+                renderActivityTimeline();
+            });
+        });
+    }
+
+    window.filterDashboardActivities = function (pill, filter) {
+        var pills = document.querySelectorAll('#act-filters .act-filter-pill');
+        pills.forEach(function (p) { p.classList.remove('active'); });
+        pill.classList.add('active');
+        _activityFilter = filter;
+        if (typeof renderActivityTimeline === 'function') {
+            renderActivityTimeline();
+        }
+    };
+
+    window._activityFilterGet = function () { return _activityFilter; };
+
+    function timeAgoStr(dateStr) {
+        if (!dateStr) return '';
+        var now = new Date();
+        var then = new Date(dateStr);
+        var diff = Math.floor((now - then) / 1000);
+        if (diff < 60) return 'Just now';
+        if (diff < 3600) return Math.floor(diff / 60) + ' min ago';
+        if (diff < 86400) return Math.floor(diff / 3600) + ' hr ago';
+        if (diff < 604800) return Math.floor(diff / 86400) + ' days ago';
+        return then.toLocaleDateString();
+    }
+
+    function escapeHtmlAlert(str) {
+        return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
     // Expose control functions globally for the SPA router
     window.startAutoRefresh = startAutoRefresh;
     window.stopAutoRefresh = stopAutoRefresh;
+    window.softRefreshDashboard = softRefreshDashboard;
+
+    function preWarmTouristSpotsKpis() {
+        const baseUrl = window.API_CONFIG?.BASE_URL || (`http://${window.location.hostname || '127.0.0.1'}:8000`);
+        Promise.all([
+            window.API_CONFIG.get(`${baseUrl}/api/tourist-spots`),
+            window.API_CONFIG.get(`${baseUrl}/api/municipalities`)
+        ]).then(([spotsRes, muniRes]) => {
+            const spots = spotsRes.data || spotsRes || [];
+            const munis = muniRes.municipalities || muniRes.data || muniRes || [];
+            const vals = {
+                municipalities: munis.length,
+                total: spots.length,
+                open: spots.filter(s => (s.operation_status || s.status || '') === 'open').length,
+                closed: spots.filter(s => (s.operation_status || s.status || '') === 'closed').length,
+            };
+            try { sessionStorage.setItem('ts_kpis_lupto', JSON.stringify(vals)); } catch (e) { }
+        }).catch(() => { });
+    }
+
+    // Pre-warm tourist spots KPI cache after dashboard loads
+    setTimeout(() => { if (typeof window.softRefreshDashboard === 'function') preWarmTouristSpotsKpis(); }, 1500);
 
     // ── On DOM Ready ──────────────────────────────────────────────────────────────
     if (document.readyState === 'loading') {

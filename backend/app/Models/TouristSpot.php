@@ -3,10 +3,12 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use App\Models\User;
 
 class TouristSpot extends Model
 {
     protected $table = 'tourist_spots';
+    public $timestamps = false;
 
     protected $fillable = [
         'name',
@@ -14,6 +16,8 @@ class TouristSpot extends Model
         'barangay',
         'category',
         'entrance_fee',
+        'environmental_fee',
+        'fee_types',
         'description',
         'photo_url',
         'latitude',
@@ -23,17 +27,27 @@ class TouristSpot extends Model
         'is_maintenance',
         'status',
         'classification_status',
+        'rejection_reason',
         'visits',
         'rating',
+        'points',
+        'approved_by',
+        'approved_at',
+        'created_by',
+        'creator_role',
     ];
 
     protected $casts = [
-        'entrance_fee'   => 'float',
+        'entrance_fee'        => 'float',
+        'environmental_fee'   => 'float',
+        'fee_types'           => 'array',
         'latitude'       => 'float',
         'longitude'      => 'float',
         'is_maintenance' => 'boolean',
         'visits'         => 'integer',
         'rating'         => 'float',
+        'points'         => 'integer',
+        'approved_at'    => 'datetime',
     ];
 
     public static array $VALID_CATEGORIES = [
@@ -59,6 +73,16 @@ class TouristSpot extends Model
     public function municipality()
     {
         return $this->belongsTo(Municipality::class);
+    }
+
+    public function approver()
+    {
+        return $this->belongsTo(User::class, 'approved_by');
+    }
+
+    public function creator()
+    {
+        return $this->belongsTo(User::class, 'created_by');
     }
 
     public function images()

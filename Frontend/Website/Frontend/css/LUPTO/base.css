@@ -2,42 +2,57 @@
    LUPTO Base Styles - Shared across all pages
    ============================================================ */
 
-/* CSS Variables specific to LUPTO design standards */
+/* CSS Variables - La Union Tourism Design System */
 :root {
-    --lupto-primary: #185FA5;       /* Main Government Blue */
-    --lupto-secondary: #85B7EB;     /* Mid Blue */
-    --lupto-light: #B5D4F4;         /* Pale Blue Accent */
-    --lupto-dark: #0d3e6c;          /* Deep Blue */
-    
-    /* Mapping color gradients */
-    --pin-dark-blue: #185FA5;       /* 40+ attractions */
-    --pin-light-blue: #85B7EB;      /* 25-40 attractions */
-    --pin-pale-blue: #D0E3F7;       /* <25 attractions */
-    
-    /* Roles colors badges */
-    --role-pitco: #1e40af;          /* Blue */
-    --role-lupto: #15803d;          /* Green */
-    --role-mto: #c2410c;            /* Orange */
-    --role-tourist: #6b21a8;        /* Purple */
+    --dash-ocean: #0B5394;
+    --dash-ocean-dark: #073B6B;
+    --dash-ocean-light: #E8F0FE;
+    --dash-sand: #D9A441;
+    --dash-sand-light: #FFF8EB;
+    --dash-success: #059669;
+    --dash-success-bg: #ECFDF5;
+    --dash-danger: #DC2626;
+    --dash-danger-bg: #FEF2F2;
+    --dash-warning: #D97706;
+    --dash-warning-bg: #FFFBEB;
+    --dash-info: #2563EB;
+    --dash-info-bg: #EFF6FF;
+    --dash-card-radius: 12px;
+    --dash-card-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.03);
+    --dash-card-hover: 0 4px 12px rgba(0,0,0,0.06);
+    --dash-gap: 20px;
+    --dash-font-display: 'Outfit', 'Inter', system-ui, sans-serif;
+    --dash-font-body: 'Inter', system-ui, -apple-system, sans-serif;
 
-    /* Generic semantic statuses */
+    --lupto-primary: #0B5394;
+    --lupto-secondary: #6BAED6;
+    --lupto-light: #B5D4F4;
+    --lupto-dark: #073B6B;
+
+    --pin-dark-blue: #0B5394;
+    --pin-light-blue: #6BAED6;
+    --pin-pale-blue: #E8F0FE;
+
+    --role-accent: #0B5394;
+    --role-pitco: #1e40af;
+    --role-lupto: #0B5394;
+    --role-mto: #c2410c;
+    --role-tourist: #6b21a8;
+
     --status-active: #22c55e;
     --status-pending: #f59e0b;
     --status-inactive: #ef4444;
-    
-    /* Text colors */
+
     --text-primary: #1e293b;
     --text-secondary: #475569;
     --text-muted: #94a3b8;
-    
-    /* Borders */
+
     --border: #e2e8f0;
-    
-    /* Shadows */
+
     --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
     --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
     --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-    
+
     --transition-smooth: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 

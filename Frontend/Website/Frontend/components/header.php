@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 // Start session only if not already started
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -108,20 +108,38 @@ $headerConfig = [
 // Get current user's role from session (with validation)
 $userRole = isset($_SESSION['user_role']) ? $_SESSION['user_role'] : null;
 
-// Determine header text (with fallback for unrecognized roles)
-if ($userRole && isset($headerConfig[$userRole])) {
+// Resolve municipality name for municipal/MTO roles
+$resolvedMunicipalityName = null;
+$isMunicipalRole = ($userRole === 'municipal' || (is_string($userRole) && str_ends_with($userRole, '_mto')));
+if ($isMunicipalRole) {
+    $resolvedMunicipalityName = $_SESSION['user_municipality_name'] ?? null;
+}
+
+// Determine header text dynamically
+if ($isMunicipalRole && $resolvedMunicipalityName) {
+    $headerText = [
+        'title'    => $resolvedMunicipalityName . ' MTO',
+        'subtitle' => strtoupper($resolvedMunicipalityName) . ' MUNICIPAL TOURISM OFFICE',
+    ];
+} elseif ($userRole && isset($headerConfig[$userRole])) {
     $headerText = $headerConfig[$userRole];
 } else {
-    // Fallback for unrecognized roles or no role
     $headerText = [
-        'title' => 'Dashboard',
-        'subtitle' => 'Tourism Monitoring System'
+        'title'    => 'Dashboard',
+        'subtitle' => 'Tourism Monitoring System',
     ];
 }
 
 // Logged-in user name (from session)
 $userName = isset($_SESSION['user_name']) ? $_SESSION['user_name'] : 'User';
 $userRole = isset($_SESSION['user_role']) ? $_SESSION['user_role'] : null;
+
+$roleAccent = match (true) {
+    $userRole === 'picto' => '#1E3A8A',
+    $userRole === 'lupto' => '#0B5394',
+    str_ends_with($userRole, '_mto') || $userRole === 'municipal' => '#D97706',
+    default => '#6B7280',
+};
 
 // Notification type → icon/color map
 $notifMeta = [
@@ -147,7 +165,7 @@ function timeAgo($datetime) {
         </button>
         <div class="header-brand">
             <h1 class="brand-title"><?= htmlspecialchars($headerText['subtitle']) ?></h1>
-            <span class="brand-subtitle">Tourism Monitoring System</span>
+            <span class="brand-subtitle">Tourism Monitoring System <span class="header-role-badge" style="background: <?= $roleAccent ?>"><?= htmlspecialchars($headerText['title']) ?></span></span>
         </div>
     </div>
 
@@ -158,12 +176,6 @@ function timeAgo($datetime) {
             <input type="date" class="ctrl-date" id="reportDate" value="<?= date('Y-m-d') ?>">
         </div>
 
-        <div class="notif-control" style="margin-right: 4px;">
-            <button class="notif-btn" id="spaRefreshBtn" title="Refresh Active Tab" aria-label="Refresh">
-                <i class="fas fa-sync-alt" id="spaRefreshIcon"></i>
-            </button>
-        </div>
-
         <div class="notif-control">
             <button class="notif-btn" id="notifBtn" aria-label="Notifications">
                 <i class="fas fa-bell"></i>
@@ -171,17 +183,18 @@ function timeAgo($datetime) {
             </button>
             <div class="notif-dropdown" id="notifDropdown">
                 <div class="notif-header">
-                    <span>Notifications</span>
-                    <span class="notif-count" id="notifCount">0 new</span>
-                </div>
-                <div id="notifItems">
-                    <div class="notif-item">
-                        <i class="fas fa-spinner fa-spin" style="color:var(--text-muted)"></i>
-                        <div><p class="notif-text">Loading notifications…</p></div>
+                    <div class="notif-header-left">
+                        <i class="fas fa-bell"></i> Notifications
+                    </div>
+                    <div class="notif-header-actions">
+                        <button class="mark-all-read" onclick="window.markAllRead()" title="Mark all as read">Mark all read</button>
+                        <button class="clear-all" onclick="if(confirm('Clear all notifications?'))window.clearAllNotifs()" title="Clear all">Clear</button>
                     </div>
                 </div>
-                <div class="notif-footer">
-                    <a href="#">View all notifications</a>
+                <div class="notif-scroll" id="notifItems">
+                    <div class="notif-item">
+                        <i class="fas fa-spinner fa-spin" style="color:#94A3B8; margin: 12px auto; font-size: 16px;"></i>
+                    </div>
                 </div>
             </div>
         </div>
@@ -208,68 +221,217 @@ function timeAgo($datetime) {
     </div>
 </header>
 
+<!-- Logout Confirmation Modal Styles (inline for global availability) -->
+<style>
+#logoutConfirmModal {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 10002;
+  overflow-y: auto;
+  padding: 24px;
+  backdrop-filter: blur(2px);
+}
+#logoutConfirmModal.active {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn 0.2s ease;
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+#logoutConfirmModal .modal-content {
+  background: white;
+  border-radius: 16px;
+  width: 90%;
+  max-width: 420px;
+  max-height: 90vh;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+}
+#logoutConfirmModal .btn {
+  padding: 12px 20px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  border: 2px solid #E5E7EB;
+  background: white;
+  color: #4B5563;
+}
+#logoutConfirmModal .btn:hover {
+  background: #F9FAFB;
+}
+#logoutConfirmModal .btn.btn-outline {
+  border: 2px solid #E5E7EB;
+}
+#logoutConfirmModal .btn.btn-danger {
+  border: none;
+  color: white;
+}
+</style>
+
+<!-- Logout Confirmation Modal -->
+<div class="modal" id="logoutConfirmModal">
+    <div class="modal-content" style="max-width: 420px; border-radius: 16px; overflow: hidden;">
+        <div style="background: #FEE2E2; padding: 28px 28px 16px 28px; text-align: center;">
+            <div style="width: 56px; height: 56px; background: #DC2626; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 12px;">
+                <i class="fas fa-right-from-bracket" style="color: white; font-size: 22px;"></i>
+            </div>
+            <h3 style="margin: 0; font-size: 18px; font-weight: 700; color: #991B1B;">Logout</h3>
+        </div>
+        <div style="padding: 20px 28px 28px 28px;">
+            <p style="text-align: center; color: #4B5563; margin: 0 0 24px 0; font-size: 14px;">Are you sure you want to logout?</p>
+            <div style="display: flex; gap: 12px;">
+                <button class="btn btn-outline" id="cancelLogoutBtn" style="flex: 1; justify-content: center;">
+                    <i class="fas fa-times" style="margin-right: 6px;"></i> No
+                </button>
+                <button class="btn btn-danger" id="confirmLogoutBtn" style="flex: 1; justify-content: center; background: #DC2626; border-color: #DC2626;">
+                    <i class="fas fa-check" style="margin-right: 6px;"></i> Yes
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
-// Load notifications from Laravel API after page load
-(function loadNotifications() {
-    const role = '<?= htmlspecialchars($userRole ?? '') ?>';
-    const prefixMap = { picto: 'pitco', lupto: 'lupto' };
-    // Notifications are part of the dashboard response; use a quick /api/auth/check call
-    // to confirm session, then fetch alerts from the dashboard endpoint.
-    const prefix = prefixMap[role] || (role.endsWith('_mto') || role === 'municipal' ? 'municipal' : null);
+(function () {
+    var role = document.querySelector('meta[name="user-role"]') ? '' : '<?= htmlspecialchars($userRole ?? "") ?>';
+    var prefixMap = { picto: 'pitco', lupto: 'lupto' };
+    var prefix = prefixMap[role] || (role.endsWith && role.endsWith('_mto') || role === 'municipal' ? 'municipal' : null);
+    if (!prefix) return;
+    var baseUrl = window.API_CONFIG ? window.API_CONFIG.BASE_URL : 'http://localhost:8000';
+    var API = baseUrl + '/api/' + prefix + '/notifications';
+    var unreadCount = 0, lastNotifId = 0, badgePrev = 0;
+    var notifItemsEl = document.getElementById('notifItems');
+    var notifBadge = document.getElementById('notifBadge');
+    var notifCountEl = document.getElementById('notifCount');
+    if (!notifItemsEl) return;
 
-    const notifItemsEl  = document.getElementById('notifItems');
-    const notifBadgeEl  = document.getElementById('notifBadge');
-    const notifCountEl  = document.getElementById('notifCount');
 
-    if (!prefix || !notifItemsEl) return;
-
-    const baseUrl = window.API_CONFIG ? window.API_CONFIG.BASE_URL : 'http://localhost:8000';
-    fetch(`${baseUrl}/api/${prefix}/dashboard`, { credentials: 'include' })
-        .then(r => r.ok ? r.json() : Promise.reject(r.status))
-        .then(data => {
-            const alerts = (data.alerts || []).slice(0, 5);
-            const count  = alerts.length;
-
-            if (notifBadgeEl) {
-                notifBadgeEl.textContent = count;
-                notifBadgeEl.style.display = count > 0 ? '' : 'none';
-            }
-            if (notifCountEl) notifCountEl.textContent = count + ' new';
-
-            if (!notifItemsEl) return;
-            if (count === 0) {
-                notifItemsEl.innerHTML = `
-                    <div class="notif-item">
-                        <i class="fas fa-check-circle" style="color:var(--success)"></i>
-                        <div><p class="notif-text">No unread notifications.</p>
-                        <span class="notif-time">All clear</span></div>
-                    </div>`;
-                return;
-            }
-
-            function timeAgoJS(dateStr) {
-                const diff = Math.floor((Date.now() - new Date(dateStr)) / 1000);
-                if (diff < 60)     return 'Just now';
-                if (diff < 3600)   return Math.floor(diff / 60)   + ' min ago';
-                if (diff < 86400)  return Math.floor(diff / 3600)  + ' hr ago';
-                return Math.floor(diff / 86400) + ' day(s) ago';
-            }
-
-            notifItemsEl.innerHTML = alerts.map(a => `
-                <div class="notif-item unread">
-                    <i class="fas fa-bell" style="color:var(--warning)"></i>
-                    <div>
-                        <p class="notif-text">${(a.message || '').replace(/</g,'&lt;')}</p>
-                        <span class="notif-time">${timeAgoJS(a.created_at)}</span>
-                    </div>
-                </div>`).join('');
-        })
-        .catch(() => {
-            if (notifItemsEl) notifItemsEl.innerHTML = `
-                <div class="notif-item">
-                    <i class="fas fa-check-circle" style="color:var(--success)"></i>
-                    <div><p class="notif-text">No unread notifications.</p></div>
-                </div>`;
+    function timeAgo(dateStr) {
+        if (!dateStr) return '';
+        var diff = Math.floor((Date.now() - new Date(dateStr)) / 1000);
+        if (diff < 60) return 'Just now';
+        if (diff < 3600) return Math.floor(diff / 60) + ' min ago';
+        if (diff < 86400) return Math.floor(diff / 3600) + ' hr ago';
+        if (diff < 604800) return Math.floor(diff / 86400) + ' days ago';
+        return new Date(dateStr).toLocaleDateString();
+    }
+    function esc(str) { return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+    function updateBadge(count) {
+        unreadCount = count;
+        if (!notifBadge) return;
+        notifBadge.textContent = count > 99 ? '99+' : count;
+        notifBadge.style.display = count > 0 ? '' : 'none';
+        if (count > badgePrev && badgePrev >= 0) {
+            notifBadge.classList.remove('pulse'); void notifBadge.offsetWidth; notifBadge.classList.add('pulse');
+            var btn = document.getElementById('notifBtn');
+            if (btn) { btn.classList.remove('shake'); void btn.offsetWidth; btn.classList.add('shake'); }
+        }
+        badgePrev = count;
+        if (notifCountEl) notifCountEl.textContent = count + ' new';
+    }
+    function renderNotifications(notifications) {
+        var html = '';
+        if (!notifications || !notifications.length) {
+            html = '<div class="notif-empty"><i class="fas fa-bell-slash"></i><span>No notifications yet</span></div>';
+        } else {
+            notifications.forEach(function (n) {
+                if (n.id > lastNotifId) lastNotifId = n.id;
+                var color = n.type_color || 'gray';
+                var icon = n.type_icon || 'fa-bell';
+                var typeLabel = (n.type || '').replace(/_/g, ' ');
+                html += '<div class="notif-item' + (n.is_read ? '' : ' unread') + '" data-id="' + n.id + '" onclick="window.handleNotifClick(this,\'' + esc(n.action_url || '') + '\',' + n.id + ')">' +
+                    '<div class="notif-dot"></div>' +
+                    '<div class="notif-icon ' + color + '"><i class="fas ' + icon + '"></i></div>' +
+                    '<div class="notif-body">' +
+                    '<div class="notif-type ' + color + '">' + esc(typeLabel) + '</div>' +
+                    '<div class="notif-title">' + esc(n.title || '') + '</div>' +
+                    '<div class="notif-msg">' + esc(n.message || '') + '</div>' +
+                    '<div class="notif-meta">' +
+                    (n.actor_name ? '<span><i class="fas fa-user-circle"></i> ' + esc(n.actor_name) + '</span>' : '') +
+                    (n.municipality_name ? '<span><i class="fas fa-map-pin"></i> ' + esc(n.municipality_name) + '</span>' : '') +
+                    '<span><i class="far fa-clock"></i> ' + timeAgo(n.created_at) + '</span>' +
+                    '</div></div>' +
+                    '<button class="notif-delete" title="Delete" onclick="event.stopPropagation();window.deleteNotif(' + n.id + ')"><i class="fas fa-times"></i></button>' +
+                    '</div>';
+            });
+        }
+        html += '<div class="notif-footer"><a href="notifications.php"><i class="fas fa-list"></i> View All Notifications <i class="fas fa-arrow-right"></i></a></div>';
+        notifItemsEl.innerHTML = html;
+    }
+    function fetchNotifications() {
+        window.API_CONFIG.get(API + '/recent').then(function (data) {
+            updateBadge(data.unread_count || 0);
+            renderNotifications(data.notifications || []);
+        }).catch(function () {
+            notifItemsEl.innerHTML = '<div class="notif-empty"><i class="fas fa-bell-slash"></i><span>Unable to load</span></div>';
         });
+    }
+    window.handleNotifClick = function (el, url, id) {
+        el.classList.remove('unread'); var dot = el.querySelector('.notif-dot'); if (dot) dot.style.display = 'none';
+        window.API_CONFIG.patch(API + '/' + id + '/read', {}).catch(function () {});
+        fetchNotifications();
+        if (url && url.endsWith('.php')) { window.location.href = url; }
+    };
+    window.deleteNotif = function (id) {
+        window.API_CONFIG.delete(API + '/' + id).then(function () { fetchNotifications(); }).catch(function () {});
+    };
+    window.markAllRead = function () {
+        window.API_CONFIG.patch(API + '/read-all', {}).then(function () { fetchNotifications(); }).catch(function () {});
+    };
+    window.clearAllNotifs = function () {
+        window.API_CONFIG.delete(API + '/clear-all').then(function () { fetchNotifications(); }).catch(function () {});
+    };
+    function startSSE() {
+        try {
+            var es = new EventSource(API + '/stream?last_id=' + lastNotifId, { withCredentials: true });
+            es.addEventListener('notification', function (e) {
+                fetchNotifications();
+                try {
+                    var notif = JSON.parse(e.data);
+                    void 0;
+                    
+                    if (notif.module === 'Dashboard' || notif.type === 'spot_approved' || notif.type === 'spot_rejected' || notif.type === 'spot_pending') {
+                        if (typeof window.softRefreshDashboard === 'function') {
+                            window.softRefreshDashboard();
+                        }
+                        if (typeof window.softRefreshTouristSpots === 'function') {
+                            window.softRefreshTouristSpots();
+                        }
+                    } else if (notif.module === 'Users' || notif.type === 'user_created' || notif.type === 'user_updated') {
+                        if (typeof window.softRefreshDashboard === 'function') {
+                            window.softRefreshDashboard();
+                        }
+                        if (typeof window.refreshTable === 'function') {
+                            window.refreshTable();
+                        }
+                    } else if (notif.module === 'FareData' || notif.type === 'fare_updated') {
+                        if (typeof window.softRefreshDashboard === 'function') {
+                            window.softRefreshDashboard();
+                        }
+                        if (typeof window.softRefreshFareData === 'function') {
+                            window.softRefreshFareData();
+                        }
+                    }
+                } catch (err) {
+                    console.error('Error parsing notification data:', err);
+                }
+            });
+            es.addEventListener('count', function (e) { try { var d = JSON.parse(e.data); updateBadge(d.unread_count || 0); } catch (er) {} });
+            es.onerror = function () { es.close(); };
+        } catch (err) {}
+    }
+    fetchNotifications();
+    setTimeout(startSSE, 2000);
+    setInterval(fetchNotifications, 60000);
 })();
 </script>

@@ -1,5 +1,4 @@
-
-   /* PICTO Dashboard Styles */
+/* PICTO Dashboard Styles */
 
 /* Filter Bar */
 .lupto-filters-bar {
@@ -13,10 +12,12 @@
     margin-bottom: 20px;
     box-shadow: var(--shadow-sm);
 }
+
 .lupto-filter-group {
     display: flex;
     gap: 12px;
 }
+
 .lupto-filter-select {
     padding: 8px 14px;
     border: 1px solid var(--border);
@@ -26,15 +27,18 @@
     cursor: pointer;
     transition: var(--transition-smooth);
 }
+
 .lupto-filter-select:focus {
     outline: none;
     border-color: var(--lupto-primary);
     box-shadow: 0 0 0 3px rgba(24, 95, 165, 0.1);
 }
+
 .lupto-actions-group {
     display: flex;
     gap: 10px;
 }
+
 .lupto-action-btn {
     padding: 8px 16px;
     border: 1px solid var(--border);
@@ -48,6 +52,7 @@
     gap: 6px;
     transition: var(--transition-smooth);
 }
+
 .lupto-action-btn:hover {
     background: #f8fafc;
     border-color: var(--lupto-primary);
@@ -61,6 +66,7 @@
     gap: 16px;
     margin-bottom: 20px;
 }
+
 .lupto-kpi-card {
     background: #ffffff;
     border: 1px solid var(--border);
@@ -74,14 +80,17 @@
     position: relative;
     overflow: hidden;
 }
+
 .lupto-kpi-card:hover {
     transform: translateY(-4px);
     box-shadow: var(--shadow-md);
     border-color: var(--lupto-secondary);
 }
+
 .lupto-kpi-info {
     flex: 1;
 }
+
 .lupto-kpi-info h4 {
     margin: 0 0 8px 0;
     font-size: 12px;
@@ -90,6 +99,7 @@
     color: var(--text-secondary);
     font-weight: 600;
 }
+
 .lupto-kpi-value {
     font-size: 30px;
     font-weight: 800;
@@ -98,6 +108,7 @@
     display: block;
     line-height: 1.1;
 }
+
 .lupto-kpi-trend {
     font-size: 12px;
     font-weight: 600;
@@ -105,15 +116,19 @@
     align-items: center;
     gap: 4px;
 }
+
 .lupto-kpi-trend.trend-up {
     color: #16a34a;
 }
+
 .lupto-kpi-trend.trend-down {
     color: #dc2626;
 }
+
 .lupto-kpi-trend.trend-neutral {
     color: #64748b;
 }
+
 .lupto-kpi-icon {
     width: 60px;
     height: 60px;
@@ -123,29 +138,36 @@
     justify-content: center;
     transition: var(--transition-smooth);
 }
+
 .lupto-kpi-icon.bg-blue {
-    background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+    background: none !important;
     color: #1e40af;
 }
+
 .lupto-kpi-icon.bg-green {
-    background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
+    background: none !important;
     color: #15803d;
 }
+
 .lupto-kpi-icon.bg-orange {
-    background: linear-gradient(135deg, #ffedd5 0%, #fed7aa 100%);
+    background: none !important;
     color: #c2410c;
 }
+
 .lupto-kpi-icon.bg-purple {
-    background: linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%);
+    background: none !important;
     color: #7c3aed;
 }
+
 .lupto-kpi-icon.bg-yellow {
-    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+    background: none !important;
     color: #b45309;
 }
+
 .lupto-kpi-icon i {
     font-size: 28px;
 }
+
 .lupto-kpi-card:hover .lupto-kpi-icon {
     transform: scale(1.1);
 }
@@ -157,6 +179,7 @@
     gap: 16px;
     margin-bottom: 20px;
 }
+
 .lupto-insight-card {
     background: #ffffff;
     border: 1px solid var(--border);
@@ -168,22 +191,28 @@
     box-shadow: var(--shadow-sm);
     transition: var(--transition-smooth);
 }
+
 .lupto-insight-card:hover {
     transform: translateY(-2px);
     box-shadow: var(--shadow-md);
 }
+
 .lupto-insight-card.success {
     border-left: 4px solid #22c55e;
 }
+
 .lupto-insight-card.warning {
     border-left: 4px solid #f59e0b;
 }
+
 .lupto-insight-card.info {
     border-left: 4px solid #3b82f6;
 }
+
 .lupto-insight-card.danger {
     border-left: 4px solid #ef4444;
 }
+
 .lupto-insight-icon {
     width: 44px;
     height: 44px;
@@ -193,31 +222,38 @@
     justify-content: center;
     flex-shrink: 0;
 }
+
 .lupto-insight-card.success .lupto-insight-icon {
     background: #dcfce7;
     color: #16a34a;
 }
+
 .lupto-insight-card.warning .lupto-insight-icon {
     background: #fef3c7;
     color: #d97706;
 }
+
 .lupto-insight-card.info .lupto-insight-icon {
     background: #dbeafe;
     color: #2563eb;
 }
+
 .lupto-insight-card.danger .lupto-insight-icon {
     background: #fee2e2;
     color: #dc2626;
 }
+
 .lupto-insight-icon i {
     font-size: 22px;
 }
+
 .lupto-insight-content h4 {
     margin: 0 0 6px 0;
     font-size: 14px;
     font-weight: 700;
     color: #1e293b;
 }
+
 .lupto-insight-content p {
     margin: 0;
     font-size: 13px;
@@ -232,6 +268,7 @@
     gap: 16px;
     margin-bottom: 20px;
 }
+
 .lupto-chart-card {
     background: #ffffff;
     border: 1px solid var(--border);
@@ -239,11 +276,13 @@
     padding: 18px;
     box-shadow: var(--shadow-sm);
 }
+
 .lupto-chart-header {
     margin-bottom: 14px;
     padding-bottom: 12px;
     border-bottom: 1px solid #f1f5f9;
 }
+
 .lupto-chart-header h3 {
     margin: 0;
     font-size: 15px;
@@ -253,9 +292,11 @@
     align-items: center;
     gap: 8px;
 }
+
 .lupto-chart-header h3 i {
     color: var(--lupto-primary);
 }
+
 .lupto-chart-container {
     height: 260px;
 }
@@ -272,6 +313,7 @@
     margin-bottom: 20px;
     position: relative;
 }
+
 .lupto-embedded-map {
     height: 420px;
     width: 100%;
@@ -280,6 +322,7 @@
     box-shadow: var(--shadow-sm);
     z-index: 10;
 }
+
 .lupto-map-header-action {
     display: flex;
     justify-content: space-between;
@@ -297,6 +340,7 @@
     overflow: hidden;
     border: 1px solid var(--border);
 }
+
 .lupto-map-controls-panel {
     display: flex;
     gap: 12px;
@@ -306,6 +350,7 @@
     align-items: center;
     flex-wrap: wrap;
 }
+
 .lupto-dedicated-map {
     flex: 1;
     width: 100%;
@@ -323,23 +368,26 @@
     line-height: 1.5;
     box-shadow: var(--shadow-md);
 }
+
 .lupto-map-legend-title {
     font-weight: 700;
     margin-bottom: 6px;
     color: var(--lupto-dark);
 }
+
 .lupto-legend-item {
     display: flex;
     align-items: center;
     gap: 8px;
     margin-bottom: 4px;
 }
+
 .lupto-legend-color {
     width: 16px;
     height: 16px;
     border-radius: 50%;
     border: 1px solid #ffffff;
-    box-shadow: 0 0 2px rgba(0,0,0,0.3);
+    box-shadow: 0 0 2px rgba(0, 0, 0, 0.3);
 }
 
 /* Leaflet Custom Marker Sizing */
@@ -351,14 +399,15 @@
     color: white;
     font-weight: bold;
     font-size: 11px;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
     border: 2px solid white;
-    text-shadow: 1px 1px 1px rgba(0,0,0,0.5);
+    text-shadow: 1px 1px 1px rgba(0, 0, 0, 0.5);
     transition: var(--transition-smooth);
 }
+
 .lupto-map-marker:hover {
     transform: scale(1.15);
-    box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
     z-index: 999 !important;
 }
 
@@ -367,17 +416,20 @@
     font-family: inherit;
     padding: 4px;
 }
+
 .lupto-popup-title {
     font-size: 14px;
     font-weight: 700;
     margin: 0 0 4px;
     color: var(--lupto-primary);
 }
+
 .lupto-popup-info {
     font-size: 12px;
     color: var(--text-secondary);
     margin-bottom: 8px;
 }
+
 .lupto-popup-btn {
     display: block;
     width: 100%;
@@ -393,6 +445,7 @@
     text-decoration: none;
     transition: var(--transition-smooth);
 }
+
 .lupto-popup-btn:hover {
     background: var(--lupto-dark);
 }
@@ -406,7 +459,7 @@
     padding: 6px 10px;
     border-radius: 6px;
     border: none;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
     text-align: center;
     white-space: nowrap;
     pointer-events: none;
@@ -419,9 +472,18 @@
     border-radius: 50%;
     display: inline-block;
 }
-.status-indicator-dot.online { background-color: var(--status-active); }
-.status-indicator-dot.warning { background-color: var(--status-pending); }
-.status-indicator-dot.offline { background-color: var(--status-inactive); }
+
+.status-indicator-dot.online {
+    background-color: var(--status-active);
+}
+
+.status-indicator-dot.warning {
+    background-color: var(--status-pending);
+}
+
+.status-indicator-dot.offline {
+    background-color: var(--status-inactive);
+}
 
 /* Recent Activities */
 .lupto-recent-activities {
@@ -431,6 +493,7 @@
     border: 1px solid var(--border);
     box-shadow: var(--shadow-sm);
 }
+
 .lupto-recent-activities h3 {
     margin: 0 0 14px 0;
     font-size: 15px;
@@ -440,6 +503,7 @@
     align-items: center;
     gap: 8px;
 }
+
 .lupto-activity-item {
     display: flex;
     gap: 12px;
@@ -449,22 +513,28 @@
     margin-bottom: 8px;
     transition: var(--transition-smooth);
 }
+
 .lupto-activity-item:last-child {
     border-bottom: none;
     margin-bottom: 0;
 }
+
 .lupto-activity-item:hover {
     background: #f8fafc;
 }
+
 .lupto-activity-item.added {
     border-left: 3px solid #22c55e;
 }
+
 .lupto-activity-item.approved {
     border-left: 3px solid #3b82f6;
 }
+
 .lupto-activity-item.uploaded {
     border-left: 3px solid #f59e0b;
 }
+
 .lupto-activity-icon {
     width: 40px;
     height: 40px;
@@ -474,36 +544,44 @@
     justify-content: center;
     flex-shrink: 0;
 }
+
 .lupto-activity-item.added .lupto-activity-icon {
     background: #dcfce7;
     color: #16a34a;
 }
+
 .lupto-activity-item.approved .lupto-activity-icon {
     background: #dbeafe;
     color: #2563eb;
 }
+
 .lupto-activity-item.uploaded .lupto-activity-icon {
     background: #fef3c7;
     color: #d97706;
 }
+
 .lupto-activity-icon i {
     font-size: 18px;
 }
+
 .lupto-activity-content h4 {
     margin: 0 0 4px 0;
     font-size: 14px;
     font-weight: 700;
     color: #1e293b;
 }
+
 .lupto-activity-content p {
     margin: 0 0 6px 0;
     font-size: 13px;
     color: #64748b;
     line-height: 1.4;
 }
+
 .lupto-activity-content p strong {
     color: #1e293b;
 }
+
 .lupto-activity-time {
     font-size: 12px;
     color: #94a3b8;
@@ -519,6 +597,7 @@
     gap: 12px;
     margin-top: 20px;
 }
+
 .lupto-quick-btn {
     background: #ffffff;
     border: 1px solid var(--border);
@@ -534,20 +613,24 @@
     color: #1e293b;
     position: relative;
 }
+
 .lupto-quick-btn:hover {
     border-color: var(--lupto-primary);
     box-shadow: var(--shadow-md);
     transform: translateY(-3px);
 }
+
 .lupto-quick-btn i {
     font-size: 32px;
     color: var(--lupto-primary);
 }
+
 .lupto-quick-btn span {
     font-size: 13px;
     font-weight: 700;
     text-align: center;
 }
+
 .lupto-quick-badge {
     position: absolute;
     top: 10px;
@@ -568,38 +651,48 @@
         grid-template-columns: 1fr;
     }
 }
+
 @media (max-width: 768px) {
     .lupto-filters-bar {
         flex-direction: column;
         gap: 12px;
         align-items: stretch;
     }
+
     .lupto-filter-group {
         flex-direction: column;
     }
+
     .lupto-actions-group {
         justify-content: stretch;
     }
+
     .lupto-action-btn {
         flex: 1;
         justify-content: center;
     }
+
     .lupto-kpi-grid {
         grid-template-columns: 1fr;
     }
+
     .lupto-insights-grid {
         grid-template-columns: 1fr;
     }
+
     .lupto-dashboard-main-grid {
         grid-template-columns: 1fr;
     }
+
     .lupto-fullscreen-map-wrapper {
         height: 500px;
     }
+
     .lupto-map-controls-panel {
         flex-direction: column;
         align-items: stretch;
     }
+
     .lupto-map-legend {
         margin-left: 0 !important;
         flex-wrap: wrap;

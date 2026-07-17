@@ -7,6 +7,7 @@ use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 
 class RegisterController extends Controller
 {
@@ -22,18 +23,30 @@ class RegisterController extends Controller
             'password' => 'required|string|min:8|confirmed',
         ]);
 
+        $token = Str::random(60);
+
         $user = User::create([
-            'name'     => $request->name,
-            'email'    => $request->email,
-            'password' => Hash::make($request->password),
-            'role'     => 'tourist',
-            'status'   => 'active',
+            'name'      => $request->name,
+            'email'     => $request->email,
+            'password'  => Hash::make($request->password),
+            'role'      => 'tourist',
+            'status'    => 'active',
+            'api_token' => $token,
         ]);
 
         return response()->json([
             'success' => true,
             'message' => 'Account created successfully.',
-            'user_id' => $user->id,
+            'token'   => $token,
+            'user'    => [
+                'id'     => $user->id,
+                'name'   => $user->name,
+                'email'  => $user->email,
+                'role'   => $user->role,
+                'xp'     => 0,
+                'level'  => 1,
+                'avatar' => null,
+            ],
         ], 201);
     }
 }

@@ -469,3 +469,65 @@
     bottom: 0 !important;
     z-index: 10 !important;
 }
+
+/* ══════════════════════════════════════════════════════════
+   REAL-TIME SYNC — New Card & Row Entry Animations
+   ══════════════════════════════════════════════════════════ */
+
+/* 1. Slide-up + Fade-in entry */
+@keyframes ts-slideFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(24px) scale(0.96);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+/* 2. Highlight flash — gold pulse after entering */
+@keyframes ts-highlightFlash {
+    0%   { box-shadow: 0 0 0 0   rgba(37, 99, 235, 0.0); }
+    25%  { box-shadow: 0 0 0 6px rgba(37, 99, 235, 0.35); }
+    60%  { box-shadow: 0 0 0 10px rgba(37, 99, 235, 0.15); }
+    100% { box-shadow: 0 0 0 0   rgba(37, 99, 235, 0.0); }
+}
+
+/* 3. Table row slide-in */
+@keyframes ts-rowSlideIn {
+    from {
+        opacity: 0;
+        background-color: #EFF6FF;
+        transform: translateX(-12px);
+    }
+    to {
+        opacity: 1;
+        background-color: transparent;
+        transform: translateX(0);
+    }
+}
+
+/* Apply animations to newly added cards */
+.spot-card.new-card-animate {
+    animation:
+        ts-slideFadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards,
+        ts-highlightFlash 1.2s ease 0.45s forwards;
+}
+
+/* Apply animation to newly added table rows */
+tr.new-row-animate {
+    animation: ts-rowSlideIn 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* KPI counter flash when value updates */
+@keyframes ts-kpiPulse {
+    0%   { transform: scale(1);    color: inherit; }
+    40%  { transform: scale(1.18); color: #2563EB; }
+    100% { transform: scale(1);    color: inherit; }
+}
+
+.lupto-kpi-value.kpi-updated {
+    animation: ts-kpiPulse 0.55s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+

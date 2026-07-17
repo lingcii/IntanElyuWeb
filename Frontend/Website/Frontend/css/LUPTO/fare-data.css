@@ -1,3 +1,514 @@
 /* ============================================================
-   LUPTO Fare Data Styles
+   LUPTO Transportation Fare Matrix — View-Only Dashboard
    ============================================================ */
+
+/* ── Container ─────────────────────────────────────────────── */
+.fd-container {
+    max-width: 100%;
+    min-height: 400px;
+}
+
+/* ── Info banner ──────────────────────────────────────────── */
+.fd-info-banner {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 16px 22px;
+    background: linear-gradient(135deg, #eff6ff 0%, #f0f7ff 100%);
+    border: 1px solid #bfdbfe;
+    border-left: 5px solid #2563eb;
+    border-radius: 12px;
+    margin-bottom: 20px;
+    font-size: 13px;
+    color: #1e3a8a;
+}
+.fd-info-banner i {
+    font-size: 22px;
+    color: #2563eb;
+    flex-shrink: 0;
+}
+.fd-info-banner strong {
+    display: block;
+    font-size: 14px;
+    margin-bottom: 2px;
+}
+.fd-info-banner p {
+    margin: 0;
+    color: #475569;
+    font-size: 12px;
+}
+
+/* ── Search / filter bar ──────────────────────────────────── */
+.fd-search-bar {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+    padding: 14px 18px;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    margin-bottom: 20px;
+}
+.fd-search-wrap {
+    position: relative;
+    flex: 1;
+    min-width: 220px;
+}
+.fd-search-wrap .fas {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #9ca3af;
+    font-size: 13px;
+    pointer-events: none;
+}
+.fd-search-input {
+    width: 100%;
+    padding: 10px 14px 10px 36px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    font-size: 13px;
+    font-family: inherit;
+    outline: none;
+    box-sizing: border-box;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    background: #f9fafb;
+}
+.fd-search-input:focus {
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37,99,235,0.1);
+    background: #fff;
+}
+.fd-filter-select {
+    padding: 10px 14px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    font-size: 13px;
+    font-family: inherit;
+    background: #f9fafb;
+    cursor: pointer;
+    outline: none;
+    min-width: 160px;
+    transition: border-color 0.2s;
+}
+.fd-filter-select:focus {
+    border-color: #2563eb;
+}
+
+/* ── Refresh button ───────────────────────────────────────── */
+.fd-btn-refresh {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 9px 16px;
+    background: #fff;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #374151;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+.fd-btn-refresh:hover {
+    background: #f3f4f6;
+    border-color: #9ca3af;
+}
+.fd-btn-refresh i { font-size: 12px; }
+
+/* ── Guide count badge ────────────────────────────────────── */
+.fd-guide-count {
+    font-size: 12px;
+    font-weight: 600;
+    color: #6b7280;
+    padding: 4px 12px;
+    background: #f3f4f6;
+    border-radius: 20px;
+    margin-left: auto;
+    white-space: nowrap;
+}
+
+/* ── Fare guide cards grid ────────────────────────────────── */
+.fd-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+.fd-fare-card {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
+    cursor: pointer;
+    position: relative;
+}
+.fd-fare-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+    border-color: #93c5fd;
+}
+
+/* Card top stripe by vehicle type */
+.fd-card-stripe {
+    height: 5px;
+}
+.fd-stripe-bus      { background: linear-gradient(90deg, #1d4ed8, #3b82f6); }
+.fd-stripe-jeepney  { background: linear-gradient(90deg, #d97706, #f59e0b); }
+.fd-stripe-van      { background: linear-gradient(90deg, #7c3aed, #8b5cf6); }
+.fd-stripe-tricycle { background: linear-gradient(90deg, #059669, #10b981); }
+.fd-stripe-default  { background: linear-gradient(90deg, #185FA5, #85B7EB); }
+
+.fd-card-body {
+    padding: 18px 20px;
+}
+
+/* Vehicle type icon + label row */
+.fd-card-header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+}
+.fd-vehicle-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+.fd-vehicle-badge.bus      { background: #dbeafe; color: #1d4ed8; }
+.fd-vehicle-badge.jeepney  { background: #fef3c7; color: #b45309; }
+.fd-vehicle-badge.van      { background: #ede9fe; color: #6d28d9; }
+.fd-vehicle-badge.tricycle { background: #dcfce7; color: #15803d; }
+.fd-vehicle-badge.default  { background: #f1f5f9; color: #475569; }
+
+.fd-region-tag {
+    font-size: 11px;
+    padding: 3px 10px;
+    border-radius: 12px;
+    background: #f1f5f9;
+    color: #475569;
+    font-weight: 600;
+}
+
+.fd-card-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: #1e293b;
+    margin: 0 0 12px;
+    line-height: 1.35;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.fd-card-meta-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 12px;
+    font-size: 12px;
+    color: #6b7280;
+}
+.fd-card-meta-row .fas {
+    font-size: 11px;
+    color: #9ca3af;
+    margin-right: 3px;
+}
+
+.fd-view-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.2s;
+}
+.fd-view-btn:hover {
+    background: linear-gradient(135deg, #1d4ed8, #1e40af);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(37,99,235,0.3);
+}
+
+/* ── Matrix viewer panel ──────────────────────────────────── */
+.fd-matrix-panel {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    margin-bottom: 20px;
+    display: none;
+}
+.fd-matrix-panel.active { display: block; animation: fd-slide-in 0.25s ease; }
+
+@keyframes fd-slide-in {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.fd-matrix-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 22px;
+    background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+    border-bottom: 1px solid #e5e7eb;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+.fd-matrix-header h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 700;
+    color: #1e293b;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.fd-matrix-header h3 i { color: #2563eb; }
+.fd-matrix-actions {
+    display: flex;
+    gap: 8px;
+}
+.fd-btn-export {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    background: #059669;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.2s;
+}
+.fd-btn-export:hover {
+    background: #047857;
+    transform: translateY(-1px);
+}
+.fd-btn-close {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    background: #fff;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #374151;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.2s;
+}
+.fd-btn-close:hover {
+    background: #f3f4f6;
+}
+
+.fd-matrix-body {
+    max-height: 520px;
+    overflow-y: auto;
+    padding: 0;
+}
+
+.fd-matrix-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+.fd-matrix-table thead {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+.fd-matrix-table th {
+    background: #f8fafc;
+    padding: 12px 16px;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 700;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 2px solid #e2e8f0;
+    white-space: nowrap;
+}
+.fd-matrix-table td {
+    padding: 11px 16px;
+    border-bottom: 1px solid #f1f5f9;
+    color: #374151;
+    white-space: nowrap;
+}
+.fd-matrix-table tbody tr:hover { background: #f8fafc; }
+.fd-matrix-table tbody tr:last-child td { border-bottom: none; }
+.fd-matrix-table .fd-col-distance { font-weight: 600; color: #1e293b; }
+.fd-matrix-table .fd-col-regular { font-weight: 700; color: #2563eb; }
+.fd-matrix-table .fd-col-discounted { color: #059669; }
+
+/* ── Empty / loading states ───────────────────────────────── */
+.fd-empty-state {
+    text-align: center;
+    padding: 48px 20px;
+    color: #9ca3af;
+}
+.fd-empty-state i {
+    font-size: 36px;
+    margin-bottom: 12px;
+    opacity: 0.5;
+    display: block;
+}
+.fd-empty-state p {
+    margin: 0;
+    font-size: 14px;
+}
+
+.fd-loading-spinner {
+    text-align: center;
+    padding: 48px 20px;
+    color: #9ca3af;
+}
+.fd-loading-spinner i {
+    font-size: 28px;
+    margin-bottom: 10px;
+    display: block;
+}
+
+.fd-error-state {
+    text-align: center;
+    padding: 48px 20px;
+    color: #dc2626;
+}
+.fd-error-state i {
+    font-size: 36px;
+    margin-bottom: 12px;
+    display: block;
+}
+.fd-error-state p {
+    margin: 0;
+    font-size: 14px;
+}
+
+/* ── Toast notifications ──────────────────────────────────── */
+.fd-toast-container {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    pointer-events: none;
+}
+.fd-toast {
+    background: #fff;
+    border-radius: 10px;
+    padding: 14px 18px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #1e293b;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 280px;
+    max-width: 420px;
+    pointer-events: auto;
+    border-left: 4px solid #2563eb;
+    animation: fd-toast-in 0.3s ease;
+}
+.fd-toast.success { border-left-color: #10b981; }
+.fd-toast.danger  { border-left-color: #dc2626; }
+.fd-toast.info    { border-left-color: #2563eb; }
+.fd-toast i { font-size: 16px; flex-shrink: 0; }
+.fd-toast.success i { color: #10b981; }
+.fd-toast.danger i  { color: #dc2626; }
+.fd-toast.info i    { color: #2563eb; }
+
+@keyframes fd-toast-in {
+    from { opacity: 0; transform: translateX(40px); }
+    to   { opacity: 1; transform: translateX(0); }
+}
+
+/* ── Skeleton loading shimmer ─────────────────────────────── */
+.fd-skeleton {
+    background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+    background-size: 200% 100%;
+    animation: fd-shimmer 1.5s infinite;
+    border-radius: 6px;
+}
+@keyframes fd-shimmer {
+    0%   { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+.fd-skeleton-card {
+    height: 160px;
+    border-radius: 14px;
+}
+
+/* ── Responsive ───────────────────────────────────────────── */
+@media (max-width: 768px) {
+    .fd-cards-grid {
+        grid-template-columns: 1fr;
+    }
+    .fd-search-bar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .fd-search-wrap {
+        min-width: 100%;
+    }
+    .fd-filter-select {
+        width: 100%;
+    }
+    .fd-matrix-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    .fd-matrix-body {
+        max-height: 360px;
+    }
+    .fd-toast {
+        min-width: auto;
+        max-width: 90vw;
+    }
+}
+
+@keyframes slideFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.fd-fare-card.new-card-animate {
+  animation: slideFadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}

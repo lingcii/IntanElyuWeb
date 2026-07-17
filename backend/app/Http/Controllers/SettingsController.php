@@ -2,9 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\ActivityAction;
 use App\Models\User;
+use App\Services\ActivityLogService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 
 class SettingsController extends Controller
@@ -38,6 +41,16 @@ class SettingsController extends Controller
         $request->session()->put('user_name',  $user->name);
         $request->session()->put('user_email', $user->email);
 
+        ActivityLogService::log(
+            ActivityAction::PROFILE_UPDATED,
+            'Settings',
+            'Profile updated for "' . $user->name . '"',
+            ['name' => $user->getOriginal('name'), 'email' => $user->getOriginal('email')],
+            ['name' => $request->name, 'email' => $request->email],
+            $request
+        );
+        Cache::forget('activity_stats');
+
         return response()->json(['success' => true, 'message' => 'Profile updated.']);
     }
 
@@ -57,8 +70,32 @@ class SettingsController extends Controller
             return response()->json(['error' => 'Current password is incorrect.'], 422);
         }
 
-        $user->update(['password' => Hash::make($request->new_password)]);
+        $wasDefault = $user->is_default_password;
+        $updates = ['password' => Hash::make($request->new_password)];
 
-        return response()->json(['success' => true, 'message' => 'Password updated.']);
+        if ($wasDefault) {
+            $updates['is_default_password'] = false;
+            if ($user->status === 'pending') {
+                $updates['status'] = 'active';
+            }
+        }
+
+        $user->update($updates);
+
+        ActivityLogService::log(
+            ActivityAction::PASSWORD_CHANGED,
+            'Settings',
+            'Password changed for "' . $user->name . '"',
+            null,
+            null,
+            $request
+        );
+        Cache::forget('activity_stats');
+
+        return response()->json([
+            'success'          => true,
+            'message'          => 'Password updated.',
+            'first_time_reset' => $wasDefault ? true : false,
+        ]);
     }
 }

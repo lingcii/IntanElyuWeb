@@ -1,4 +1,4 @@
-
+﻿
 // map-view-api.js initializer — works both on fresh page load AND SPA injection
 // (DOMContentLoaded may have already fired when this script is injected by the SPA router)
 function initMapView() {
@@ -69,7 +69,9 @@ function _runMapView() {
         'POTENTIAL': 'POTENTIAL'
     };
 
-    const touristSpots = window.touristSpotsData.map(spot => {
+    let touristSpots = window.touristSpotsData
+        .filter(spot => spot.status === 'approved')
+        .map(spot => {
         let normalizedImages = [];
         if (spot.images && spot.images.length > 0) {
             normalizedImages = spot.images;
@@ -80,14 +82,15 @@ function _runMapView() {
             id: spot.id,
             name: spot.name,
             municipality: spot.municipality_name,
+            barangay: spot.barangay || null,
             lat: spot.latitude,
             lng: spot.longitude,
             description: spot.description || 'No description provided',
             category: spot.category,
             photo_url: spot.photo_url,
             images: normalizedImages,
-            admissionFee: spot.entrance_fee ? `₱${parseFloat(spot.entrance_fee).toLocaleString()}` : 'Free',
-            rating: spot.rating || 4.0,
+            admissionFee: (() => { var ft = Array.isArray(spot.fee_types) ? spot.fee_types : []; if (!ft || ft.length === 0) return 'Free'; var p = []; if (ft.includes('entrance') && Number(spot.entrance_fee||0) > 0) p.push('₱'+Number(spot.entrance_fee).toLocaleString()); if (ft.includes('environmental') && Number(spot.environmental_fee||0) > 0) p.push('EF:₱'+Number(spot.environmental_fee).toLocaleString()); return p.length ? p.join(' | ') : 'Free'; })(),
+            rating: spot.rating !== undefined && spot.rating !== null ? parseFloat(spot.rating) : 0.0,
             classification_status: statusMap[spot.classification_status] || spot.classification_status,
             opening_time: spot.opening_time,
             closing_time: spot.closing_time,
@@ -97,7 +100,7 @@ function _runMapView() {
     }).filter(spot => spot.lat && spot.lng); // Filter out spots without coordinates
 
     // Municipality coordinates from database
-    const municipalityCoordinates = window.municipalitiesData.map(muni => ({
+    let municipalityCoordinates = window.municipalitiesData.map(muni => ({
         name: muni.name,
         lat: muni.latitude,
         lng: muni.longitude,
@@ -158,12 +161,12 @@ function _runMapView() {
         };
     }
 
-    const municipalitySpotCounts = touristSpots.reduce((counts, spot) => {
+    let municipalitySpotCounts = touristSpots.reduce((counts, spot) => {
         counts[spot.municipality] = (counts[spot.municipality] || 0) + 1;
         return counts;
     }, {});
 
-    const municipalities = municipalityCoordinates.map((municipality) => ({
+    let municipalities = municipalityCoordinates.map((municipality) => ({
         ...municipality,
         count: municipalitySpotCounts[municipality.name] || 0,
         ...buildMunicipalityProfile(municipality.name)
@@ -171,11 +174,12 @@ function _runMapView() {
 
     let map, allMarkers = [], spotMarkers = [], currentRouteLayer = null, userLocation = null;
     let selectedMunicipality = null, selectedSpot = null, currentTravelMode = 'driving';
-    let sidebarState = 'municipality'; // 'municipality' or 'spot'
+    let sidebarState = 'municipality';
     let currentBaseLayer = 'street';
     let currentMapLayer = null;
     let satelliteLabelsLayer = null;
     let activeSpotMarker = null;
+    let statusInterval = null;
     let laUnionBounds;
     if (municipalities && municipalities.length > 0) {
         laUnionBounds = L.latLngBounds(municipalities.map((municipality) => [municipality.lat, municipality.lng])).pad(0.08);
@@ -200,7 +204,7 @@ function _runMapView() {
     });
 
     function updateAllStatuses() {
-        // Update each spot's status
+        if (!document.getElementById('lupto-map')) return;
         touristSpots.forEach(spot => {
             const newStatus = calculateSpotStatus(spot);
             if (spot.status !== newStatus) {
@@ -216,7 +220,7 @@ function _runMapView() {
                 if (marker._icon) {
                     const markerDiv = marker._icon.querySelector('.spot-marker');
                     if (markerDiv) {
-                        markerDiv.style.background = newStatusColor;
+                        markerDiv.style.borderColor = newStatusColor;
                     }
                 }
             });
@@ -240,7 +244,7 @@ function _runMapView() {
         map.fitBounds(laUnionBounds);
 
         // Add municipality markers
-        addMunicipalityMarkers();
+        // addMunicipalityMarkers(); // Removed as requested
 
         // Show all tourist spots initially on the map
         showSpotMarkers();
@@ -249,8 +253,79 @@ function _runMapView() {
         setupEventListeners();
         
         // Start real-time status updates (check every 60 seconds)
-        setInterval(updateAllStatuses, 60000);
+        statusInterval = setInterval(updateAllStatuses, 60000);
     }
+
+    function rebuildTouristSpotsData() {
+        touristSpots = window.touristSpotsData
+            .filter(spot => spot.status === 'approved')
+            .map(spot => {
+            let normalizedImages = [];
+            if (spot.images && spot.images.length > 0) {
+                normalizedImages = spot.images;
+            } else if (spot.photo_url) {
+                normalizedImages = [{ photo_url: spot.photo_url }];
+            }
+            return {
+                id: spot.id,
+                name: spot.name,
+                municipality: spot.municipality_name,
+                barangay: spot.barangay || null,
+                lat: spot.latitude,
+                lng: spot.longitude,
+                description: spot.description || 'No description provided',
+                category: spot.category,
+                photo_url: spot.photo_url,
+                images: normalizedImages,
+                admissionFee: (() => { var ft = Array.isArray(spot.fee_types) ? spot.fee_types : []; if (!ft || ft.length === 0) return 'Free'; var p = []; if (ft.includes('entrance') && Number(spot.entrance_fee||0) > 0) p.push('₱'+Number(spot.entrance_fee).toLocaleString()); if (ft.includes('environmental') && Number(spot.environmental_fee||0) > 0) p.push('EF:₱'+Number(spot.environmental_fee).toLocaleString()); return p.length ? p.join(' | ') : 'Free'; })(),
+                rating: spot.rating !== undefined && spot.rating !== null ? parseFloat(spot.rating) : 0.0,
+                classification_status: statusMap[spot.classification_status] || spot.classification_status,
+                opening_time: spot.opening_time,
+                closing_time: spot.closing_time,
+                is_maintenance: spot.is_maintenance,
+                status: calculateSpotStatus(spot)
+            };
+        }).filter(spot => spot.lat && spot.lng);
+
+        municipalityCoordinates = window.municipalitiesData.map(muni => ({
+            name: muni.name,
+            lat: muni.latitude,
+            lng: muni.longitude,
+            attraction_count: muni.attraction_count
+        }));
+
+        municipalitySpotCounts = touristSpots.reduce((counts, spot) => {
+            counts[spot.municipality] = (counts[spot.municipality] || 0) + 1;
+            return counts;
+        }, {});
+
+        municipalities = municipalityCoordinates.map(m => ({
+            ...m,
+            count: municipalitySpotCounts[m.name] || 0,
+            ...buildMunicipalityProfile(m.name)
+        }));
+    }
+
+    window.refreshLuptoMap = function() {
+        clearInterval(statusInterval);
+        rebuildTouristSpotsData();
+
+        allMarkers.forEach(m => map.removeLayer(m));
+        allMarkers = [];
+        spotMarkers.forEach(m => map.removeLayer(m));
+        spotMarkers = [];
+        activeSpotMarker = null;
+
+        if (currentRouteLayer) {
+            map.removeLayer(currentRouteLayer);
+            currentRouteLayer = null;
+        }
+
+        // addMunicipalityMarkers(); // Removed as requested
+        showSpotMarkers(selectedMunicipality ? selectedMunicipality.name : null);
+
+        statusInterval = setInterval(updateAllStatuses, 60000);
+    };
 
     function addMunicipalityMarkers() {
         municipalities.forEach(muni => {
@@ -298,7 +373,7 @@ function _runMapView() {
                 },
                 () => {
                     // Fallback if geolocation is denied
-                    console.log('Geolocation not available');
+                    void 0;
                 }
             );
         }
@@ -322,11 +397,11 @@ function _runMapView() {
         }
     }
 
-    function handleMunicipalityClick(muni) {
+    function selectMunicipality(muni) {
         selectedMunicipality = muni;
         selectedSpot = null;
         sidebarState = 'municipality';
-        
+
         // Hide all municipality markers except selected
         allMarkers.forEach(marker => {
             if (marker.options.muniData.name !== muni.name) {
@@ -335,6 +410,7 @@ function _runMapView() {
                     marker.getTooltip().setOpacity(0);
                 }
             } else {
+                marker.setZIndexOffset(100);
                 if (marker.getTooltip()) {
                     marker.getTooltip().setOpacity(1);
                 }
@@ -343,12 +419,94 @@ function _runMapView() {
 
         // Show spot markers for this municipality
         showSpotMarkers(muni.name);
-        
-        // Update back button visibility
-        document.getElementById('sidebarBackBtn').classList.add('hidden');
-        
-        // Open sidebar with municipality detail
-        openSidebar('municipality', muni);
+
+        // Zoom to municipality area using its spot markers for bounds
+        const muniSpots = touristSpots.filter(s => s.municipality === muni.name);
+        if (muniSpots.length > 0) {
+            const spotLats = muniSpots.map(s => s.lat).filter(Boolean);
+            const spotLngs = muniSpots.map(s => s.lng).filter(Boolean);
+            if (spotLats.length > 0) {
+                const bounds = L.latLngBounds(
+                    [Math.min(...spotLats), Math.min(...spotLngs)],
+                    [Math.max(...spotLats), Math.max(...spotLngs)]
+                );
+                // Include municipality center in bounds
+                bounds.extend([muni.lat, muni.lng]);
+                map.fitBounds(bounds.pad(0.15), { maxZoom: 14 });
+            } else {
+                map.setView([muni.lat, muni.lng], 13);
+            }
+        } else {
+            map.setView([muni.lat, muni.lng], 13);
+        }
+
+        // Update selected municipality badge
+        const badge = document.getElementById('selectedMuniBadge');
+        const nameEl = document.getElementById('selectedMuniName');
+        if (badge && nameEl) {
+            nameEl.textContent = muni.name;
+            badge.style.display = 'flex';
+        }
+
+        // Close sidebar if it was open
+        const sidebar = document.getElementById('sidebarContainer');
+        const overlay = document.getElementById('sidebarOverlay');
+        if (sidebar && sidebar.classList.contains('active')) {
+            sidebar.classList.remove('active');
+            overlay.classList.remove('active');
+        }
+    }
+
+    function deselectMunicipality() {
+        selectedMunicipality = null;
+        selectedSpot = null;
+        sidebarState = 'municipality';
+
+        // Reset all municipality markers
+        allMarkers.forEach(marker => {
+            marker.setOpacity(1);
+            marker.setZIndexOffset(0);
+            if (marker.getTooltip()) {
+                marker.getTooltip().setOpacity(1);
+            }
+        });
+
+        // Show all spot markers
+        showSpotMarkers();
+
+        // Hide badge
+        const badge = document.getElementById('selectedMuniBadge');
+        if (badge) {
+            badge.style.display = 'none';
+        }
+
+        // Close sidebar if open
+        const sidebar = document.getElementById('sidebarContainer');
+        const overlay = document.getElementById('sidebarOverlay');
+        if (sidebar) {
+            sidebar.classList.remove('active');
+        }
+        if (overlay) {
+            overlay.classList.remove('active');
+        }
+
+        // Reset map view
+        map.fitBounds(laUnionBounds);
+
+        // Clear route
+        if (currentRouteLayer) {
+            map.removeLayer(currentRouteLayer);
+            currentRouteLayer = null;
+        }
+    }
+
+    function handleMunicipalityClick(muni) {
+        if (selectedMunicipality && selectedMunicipality.name === muni.name) {
+            // Clicking the same municipality deselects it
+            deselectMunicipality();
+        } else {
+            selectMunicipality(muni);
+        }
     }
 
     function getClassificationBadge(status) {
@@ -362,8 +520,8 @@ function _runMapView() {
         } else if (upper === 'POTENTIAL') {
             bg = '#FFFBEB'; color = '#D97706'; status = 'POTENTIAL';
         }
-        return `<div style="display: inline-flex; align-items: center; gap: 4px; background: ${bg}; color: ${color}; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 600; text-transform: uppercase;">
-            <i class="fas fa-tag"></i> ${status}
+        return `<div style="display: inline-flex; align-items: center; gap: 3px; background: ${bg}; color: ${color}; padding: 1.5px 5px; border-radius: 4px; font-size: 9px; font-weight: 600; text-transform: uppercase;">
+            <i class="fas fa-tag" style="font-size: 8px;"></i> ${status}
         </div>`;
     }
 
@@ -385,44 +543,51 @@ function _runMapView() {
                 </div>`,
                 className: 'spot-marker-icon',
                 iconSize: [32, 32],
-                iconAnchor: [16, 32]
+                iconAnchor: [16, 32],
+                popupAnchor: [0, -32]
             });
 
             const marker = L.marker([spot.lat, spot.lng], { icon: icon, spotData: spot });
-            marker.addTo(map);
             
             // Build rich popup content
             const hasImage = spot.images && spot.images.length > 0;
-            const shortDesc = spot.description && spot.description.length > 80 
-                ? spot.description.substring(0, 80) + '...' 
+            const shortDesc = spot.description && spot.description.length > 60 
+                ? spot.description.substring(0, 60) + '...' 
                 : spot.description || 'No description available.';
             const popupHtml = `
-                <div class="map-popup-card" style="font-family: inherit; width: 220px; padding: 4px;">
-                    ${hasImage ? `<img src="${spot.images[0].photo_url}" style="width:100%; height:110px; object-fit:cover; border-radius:6px; margin-bottom:8px;" alt="${spot.name}">` : ''}
-                    <h4 style="margin: 0 0 4px 0; font-size: 14px; font-weight: 700; color: #1E293B;">${spot.name}</h4>
-                    <div style="display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 8px;">
-                        <div style="display: inline-flex; align-items: center; gap: 4px; background: #EEF2FF; color: #2563EB; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 600; text-transform: uppercase;">
-                            <i class="fas fa-${getCategoryIcon(spot.category)}"></i> ${spot.category}
+                <div class="map-popup-card" style="font-family: inherit; width: 180px; padding: 2px;">
+                    ${hasImage ? `<img src="${spot.images[0].photo_url}" style="width:100%; height:80px; object-fit:cover; border-radius:6px; margin-bottom:6px;" alt="${spot.name}">` : ''}
+                    <h4 style="margin: 0 0 2px 0; font-size: 12.5px; font-weight: 700; color: #1E293B;">${spot.name}</h4>
+                    <div style="font-size: 10px; color: #6B7280; margin-bottom: 4px;">
+                        <i class="fas fa-map-marker-alt" style="margin-right: 3px; color: #2563EB;"></i> ${spot.municipality}, La Union
+                    </div>
+                    <div style="display: flex; gap: 3px; flex-wrap: wrap; margin-bottom: 6px;">
+                        <div style="display: inline-flex; align-items: center; gap: 3px; background: #EEF2FF; color: #2563EB; padding: 1.5px 5px; border-radius: 4px; font-size: 9px; font-weight: 600; text-transform: uppercase;">
+                            <i class="fas fa-${getCategoryIcon(spot.category)}" style="font-size: 8px;"></i> ${spot.category}
                         </div>
                         ${getClassificationBadge(spot.classification_status)}
                     </div>
-                    <p style="margin: 0 0 8px 0; font-size: 12px; color: #4B5563; line-height: 1.4;">${shortDesc}</p>
-                    <div style="font-size: 12px; color: #6B7280; margin-bottom: 8px; line-height: 1.4;">
+                    <p style="margin: 0 0 6px 0; font-size: 11px; color: #4B5563; line-height: 1.3;">${shortDesc}</p>
+                    <div style="font-size: 10.5px; color: #6B7280; margin-bottom: 6px; line-height: 1.3;">
                         <i class="fas fa-ticket-alt" style="margin-right: 4px; color: #6B7280;"></i> ${spot.admissionFee}<br>
                         <i class="fas fa-clock" style="margin-right: 4px; color: #6B7280;"></i> ${formatTime(spot.opening_time)} - ${formatTime(spot.closing_time)}
                     </div>
-                    <button class="popup-detail-btn" onclick="window.viewSpotDetailsFromMap(${spot.id})" style="width: 100%; padding: 6px; background: #2563EB; color: white; border: none; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; transition: background 0.2s;">
+                    <button class="popup-detail-btn" onclick="window.viewSpotDetailsFromMap(${spot.id})" style="width: 100%; padding: 4px 6px; background: #2563EB; color: white; border: none; border-radius: 6px; font-size: 11px; font-weight: 600; cursor: pointer; transition: background 0.2s;">
                         <i class="fas fa-info-circle"></i> View Full Details
                     </button>
                 </div>
             `;
             
             marker.bindPopup(popupHtml, {
-                maxWidth: 260,
+                maxWidth: 200,
                 className: 'custom-map-popup'
             });
 
-            marker.on('click', () => handleSpotClick(spot));
+            marker.on('click', () => {
+                map.setView(marker.getLatLng(), map.getZoom());
+            });
+
+            marker.addTo(map);
             spotMarkers.push(marker);
         });
     }
@@ -437,9 +602,11 @@ function _runMapView() {
     };
 
     function getCategoryColor(categoryStr) {
+        if (window.MapMarkersConfig && typeof window.MapMarkersConfig.getCategoryColor === 'function') {
+            return window.MapMarkersConfig.getCategoryColor(categoryStr);
+        }
         if (!categoryStr) return '#6B7280';
         const categories = categoryStr.split(',').map(c => c.trim().toLowerCase());
-        
         const blue = '#0EA5E9';
         const cyan = '#06B6D4';
         const green = '#22C55E';
@@ -447,124 +614,56 @@ function _runMapView() {
         const amber = '#F59E0B';
         const pink = '#EC4899';
         const gold = '#D97706';
-        
         const mapping = {
-            'beach': blue,
-            'beaches': blue,
-            'island': blue,
-            'marine sanctuary': blue,
-            'hot spring': blue,
-            'cold spring': blue,
-            
-            'waterfall': cyan,
-            'waterfalls': cyan,
-            'river': cyan,
-            'lake': cyan,
-            
-            'forest': green,
-            'nature park': green,
-            'wildlife sanctuary': green,
-            'farm': green,
-            'eco-tourism': green,
-            'garden': green,
-            'park': green,
-            
-            'mountain': purple,
-            'mountains': purple,
-            'mountains & hiking': purple,
-            'cave': purple,
-            'volcano': purple,
-            'hiking': purple,
-            'camping': purple,
-            'viewpoint': purple,
-            'binoculars': purple,
-            
-            'historical': amber,
-            'cultural heritage': amber,
-            'museum': amber,
-            'monument': amber,
-            'landmark': amber,
-            
-            'religious': gold,
-            'church': gold,
-            
-            'adventure': pink,
-            'recreation': pink,
-            'food destination': pink,
-            'food & dining': pink,
-            'shopping': pink,
-            'festival venue': pink,
-            'resort': pink,
-            'resorts': pink
+            'beach': blue, 'beaches': blue, 'island': blue, 'marine sanctuary': blue,
+            'hot spring': blue, 'cold spring': blue,
+            'waterfall': cyan, 'waterfalls': cyan, 'river': cyan, 'lake': cyan,
+            'forest': green, 'nature park': green, 'wildlife sanctuary': green,
+            'farm': green, 'eco-tourism': green, 'garden': green, 'park': green,
+            'mountain': purple, 'mountains': purple, 'cave': purple, 'volcano': purple,
+            'hiking': purple, 'camping': purple, 'viewpoint': purple, 'binoculars': purple,
+            'historical': amber, 'cultural heritage': amber, 'museum': amber,
+            'monument': amber, 'landmark': amber,
+            'religious': gold, 'church': gold,
+            'adventure': pink, 'recreation': pink, 'food destination': pink,
+            'shopping': pink, 'festival venue': pink, 'resort': pink, 'resorts': pink
         };
-        
-        for (const cat of categories) {
-            if (mapping[cat]) {
-                return mapping[cat];
-            }
-        }
+        for (const cat of categories) { if (mapping[cat]) return mapping[cat]; }
         return '#6B7280';
     }
 
     function getStatusColor(status) {
         const colors = {
-            'open': '#22C55E',
-            'closed': '#EF4444',
-            'maintenance': '#F59E0B',
-            'unknown': '#6B7280'
+            'open': '#22C55E', 'closed': '#EF4444',
+            'maintenance': '#F59E0B', 'unknown': '#6B7280'
         };
         return colors[status] || '#6B7280';
     }
 
     function getCategoryIcon(categoryStr) {
+        if (window.MapMarkersConfig && typeof window.MapMarkersConfig.getCategoryIcon === 'function') {
+            return window.MapMarkersConfig.getCategoryIcon(categoryStr);
+        }
         if (!categoryStr) return 'map-marker-alt';
         const categories = categoryStr.split(',').map(c => c.trim().toLowerCase());
         const mapping = {
-            'beach': 'umbrella-beach',
-            'beaches': 'umbrella-beach',
-            'mountain': 'mountain',
-            'mountains': 'mountain',
-            'mountains & hiking': 'mountain',
-            'waterfall': 'water',
-            'waterfalls': 'water',
-            'river': 'water',
-            'lake': 'water',
-            'island': 'umbrella-beach',
-            'cave': 'mountain',
-            'volcano': 'mountain',
-            'forest': 'tree',
-            'nature park': 'tree',
-            'marine sanctuary': 'fish',
-            'wildlife sanctuary': 'paw',
-            'historical': 'landmark',
-            'cultural heritage': 'landmark',
-            'religious': 'church',
-            'museum': 'museum',
-            'monument': 'monument',
-            'landmark': 'landmark',
-            'viewpoint': 'binoculars',
-            'adventure': 'hiking',
-            'hiking': 'hiking',
-            'camping': 'campground',
-            'farm': 'seedling',
-            'eco-tourism': 'leaf',
-            'garden': 'seedling',
-            'park': 'tree',
-            'recreation': 'bicycle',
-            'hot spring': 'hot-tub-person',
-            'cold spring': 'snowflake',
-            'food destination': 'utensils',
-            'shopping': 'shopping-cart',
-            'festival venue': 'masks-theater',
-            'resort': 'hotel',
-            'resorts': 'hotel',
+            'beach': 'umbrella-beach', 'beaches': 'umbrella-beach',
+            'mountain': 'mountain', 'mountains': 'mountain',
+            'waterfall': 'water', 'waterfalls': 'water', 'river': 'water', 'lake': 'water',
+            'island': 'umbrella-beach', 'cave': 'mountain', 'volcano': 'mountain',
+            'forest': 'tree', 'nature park': 'tree', 'marine sanctuary': 'fish',
+            'wildlife sanctuary': 'paw', 'historical': 'landmark',
+            'cultural heritage': 'landmark', 'religious': 'church',
+            'museum': 'museum', 'monument': 'monument', 'landmark': 'landmark',
+            'viewpoint': 'binoculars', 'adventure': 'hiking', 'hiking': 'hiking',
+            'camping': 'campground', 'farm': 'seedling', 'eco-tourism': 'leaf',
+            'garden': 'seedling', 'park': 'tree', 'recreation': 'bicycle',
+            'hot spring': 'hot-tub-person', 'cold spring': 'snowflake',
+            'food destination': 'utensils', 'shopping': 'shopping-cart',
+            'festival venue': 'masks-theater', 'resort': 'hotel', 'resorts': 'hotel',
             'other': 'star'
         };
-        for (const cat of categories) {
-            if (mapping[cat]) {
-                return mapping[cat];
-            }
-        }
+        for (const cat of categories) { if (mapping[cat]) return mapping[cat]; }
         return 'map-marker-alt';
     }
 
@@ -744,13 +843,11 @@ function _runMapView() {
 
         // Highlight active marker
         if (activeSpotMarker) {
-            // Reset previous active marker
             activeSpotMarker.setZIndexOffset(0);
         }
         activeSpotMarker = spotMarkers.find(m => m.options.spotData.id === spot.id);
         if (activeSpotMarker) {
             activeSpotMarker.setZIndexOffset(1000);
-            // Bounce animation for marker
             activeSpotMarker._icon.style.transform = 'scale(1.3)';
             setTimeout(() => {
                 if (activeSpotMarker && activeSpotMarker._icon) {
@@ -759,11 +856,23 @@ function _runMapView() {
             }, 300);
         }
 
-        // Update sidebar to spot detail
+        // Open sidebar and populate spot detail
+        const sidebar = document.getElementById('sidebarContainer');
+        const overlay = document.getElementById('sidebarOverlay');
+        const title = document.getElementById('sidebarTitle');
+
+        if (title) {
+            title.textContent = spot.name;
+        }
+
         document.getElementById('sidebarBackBtn').classList.remove('hidden');
-        
-        // Just update sidebar with spot info (removed polyline routing line)
+
         populateSpotDetail(spot);
+
+        if (sidebar && !sidebar.classList.contains('active')) {
+            sidebar.classList.add('active');
+            overlay.classList.add('active');
+        }
     }
 
     function populateSpotDetail(spot) {
@@ -808,43 +917,95 @@ function _runMapView() {
                 <i class="fas fa-map-marker-alt" style="color: #2563EB;"></i>
                 ${spot.municipality}, La Union
             </div>
+
+            <div class="spot-detail-tags">
+                <span class="spot-detail-category-tag">
+                    <i class="fas fa-${getCategoryIcon(spot.category)}"></i> ${spot.category}
+                </span>
+                ${spot.classification_status ? `<span class="spot-detail-classification-tag">${spot.classification_status}</span>` : ''}
+            </div>
             
-            <!-- Real-time status badge -->
-            <div style="display: inline-block; padding: 6px 16px; border-radius: 20px; background: ${getStatusColor(spot.status)}; color: white; font-weight: 600; font-size: 14px; margin-bottom: 16px;">
+            <div class="spot-detail-status" style="display: inline-block; padding: 6px 16px; border-radius: 20px; background: ${getStatusColor(spot.status)}; color: white; font-weight: 600; font-size: 14px; margin-bottom: 16px;">
                 ${spot.status === 'open' ? 'Open' : spot.status === 'closed' ? 'Closed' : spot.status === 'maintenance' ? 'Under Maintenance' : 'Status Unknown'}
             </div>
-            
-            <!-- Opening hours -->
-            <div style="background: #F3F4F6; padding: 16px; border-radius: 8px; margin-bottom: 16px;">
-                <div style="font-weight: 600; margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
-                    <i class="fas fa-clock" style="color: #374151;"></i> Operating Hours
+
+            <div class="spot-detail-section">
+                <div class="spot-detail-section-title">
+                    <i class="fas fa-align-left"></i> Description
                 </div>
-                <div style="color: #374151;">
-                    ${formatTime(spot.opening_time)} - ${formatTime(spot.closing_time)}
-                </div>
+                <div class="spot-detail-description">${spot.description}</div>
             </div>
-            
-            <div class="spot-detail-description">${spot.description}</div>
-            
+
             <div class="info-grid">
                 <div class="info-card">
-                    <div class="info-card-label">Category</div>
-                    <div class="info-card-value" style="display:flex;align-items:center;gap:6px;"><i class="fas fa-${getCategoryIcon(spot.category)}" style="color:#2563EB;"></i> ${spot.category}</div>
+                    <div class="info-card-icon"><i class="fas fa-clock"></i></div>
+                    <div class="info-card-label">Operating Hours</div>
+                    <div class="info-card-value">${formatTime(spot.opening_time)} - ${formatTime(spot.closing_time)}</div>
                 </div>
                 <div class="info-card">
-                    <div class="info-card-label">Admission</div>
+                    <div class="info-card-icon"><i class="fas fa-ticket-alt"></i></div>
+                    <div class="info-card-label">Entrance Fee</div>
                     <div class="info-card-value">${spot.admissionFee}</div>
                 </div>
                 <div class="info-card">
+                    <div class="info-card-icon"><i class="fas fa-map-pin"></i></div>
+                    <div class="info-card-label">Address</div>
+                    <div class="info-card-value">${spot.barangay ? spot.barangay + ', ' : ''}${spot.municipality}, La Union</div>
+                </div>
+                <div class="info-card">
+                    <div class="info-card-icon"><i class="fas fa-globe"></i></div>
                     <div class="info-card-label">Coordinates</div>
-                    <div class="info-card-value" style="font-size:12px;font-family:var(--font-mono);">${parseFloat(spot.lat).toFixed(6)}, ${parseFloat(spot.lng).toFixed(6)}</div>
+                    <div class="info-card-value spot-detail-coords">${parseFloat(spot.lat).toFixed(6)}, ${parseFloat(spot.lng).toFixed(6)}</div>
+                </div>
+                <div class="info-card">
+                    <div class="info-card-icon"><i class="fas fa-tag"></i></div>
+                    <div class="info-card-label">Category</div>
+                    <div class="info-card-value">${spot.category}</div>
                 </div>
                 ${spot.classification_status ? `
-                    <div class="info-card">
-                        <div class="info-card-label">Classification</div>
-                        <div class="info-card-value">${spot.classification_status}</div>
-                    </div>
+                <div class="info-card">
+                    <div class="info-card-icon"><i class="fas fa-layer-group"></i></div>
+                    <div class="info-card-label">Classification</div>
+                    <div class="info-card-value">${spot.classification_status}</div>
+                </div>
                 ` : ''}
+            </div>
+
+            <div class="spot-detail-section">
+                <div class="spot-detail-section-title">
+                    <i class="fas fa-info-circle"></i> Additional Information
+                </div>
+                <div class="info-grid info-grid-na">
+                    <div class="info-card info-card-na">
+                        <div class="info-card-icon"><i class="fas fa-phone"></i></div>
+                        <div class="info-card-label">Contact Information</div>
+                        <div class="info-card-value-na">Not available</div>
+                    </div>
+                    <div class="info-card info-card-na">
+                        <div class="info-card-icon"><i class="fas fa-water-ladder"></i></div>
+                        <div class="info-card-label">Facilities</div>
+                        <div class="info-card-value-na">Not available</div>
+                    </div>
+                    <div class="info-card info-card-na">
+                        <div class="info-card-icon"><i class="fas fa-person-hiking"></i></div>
+                        <div class="info-card-label">Activities</div>
+                        <div class="info-card-value-na">Not available</div>
+                    </div>
+                    <div class="info-card info-card-na">
+                        <div class="info-card-icon"><i class="fas fa-calendar-check"></i></div>
+                        <div class="info-card-label">Best Time to Visit</div>
+                        <div class="info-card-value-na">Not available</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="spot-detail-section">
+                <a href="https://www.google.com/maps/dir/?api=1&destination=${spot.lat},${spot.lng}" 
+                   target="_blank" rel="noopener noreferrer" 
+                   class="directions-btn">
+                    <i class="fas fa-directions"></i> Get Google Maps Directions
+                    <i class="fas fa-external-link-alt" style="font-size:10px;margin-left:4px;"></i>
+                </a>
             </div>
         `;
 
@@ -927,33 +1088,15 @@ function _runMapView() {
     }
 
     function goBack() {
-        if (sidebarState === 'spot' && selectedMunicipality) {
-            sidebarState = 'municipality';
-            selectedSpot = null;
-            document.getElementById('sidebarBackBtn').classList.add('hidden');
-            populateMunicipalityDetail(selectedMunicipality);
-            map.setView([selectedMunicipality.lat, selectedMunicipality.lng], 12);
-        }
+        closeSidebar();
     }
 
     function closeSidebar() {
         const sidebar = document.getElementById('sidebarContainer');
         const overlay = document.getElementById('sidebarOverlay');
 
-        // Hide sidebar
         sidebar.classList.remove('active');
         overlay.classList.remove('active');
-
-        // Reset municipality markers to fully visible
-        allMarkers.forEach(marker => {
-            marker.setOpacity(1);
-            if (marker.getTooltip()) {
-                marker.getTooltip().setOpacity(1);
-            }
-        });
-
-        // Restore all spot markers
-        showSpotMarkers();
 
         // Clear route
         if (currentRouteLayer) {
@@ -961,13 +1104,18 @@ function _runMapView() {
             currentRouteLayer = null;
         }
 
-        // Reset map view
-        map.fitBounds(laUnionBounds);
-        
-        // Reset state
-        selectedMunicipality = null;
+        // Reset spot selection but keep municipality selected
         selectedSpot = null;
         sidebarState = 'municipality';
+
+        // Reset active spot marker highlight
+        if (activeSpotMarker) {
+            activeSpotMarker.setZIndexOffset(0);
+            if (activeSpotMarker._icon) {
+                activeSpotMarker._icon.style.transform = 'scale(1)';
+            }
+            activeSpotMarker = null;
+        }
     }
 
     window.setMainImage = function(index, thumbnail) {
@@ -1036,28 +1184,27 @@ function _runMapView() {
         const backBtn = document.getElementById('sidebarBackBtn');
         const overlay = document.getElementById('sidebarOverlay');
         const mapTabs = document.querySelectorAll('.map-tab');
+        const muniDeselectBtn = document.getElementById('muniDeselectBtn');
 
-        // Close button
         closeBtn.addEventListener('click', closeSidebar);
-        
-        // Back button
         backBtn.addEventListener('click', goBack);
-        
-        // Overlay click
         overlay.addEventListener('click', closeSidebar);
 
-        // Escape key
+        if (muniDeselectBtn) {
+            muniDeselectBtn.addEventListener('click', deselectMunicipality);
+        }
+
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
-                if (sidebarState === 'spot' && selectedMunicipality) {
-                    goBack();
-                } else {
+                const sidebar = document.getElementById('sidebarContainer');
+                if (sidebar && sidebar.classList.contains('active')) {
                     closeSidebar();
+                } else if (selectedMunicipality) {
+                    deselectMunicipality();
                 }
             }
         });
 
-        // Add accessibility focus management
         closeBtn.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
@@ -1092,8 +1239,13 @@ function _runMapView() {
 
 // Run immediately if the DOM element is already present (SPA injection),
 // otherwise wait for DOMContentLoaded (fresh page load).
-if (document.getElementById('lupto-map')) {
+// Skip auto-init on tourist-spots page — initializeAll() handles it via refreshLuptoMap.
+if (document.getElementById('lupto-map') && !document.getElementById('cardsView')) {
     initMapView();
 } else {
-    document.addEventListener('DOMContentLoaded', initMapView);
+    document.addEventListener('DOMContentLoaded', function() {
+        if (document.getElementById('lupto-map') && !document.getElementById('cardsView')) {
+            initMapView();
+        }
+    });
 }

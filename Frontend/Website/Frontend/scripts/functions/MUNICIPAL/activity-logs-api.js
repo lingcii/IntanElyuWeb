@@ -1,4 +1,4 @@
-/**
+﻿/**
  * MUNICIPAL Activity Logs API Functions
  * Uses centralized API_CONFIG for real-time database operations
  */
@@ -24,7 +24,7 @@ export function startAutoRefresh(callback) {
         try {
             await callback();
         } catch (err) {
-            console.warn('[Activity Logs] Auto-refresh failed:', err);
+            void 0;
         }
     }, 30000);
 }

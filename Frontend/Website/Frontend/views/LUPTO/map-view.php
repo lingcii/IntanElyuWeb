@@ -58,9 +58,18 @@ ob_start();
 ?>
     <div class="lupto-fullscreen-map-wrapper">
         <div class="lupto-map-controls-panel">
-            <h3 class="card-title" style="margin:0;">
-                <i class="fas fa-map"></i> La Union Interactive Map
-            </h3>
+            <div class="lupto-controls-title-row">
+                <h3 class="card-title" style="margin:0;">
+                    <i class="fas fa-map"></i> La Union Interactive Map
+                </h3>
+                <div class="selected-muni-badge" id="selectedMuniBadge" style="display:none;">
+                    <i class="fas fa-map-pin"></i>
+                    <span id="selectedMuniName"></span>
+                    <button class="muni-deselect-btn" id="muniDeselectBtn" aria-label="Deselect municipality">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
             <div class="map-view-toolbar">
                 <div class="map-tabs" aria-label="Map layer switcher">
                     <button class="map-tab active" data-view="street" type="button">

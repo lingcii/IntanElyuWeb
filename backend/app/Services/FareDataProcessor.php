@@ -18,7 +18,7 @@ class FareDataProcessor
         $this->userId = $userId;
     }
 
-    public function processUpload(string $filePath, string $originalFileName, int $fileSize, string $fileType): array
+    public function processUpload(string $filePath, string $originalFileName, int $fileSize, string $fileType, ?string $allowedVehicleType = null, array $formMetadata = []): array
     {
         try {
             $this->uploadId = $this->createUploadRecord($originalFileName, $filePath, $fileSize, $fileType);
@@ -26,8 +26,8 @@ class FareDataProcessor
 
             $this->updateUploadStatus('processing');
 
-            $parser          = new FarePDFParser($this->uploadId);
-            $data            = $parser->parsePDF($filePath, $this->uploadId, $originalFileName);
+            $parser          = new FareCSVParser($this->uploadId);
+            $data            = $parser->parseCSV($filePath, $this->uploadId, $originalFileName, $formMetadata);
 
             $validator       = new FareDataValidator($this->uploadId);
             $validationResult = $validator->validate($data);
@@ -38,11 +38,32 @@ class FareDataProcessor
                 $this->log('warning', 'Validation errors found', 'Count: ' . count($validationResult['errors']));
             }
 
+            if ($allowedVehicleType !== null && !empty($data['vehicle_type']) && $data['vehicle_type'] !== $allowedVehicleType) {
+                $this->updateUploadStatus('failed', "Vehicle type '{$data['vehicle_type']}' is not allowed. Only '{$allowedVehicleType}' is permitted for your role.");
+                $this->log('error', 'Vehicle type rejected', "Expected '{$allowedVehicleType}', got '{$data['vehicle_type']}'");
+                return [
+                    'success'       => false,
+                    'upload_id'     => $this->uploadId,
+                    'fare_guide_id' => null,
+                    'total_records' => count($data['fares']),
+                    'valid_records' => $validationResult['valid_count'],
+                    'errors'        => $validationResult['errors'],
+                    'error'         => "Only '{$allowedVehicleType}' vehicle type is allowed. The uploaded CSV contains '{$data['vehicle_type']}'.",
+                ];
+            }
+
             $fareGuideId = null;
             if ($validationResult['valid_count'] > 0) {
-                $fareGuideId = $this->saveFareGuide($data);
-                $this->saveFareMatrices($fareGuideId, $data['fares']);
-                $this->log('info', 'Data saved', "Fare Guide ID: {$fareGuideId}");
+                \Illuminate\Support\Facades\DB::beginTransaction();
+                try {
+                    $fareGuideId = $this->saveFareGuide($data);
+                    $this->saveFareMatrices($fareGuideId, $data['fares']);
+                    \Illuminate\Support\Facades\DB::commit();
+                    $this->log('info', 'Data saved', "Fare Guide ID: {$fareGuideId}");
+                } catch (\Exception $e) {
+                    \Illuminate\Support\Facades\DB::rollBack();
+                    throw $e;
+                }
             }
 
             $this->updateUploadStatus('completed');
@@ -69,6 +90,7 @@ class FareDataProcessor
             'file_name'   => $fileName,
             'file_path'   => $filePath,
             'file_size'   => $fileSize,
+            'mime_type'   => $fileType,
             'file_type'   => $fileType,
             'uploaded_by' => $this->userId,
             'status'      => 'pending',
@@ -106,7 +128,6 @@ class FareDataProcessor
             'vehicle_type'   => $data['vehicle_type'],
             'region'         => $data['region'],
             'effective_date' => $data['effective_date'],
-            'plate_number'   => $data['plate_number'] ?? null,
             'status'         => 'active',
             'created_by'     => $this->userId,
         ]);
@@ -135,8 +156,8 @@ class FareDataProcessor
             ImportLog::create([
                 'fare_upload_id' => $this->uploadId,
                 'action'         => $action,
+                'message'        => "[{$severity}] {$action}",
                 'details'        => $details,
-                'severity'       => $severity,
             ]);
         } catch (Exception) {}
     }

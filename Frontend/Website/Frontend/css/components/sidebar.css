@@ -123,6 +123,34 @@
     overflow-x: hidden;
 }
 
+/* ── Nav section groups ────────────────────────────────────────── */
+.nav-section {
+    margin-bottom: 6px;
+}
+
+.nav-section:last-child {
+    margin-bottom: 0;
+}
+
+.nav-section + .nav-section {
+    padding-top: 12px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    margin-top: 6px;
+}
+
+.nav-section-label {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    color: rgba(148, 163, 184, 0.45);
+    padding: 8px 16px 6px 16px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-family: sans-serif;
+}
+
 .sidebar-nav::-webkit-scrollbar { width: 4px; }
 .sidebar-nav::-webkit-scrollbar-thumb { background: rgba(255,255,255,.12); border-radius: 2px; }
 
@@ -207,8 +235,10 @@
 
 .sidebar.collapsed .brand-info,
 .sidebar.collapsed .nav-label,
+.sidebar.collapsed .nav-section-label,
 .sidebar-collapsed-initial .sidebar .brand-info,
-.sidebar-collapsed-initial .sidebar .nav-label {
+.sidebar-collapsed-initial .sidebar .nav-label,
+.sidebar-collapsed-initial .sidebar .nav-section-label {
     opacity: 0;
     pointer-events: none;
 }
