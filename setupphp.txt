@@ -12,3 +12,11 @@ php artisan serve --host=127.0.0.1 --port=8000
 
 cd Frontend\Website\Frontend
 php -S localhost:8080
+
+
+git add .
+
+git commit -m "Configure API for Railway and fix database cache setup"
+
+
+git push origin main
