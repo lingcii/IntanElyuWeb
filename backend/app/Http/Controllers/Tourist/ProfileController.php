@@ -29,15 +29,15 @@ class ProfileController extends Controller
                             COALESCE(up.total_points, 0) DESC,
                             COALESCE(up.completed_activities, 0) DESC,
                             COALESCE(up.points_since, u.created_at) ASC
-                    ) AS `rank`
+                    ) AS user_rank
                 FROM users u
                 LEFT JOIN user_points up ON up.user_id = u.id
                 WHERE u.role = 'tourist' AND u.status = 'active'
             )
-            SELECT `rank` FROM ranked WHERE user_id = ?
+            SELECT user_rank FROM ranked WHERE user_id = ?
         ", [$user->id]);
 
-        $myRank = $rankData ? (int) $rankData->rank : null;
+        $myRank = $rankData ? (int) $rankData->user_rank : null;
 
         // 2. Places Visited
         $placesVisited = ItineraryItem::whereHas('itinerary', function($q) use ($user) {

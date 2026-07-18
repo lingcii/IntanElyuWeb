@@ -14,14 +14,24 @@ return new class extends Migration
 {
     public function up(): void
     {
-        // MySQL won't let you ALTER an ENUM to VARCHAR directly with Blueprint
-        // when there are existing rows — use a raw statement instead.
-        DB::statement("ALTER TABLE tourist_spots MODIFY COLUMN category VARCHAR(255) NOT NULL DEFAULT 'Other'");
+        if (DB::getDriverName() === 'pgsql') {
+            DB::statement("ALTER TABLE tourist_spots ALTER COLUMN category TYPE VARCHAR(255), ALTER COLUMN category SET NOT NULL, ALTER COLUMN category SET DEFAULT 'Other'");
+        } else {
+            DB::statement("ALTER TABLE tourist_spots MODIFY COLUMN category VARCHAR(255) NOT NULL DEFAULT 'Other'");
+        }
     }
 
     public function down(): void
     {
-        // Revert to the original ENUM (single-value only)
-        DB::statement("ALTER TABLE tourist_spots MODIFY COLUMN category ENUM('Beach','Mountain','Historical','Waterfalls','Adventure','Farm','Religious','Other') NOT NULL DEFAULT 'Other'");
+        if (DB::getDriverName() === 'pgsql') {
+            try {
+                DB::statement("CREATE TYPE tourist_spots_category_enum AS ENUM('Beach','Mountain','Historical','Waterfalls','Adventure','Farm','Religious','Other')");
+            } catch (\Exception $e) {
+                // Type might already exist
+            }
+            DB::statement("ALTER TABLE tourist_spots ALTER COLUMN category TYPE tourist_spots_category_enum USING category::tourist_spots_category_enum, ALTER COLUMN category SET DEFAULT 'Other'");
+        } else {
+            DB::statement("ALTER TABLE tourist_spots MODIFY COLUMN category ENUM('Beach','Mountain','Historical','Waterfalls','Adventure','Farm','Religious','Other') NOT NULL DEFAULT 'Other'");
+        }
     }
 };

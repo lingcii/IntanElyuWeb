@@ -28,7 +28,7 @@ class LeaderboardController extends Controller
                             COALESCE(up.total_points, 0)               DESC,
                             COALESCE(up.completed_activities, 0)        DESC,
                             COALESCE(up.points_since, u.created_at)     ASC
-                    ) AS `rank`
+                    ) AS user_rank
                 FROM users u
                 LEFT JOIN user_points up ON up.user_id = u.id
                 LEFT JOIN municipalities m ON m.id = u.municipality_id
@@ -40,7 +40,7 @@ class LeaderboardController extends Controller
     public function top3(): JsonResponse
     {
         $rows = \Illuminate\Support\Facades\Cache::remember('leaderboard:top3', 60, function () {
-            $rows = DB::select($this->rankedCte() . 'SELECT * FROM ranked WHERE `rank` <= 3 ORDER BY `rank` ASC');
+            $rows = DB::select($this->rankedCte() . 'SELECT * FROM ranked WHERE user_rank <= 3 ORDER BY user_rank ASC');
             return $this->castRows($rows);
         });
 
@@ -98,7 +98,8 @@ class LeaderboardController extends Controller
 
         if ($request->filled('search')) {
             $search = $request->get('search');
-            $whereClause = "WHERE full_name LIKE ? OR CAST(user_id AS CHAR) LIKE ?";
+            $castType = DB::getDriverName() === 'pgsql' ? 'VARCHAR' : 'CHAR';
+            $whereClause = "WHERE full_name LIKE ? OR CAST(user_id AS {$castType}) LIKE ?";
             $params      = ["%{$search}%", "%{$search}%"];
         }
 
@@ -145,7 +146,7 @@ class LeaderboardController extends Controller
                 'total_points'         => (int) $r->total_points,
                 'completed_activities' => (int) $r->completed_activities,
                 'spots_managed'        => (int) ($r->spots_managed ?? 0),
-                'rank'                 => (int) $r->rank,
+                'rank'                 => (int) $r->user_rank,
                 'points_since'         => $r->points_since,
             ];
         }, $rows);

@@ -20,30 +20,28 @@ return [
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => env('CORS_ALLOWED_ORIGINS')
-        ? explode(',', env('CORS_ALLOWED_ORIGINS'))
-        : [
-            // Mobile PHP built-in dev server (port 3000)
-            'http://localhost:3000',
-            'http://127.0.0.1:3000',
+    'allowed_origins' => [
+        // Mobile PHP built-in dev server (port 3000)
+        'http://localhost:3000',
+        'http://127.0.0.1:3000',
 
-            // Website PHP built-in dev server (port 8080)
-            'http://localhost:8080',
-            'http://127.0.0.1:8080',
-            'http://localhost:8081',
+        // Website PHP built-in dev server (port 8080)
+        'http://localhost:8080',
+        'http://127.0.0.1:8080',
+        'http://localhost:8081',
 
-            // Laravel itself (for same-origin requests / Artisan serve)
-            'http://localhost:8000',
-            'http://127.0.0.1:8000',
+        // Laravel itself (for same-origin requests / Artisan serve)
+        'http://localhost:8000',
+        'http://127.0.0.1:8000',
 
-            // Generic localhost (no port)  kept for compatibility
-            'http://localhost',
-            'http://127.0.0.1',
+        // Generic localhost (no port) � kept for compatibility
+        'http://localhost',
+        'http://127.0.0.1',
 
-            // Auto-Injected Ngrok URL (updated by configure-tunnels.js at runtime)
-            // Cloudflare tunnel (remote access / staging)
-            'https://boc-cornell-rolled-delicious.trycloudflare.com',
-        ],
+        // Auto-Injected Ngrok URL (updated by configure-tunnels.js at runtime)
+        // Cloudflare tunnel (remote access / staging)
+        'https://boc-cornell-rolled-delicious.trycloudflare.com',
+    ],
 
     'allowed_origins_patterns' => [],
 

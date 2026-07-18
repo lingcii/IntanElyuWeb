@@ -3,3 +3,12 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 
 
 .\start-dev.ps1
+
+
+
+cd backend
+php artisan serve --host=127.0.0.1 --port=8000
+
+
+cd Frontend\Website\Frontend
+php -S localhost:8080

@@ -13,10 +13,7 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        // Trust all reverse proxies for Railway load balancer SSL termination (HTTPS)
-        $middleware->trustProxies(at: '*');
-
-        // CORS - allow the React dev server (port 5173) and same origin
+        // CORS — allow the React dev server (port 5173) and same origin
         $middleware->api(prepend: [
             \Illuminate\Http\Middleware\HandleCors::class,
             \Illuminate\Session\Middleware\StartSession::class,

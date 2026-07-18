@@ -15,19 +15,28 @@
 
     // ── Top-level guard ──────────────────────────────────────────────────────────
     // This exits immediately if the script was already loaded to prevent duplicate logic.
-    if (window.__API_CONFIG_LOADED__) {
-        void 0;
-        return;
-    }
-    window.__API_CONFIG_LOADED__ = true;
+   if (window.__API_CONFIG_LOADED__) {
+    return;
+}
+window.__API_CONFIG_LOADED__ = true;
 
-    // Always derive the host from the CURRENT page location.
-    // This guarantees API calls always match whatever host/port the
-    // browser actually used to load the page, so the session cookie
-    // (scoped to that same host) is always sent.
-    const apiHost = window.location.hostname || '127.0.0.1';
-    const apiPort = '8000';
-    const baseUrl = `${window.location.protocol}//${apiHost}:${apiPort}`;
+/**
+ * Backend Configuration
+ * Set USE_RAILWAY to:
+ *  - true  = Use Railway backend
+ *  - false = Use local Laravel (php artisan serve)
+ */
+const USE_RAILWAY = true;
+
+const LOCAL_BASE_URL =
+    `${window.location.protocol}//${window.location.hostname}:8000`;
+
+const RAILWAY_BASE_URL =
+    'https://intanelyu-production.up.railway.app';
+
+const baseUrl = USE_RAILWAY
+    ? RAILWAY_BASE_URL
+    : LOCAL_BASE_URL;
 
     // Dynamically calculate the frontend base URL to support both XAMPP subfolders and php -S
     let frontendBaseUrl = '';
