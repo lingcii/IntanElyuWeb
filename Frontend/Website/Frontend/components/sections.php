@@ -110,6 +110,7 @@ if (str_starts_with($entryFileDir, $frontendRootPath)) {
     <script src="<?= $basePath ?>scripts/components/sidebar.js"></script>
     <script src="<?= $basePath ?>scripts/map-cache.js"></script>
     <script src="<?= $basePath ?>scripts/spa-router.js"></script>
+    <script src="<?= $basePath ?>scripts/functions/draft-manager.js"></script>
     <script src="<?= $basePath ?>scripts/logout.js"></script>
 
 <?php if (!empty($_SESSION['must_change_password'])): ?>

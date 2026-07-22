@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // Start session only if not already started
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -223,6 +223,25 @@ function timeAgo($datetime) {
 
 <!-- Logout Confirmation Modal Styles (inline for global availability) -->
 <style>
+#logoutConfirmModal, 
+#logoutConfirmModal button, 
+#logoutConfirmModal p, 
+#logoutConfirmModal h1, 
+#logoutConfirmModal h2, 
+#logoutConfirmModal h3, 
+#logoutConfirmModal h4, 
+#logoutConfirmModal span:not(.fas):not(.far):not(.fa) {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
+}
+
+#logoutConfirmModal i,
+#logoutConfirmModal .fas,
+#logoutConfirmModal .far,
+#logoutConfirmModal .fa,
+#logoutConfirmModal [class*="fa-"] {
+  font-family: "Font Awesome 6 Free", "Font Awesome 5 Free", "FontAwesome" !important;
+}
+
 #logoutConfirmModal {
   display: none;
   position: fixed;

@@ -13,9 +13,12 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        // CORS — allow the React dev server (port 5173) and same origin
-        $middleware->api(prepend: [
+        // Register CORS globally so error responses & preflights always include CORS headers
+        $middleware->use([
             \Illuminate\Http\Middleware\HandleCors::class,
+        ]);
+
+        $middleware->api(prepend: [
             \Illuminate\Session\Middleware\StartSession::class,
         ]);
 

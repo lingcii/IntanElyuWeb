@@ -2,163 +2,108 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\FeedbackImage;
 use App\Models\SiteFeedback;
+use App\Models\FeedbackImage;
 use App\Models\TouristSpot;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 
 class FeedbackController extends Controller
 {
     /**
      * GET /api/tourist/feedback
-     * Returns testimonies and policy recommendations, optionally filtered by tourist_spot_id.
+     * List feedback for a tourist spot (mobile app).
      */
-    public function index(Request $request): JsonResponse
+    public function index(Request $request)
     {
-        $spotId = $request->query('tourist_spot_id');
+        $spotId  = $request->get('tourist_spot_id');
+        $perPage = min((int) $request->get('per_page', 10), 50);
 
-        $query = SiteFeedback::with(['user:id,name,avatar', 'images:id,feedback_id,image_path'])
-            ->latest();
+        $query = SiteFeedback::with(['user', 'images'])
+            ->whereNotNull('rating');
 
         if ($spotId) {
             $query->where('tourist_spot_id', $spotId);
         }
 
-        $feedbacks = $query->get();
+        $paginated = $query->orderByDesc('created_at')->paginate($perPage);
 
-        // Calculate summary metrics if spot ID is provided
-        $summary = null;
-        if ($spotId) {
-            $spot = TouristSpot::find($spotId);
-
-            // Calculate distributions
-            $crowdDistribution = SiteFeedback::where('tourist_spot_id', $spotId)
-                ->select('crowd_level', DB::raw('count(*) as count'))
-                ->whereNotNull('crowd_level')
-                ->groupBy('crowd_level')
-                ->pluck('count', 'crowd_level');
-
-            $cleanlinessDistribution = SiteFeedback::where('tourist_spot_id', $spotId)
-                ->select('cleanliness_level', DB::raw('count(*) as count'))
-                ->whereNotNull('cleanliness_level')
-                ->groupBy('cleanliness_level')
-                ->pluck('count', 'cleanliness_level');
-
-            $safetyDistribution = SiteFeedback::where('tourist_spot_id', $spotId)
-                ->select('safety_level', DB::raw('count(*) as count'))
-                ->whereNotNull('safety_level')
-                ->groupBy('safety_level')
-                ->pluck('count', 'safety_level');
-
-            $summary = [
-                'average_rating' => $spot ? round($spot->rating, 1) : 0,
-                'total_reviews' => SiteFeedback::where('tourist_spot_id', $spotId)->count(),
-                'crowd' => [
-                    'low' => (int)($crowdDistribution['low'] ?? 0),
-                    'medium' => (int)($crowdDistribution['medium'] ?? 0),
-                    'high' => (int)($crowdDistribution['high'] ?? 0),
-                ],
-                'cleanliness' => [
-                    'clean' => (int)($cleanlinessDistribution['clean'] ?? 0),
-                    'moderate' => (int)($cleanlinessDistribution['moderate'] ?? 0),
-                    'dirty' => (int)($cleanlinessDistribution['dirty'] ?? 0),
-                ],
-                'safety' => [
-                    'safe' => (int)($safetyDistribution['safe'] ?? 0),
-                    'moderate' => (int)($safetyDistribution['moderate'] ?? 0),
-                    'unsafe' => (int)($safetyDistribution['unsafe'] ?? 0),
-                ]
-            ];
-        }
+        $items = collect($paginated->items())->map(fn($fb) => [
+            'id'           => $fb->id,
+            'rating'       => $fb->rating,
+            'comment'      => $fb->testimony,
+            'crowd_level'  => $fb->crowd_level,
+            'cleanliness'  => $fb->cleanliness_level,
+            'safety'       => $fb->safety_level,
+            'user_name'    => $fb->user?->name ?? 'Anonymous',
+            'user_avatar'  => $fb->user?->avatar,
+            'date'         => $fb->created_at?->format('M d, Y'),
+            'images'       => $fb->images->map(fn($img) => $img->image_path)->values(),
+        ]);
 
         return response()->json([
-            'status' => 'success',
-            'data' => $feedbacks,
-            'summary' => $summary
+            'data'         => $items,
+            'current_page' => $paginated->currentPage(),
+            'last_page'    => $paginated->lastPage(),
+            'total'        => $paginated->total(),
         ]);
     }
 
     /**
      * POST /api/tourist/feedback
-     * Submit a testimony and/or policy recommendation with optional images.
+     * Submit a new review from the mobile app.
      */
-    public function store(Request $request): JsonResponse
+    public function store(Request $request)
     {
-        $request->validate([
-            'tourist_spot_id' => 'nullable|integer|exists:tourist_spots,id',
-            'rating' => 'nullable|integer|between:1,5',
-            'testimony' => 'nullable|string',
-            'policy_recommendation' => 'nullable|string',
-            'crowd_level' => 'nullable|string|in:low,medium,high',
-            'cleanliness_level' => 'nullable|string|in:clean,moderate,dirty',
-            'safety_level' => 'nullable|string|in:safe,moderate,unsafe',
-            'images.*' => 'nullable|image|max:10240', // Max 10MB per image
+        $userId = $request->session()->get('user_id');
+        if (!$userId) {
+            return response()->json(['error' => 'Unauthorized'], 401);
+        }
+
+        $validated = $request->validate([
+            'tourist_spot_id'       => 'required|exists:tourist_spots,id',
+            'rating'                => 'required|integer|min:1|max:5',
+            'testimony'             => 'nullable|string|max:2000',
+            'policy_recommendation' => 'nullable|string|max:2000',
+            'crowd_level'           => 'nullable|in:low,medium,high',
+            'cleanliness_level'     => 'nullable|in:clean,moderate,dirty',
+            'safety_level'          => 'nullable|in:safe,moderate,unsafe',
+            'images'                => 'nullable|array|max:5',
+            'images.*'              => 'nullable|image|max:5120',
         ]);
 
-        $user = $request->user();
-
-        // Save feedback
         $feedback = SiteFeedback::create([
-            'user_id' => $user ? $user->id : ($request->session()->get('user_id') ?? 1),
-            'tourist_spot_id' => $request->tourist_spot_id,
-            'rating' => $request->rating,
-            'testimony' => $request->testimony,
-            'policy_recommendation' => $request->policy_recommendation,
-            'crowd_level' => $request->crowd_level,
-            'cleanliness_level' => $request->cleanliness_level,
-            'safety_level' => $request->safety_level,
+            'user_id'               => $userId,
+            'tourist_spot_id'       => $validated['tourist_spot_id'],
+            'rating'                => $validated['rating'],
+            'testimony'             => $validated['testimony'] ?? null,
+            'policy_recommendation' => $validated['policy_recommendation'] ?? null,
+            'crowd_level'           => $validated['crowd_level'] ?? null,
+            'cleanliness_level'     => $validated['cleanliness_level'] ?? null,
+            'safety_level'          => $validated['safety_level'] ?? null,
         ]);
 
-        // Handle Image Uploads
+        // Handle uploaded images
         if ($request->hasFile('images')) {
-            foreach ($request->file('images') as $imageFile) {
-                if ($imageFile->isValid()) {
-                    $filename = 'fb_' . time() . '_' . uniqid() . '.' . $imageFile->getClientOriginalExtension();
-                    $destinationPath = storage_path('app/public/feedback_images');
-                    if (!file_exists($destinationPath)) {
-                        mkdir($destinationPath, 0777, true);
-                    }
-                    if (!is_writable($destinationPath)) {
-                        @chmod($destinationPath, 0777);
-                        if (str_starts_with(PHP_OS, 'WIN')) {
-                            @exec('attrib -r "' . $destinationPath . '" /d');
-                        }
-                    }
-                    $imageFile->move($destinationPath, $filename);
-
-                    FeedbackImage::create([
-                        'feedback_id' => $feedback->id,
-                        'image_path'  => '/storage/feedback_images/' . $filename,
-                    ]);
-                }
+            foreach ($request->file('images') as $file) {
+                $path = $file->store('feedback', 'public');
+                FeedbackImage::create([
+                    'feedback_id' => $feedback->id,
+                    'image_path'  => $path,
+                ]);
             }
         }
 
-        // If specific tourist spot feedback is given with a rating, recalculate average rating
-        if ($request->tourist_spot_id && $request->rating) {
-            $spot = TouristSpot::find($request->tourist_spot_id);
-            if ($spot) {
-                $avgRating = SiteFeedback::where('tourist_spot_id', $spot->id)
-                    ->whereNotNull('rating')
-                    ->avg('rating');
-                $spot->rating = round($avgRating, 2);
-                $spot->save();
-
-                \Illuminate\Support\Facades\Cache::forget('feedback_stats_province');
-                \Illuminate\Support\Facades\Cache::forget('feedback_gallery_province');
-                if ($spot->municipality_id) {
-                    \Illuminate\Support\Facades\Cache::forget("feedback_stats_muni_{$spot->municipality_id}");
-                    \Illuminate\Support\Facades\Cache::forget("feedback_gallery_muni_{$spot->municipality_id}");
-                }
-            }
-        }
+        // Update the spot's denormalized rating column
+        $avgRating = SiteFeedback::where('tourist_spot_id', $validated['tourist_spot_id'])
+            ->whereNotNull('rating')
+            ->avg('rating');
+        TouristSpot::where('id', $validated['tourist_spot_id'])
+            ->update(['rating' => round($avgRating, 2)]);
 
         return response()->json([
-            'status' => 'success',
-            'message' => 'Thank you for your testimony and feedback!',
-            'data' => $feedback->load('images')
-        ]);
+            'message'  => 'Feedback submitted successfully.',
+            'feedback' => $feedback->load(['images']),
+        ], 201);
     }
 }

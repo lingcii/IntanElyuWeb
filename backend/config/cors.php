@@ -16,7 +16,7 @@ return [
     |
     */
 
-    'paths' => ['api/*'],
+    'paths' => ['api/*', 'sanctum/csrf-cookie', '*'],
 
     'allowed_methods' => ['*'],
 
@@ -29,21 +29,24 @@ return [
         'http://localhost:8080',
         'http://127.0.0.1:8080',
         'http://localhost:8081',
+        'http://127.0.0.1:8081',
 
         // Laravel itself (for same-origin requests / Artisan serve)
         'http://localhost:8000',
         'http://127.0.0.1:8000',
 
-        // Generic localhost (no port) � kept for compatibility
+        // Generic localhost (no port)
         'http://localhost',
         'http://127.0.0.1',
 
-        // Auto-Injected Ngrok URL (updated by configure-tunnels.js at runtime)
         // Cloudflare tunnel (remote access / staging)
         'https://boc-cornell-rolled-delicious.trycloudflare.com',
     ],
 
-    'allowed_origins_patterns' => [],
+    'allowed_origins_patterns' => [
+        '#^https?://localhost(:\d+)?$#',
+        '#^https?://127\.0\.0\.1(:\d+)?$#',
+    ],
 
     'allowed_headers' => ['*'],
 

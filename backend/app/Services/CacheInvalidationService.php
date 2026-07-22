@@ -152,6 +152,11 @@ class CacheInvalidationService
         }
     }
 
+    public static function forgetTouristSpots(?int $muniId = null): void
+    {
+        self::invalidateTouristSpots($muniId);
+    }
+
     /**
      * Comprehensive targeted cache invalidation when a tourist spot is modified.
      */

@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class SystemStatus extends Model
 {
-    protected $table = 'system_status';
+    protected $table = 'system_statuses';
     public $timestamps = false;
 
     protected $fillable = [

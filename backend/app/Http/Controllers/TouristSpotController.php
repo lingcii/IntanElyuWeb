@@ -81,6 +81,9 @@ class TouristSpotController extends Controller
                 $query->where('municipality_id', $municipalityId);
             }
 
+            // Exclude drafts from standard spot list queries
+            $query->where('status', '!=', 'draft');
+
             $list = $query->latest()->get();
             return $this->attachPrimaryPhoto($list)->toArray();
         });
@@ -141,6 +144,129 @@ class TouristSpotController extends Controller
             'photo_url' => $url,
             'filename'  => $filename,
         ]);
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    //  DRAFT MANAGEMENT
+    // ──────────────────────────────────────────────────────────────────────────
+
+    /** GET /api/tourist-spots/draft */
+    public function getDraft(Request $request): JsonResponse
+    {
+        $userId = (int) $request->session()->get('user_id', 0);
+        $role   = $request->session()->get('user_role');
+        $muniId = (int) $request->session()->get('user_municipality_id', 0);
+
+        $query = TouristSpot::with(['municipality:id,name', 'images'])
+            ->where('status', 'draft');
+
+        if ($userId) {
+            $query->where('created_by', $userId);
+        } elseif (in_array($role, User::$MUNICIPAL_ROLES) && $muniId) {
+            $query->where('municipality_id', $muniId);
+        } else {
+            return response()->json(['draft' => null]);
+        }
+
+        $draft = $query->latest('id')->first();
+        if (!$draft) {
+            return response()->json(['draft' => null]);
+        }
+
+        return response()->json([
+            'draft' => $draft->toArray()
+        ]);
+    }
+
+    /** POST /api/tourist-spots/draft */
+    public function saveDraft(Request $request): JsonResponse
+    {
+        $userId = (int) $request->session()->get('user_id', 0);
+        $role   = $request->session()->get('user_role', 'lupto');
+        $muniId = (int) $request->session()->get('user_municipality_id', 0);
+
+        $draftId = $request->input('id');
+        $draft   = null;
+
+        if ($draftId) {
+            $draft = TouristSpot::where('id', $draftId)->where('status', 'draft')->first();
+        }
+
+        if (!$draft && $userId) {
+            $draft = TouristSpot::where('created_by', $userId)->where('status', 'draft')->latest('id')->first();
+        }
+
+        if (!$draft && in_array($role, User::$MUNICIPAL_ROLES) && $muniId) {
+            $draft = TouristSpot::where('municipality_id', $muniId)->where('status', 'draft')->latest('id')->first();
+        }
+
+        $data = [
+            'name'                  => $request->input('name') ?: 'Untitled Draft',
+            'municipality_id'       => $request->input('municipality_id') ? (int) $request->input('municipality_id') : ($muniId ?: 1),
+            'barangay'              => $request->input('barangay') ?: null,
+            'category'              => $request->input('category') ?: 'Other',
+            'entrance_fee'          => (float) ($request->input('entrance_fee') ?? 0),
+            'environmental_fee'     => (float) ($request->input('environmental_fee') ?? 0),
+            'fee_types'             => $request->input('fee_types') ?: [],
+            'description'           => $request->input('description') ?: '',
+            'latitude'              => $request->input('latitude') ? (float) $request->input('latitude') : null,
+            'longitude'             => $request->input('longitude') ? (float) $request->input('longitude') : null,
+            'opening_time'          => $request->input('opening_time') ?: null,
+            'closing_time'          => $request->input('closing_time') ?: null,
+            'is_maintenance'        => (bool) $request->input('is_maintenance', false),
+            'classification_status' => $request->input('classification_status') ?: 'EXISTING',
+            'status'                => 'draft',
+            'points'                => (int) ($request->input('points') ?? 50),
+            'created_by'            => $userId ?: null,
+            'creator_role'          => $role,
+        ];
+
+        if ($draft) {
+            $draft->update($data);
+        } else {
+            $draft = TouristSpot::create($data);
+        }
+
+        if ($request->has('images') && is_array($request->input('images'))) {
+            $draft->images()->delete();
+            foreach ($request->input('images') as $i => $img) {
+                $photoUrl = is_array($img) ? ($img['photo_url'] ?? '') : $img;
+                if ($photoUrl) {
+                    TouristSpotImage::create([
+                        'spot_id'    => $draft->id,
+                        'photo_url'  => $photoUrl,
+                        'is_primary'  => ($i === 0),
+                        'sort_order' => $i,
+                    ]);
+                }
+            }
+            if (count($request->input('images')) > 0) {
+                $firstUrl = is_array($request->input('images')[0]) ? ($request->input('images')[0]['photo_url'] ?? '') : $request->input('images')[0];
+                if ($firstUrl) {
+                    $draft->update(['photo_url' => $firstUrl]);
+                }
+            }
+        }
+
+        CacheInvalidationService::forgetTouristSpots();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Draft saved successfully.',
+            'draft'   => $draft->fresh(['images', 'municipality'])->toArray()
+        ]);
+    }
+
+    /** DELETE /api/tourist-spots/draft/{id} */
+    public function deleteDraft(Request $request, int $id): JsonResponse
+    {
+        $draft = TouristSpot::where('id', $id)->where('status', 'draft')->first();
+        if ($draft) {
+            $draft->images()->delete();
+            $draft->delete();
+            CacheInvalidationService::forgetTouristSpots();
+        }
+        return response()->json(['success' => true, 'message' => 'Draft deleted successfully.']);
     }
 
     public function store(Request $request): JsonResponse
@@ -241,14 +367,20 @@ class TouristSpotController extends Controller
                 'creator_role'          => $role,
             ];
 
-            // Use the cached column checks
-            if ($this->hasColumn('barangay')) {
-                $spotData['barangay'] = $data['barangay'] ?? null;
+            // If updating an existing draft, reuse that record instead of creating a duplicate
+            $draftId = $request->input('draft_id') ?: $request->input('id');
+            $existingDraft = null;
+            if ($draftId) {
+                $existingDraft = TouristSpot::where('id', $draftId)->where('status', 'draft')->first();
             }
 
-            // Create the spot manually to bypass automatic timestamps
-            $spot = new TouristSpot($spotData);
-            $spot->save();
+            if ($existingDraft) {
+                $existingDraft->update($spotData);
+                $spot = $existingDraft;
+            } else {
+                $spot = new TouristSpot($spotData);
+                $spot->save();
+            }
 
             $this->syncImages($spot->id, $data['images'] ?? []);
 
@@ -522,6 +654,19 @@ class TouristSpotController extends Controller
     {
         if (!$url) return null;
 
+        // If it's a full web URL (e.g. Unsplash), do NOT convert to serve-image.php unless it points to serve-image
+        if (str_starts_with($url, 'http://') || str_starts_with($url, 'https://')) {
+            if (str_contains($url, 'serve-image.php')) {
+                $parsed = parse_url($url);
+                parse_str($parsed['query'] ?? '', $params);
+                $filename = $params['file'] ?? null;
+                if ($filename) {
+                    return '/api/serve-image.php?file=' . urlencode($filename);
+                }
+            }
+            return $url;
+        }
+
         $filename = null;
 
         if (str_contains($url, 'serve-image.php')) {
@@ -529,8 +674,6 @@ class TouristSpotController extends Controller
             parse_str($parsed['query'] ?? '', $params);
             $filename = $params['file'] ?? null;
         } elseif (str_contains($url, '/api/images/tourist-spots/')) {
-            $filename = basename(parse_url($url, PHP_URL_PATH) ?? '');
-        } elseif (filter_var($url, FILTER_VALIDATE_URL)) {
             $filename = basename(parse_url($url, PHP_URL_PATH) ?? '');
         } elseif (str_starts_with($url, '/') || str_starts_with($url, '..')) {
             $filename = basename($url);

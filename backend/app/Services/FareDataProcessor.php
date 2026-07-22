@@ -100,6 +100,10 @@ class FareDataProcessor
 
     private function updateUploadStatus(string $status, ?string $errorMessage = null): void
     {
+        if (!$this->uploadId) {
+            return;
+        }
+
         $update = ['status' => $status];
         if ($status === 'completed') $update['processed_at'] = now();
         if ($errorMessage) $update['error_message'] = $errorMessage;
@@ -109,6 +113,10 @@ class FareDataProcessor
 
     private function updateUploadStats(int $total, int $valid): void
     {
+        if (!$this->uploadId) {
+            return;
+        }
+
         FareUpload::where('id', $this->uploadId)->update([
             'total_records' => $total,
             'valid_records' => $valid,

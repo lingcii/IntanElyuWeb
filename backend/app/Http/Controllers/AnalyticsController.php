@@ -48,12 +48,12 @@ class AnalyticsController extends Controller
         $data = Cache::remember($cacheKey, 3600, function () use ($isMuni, $muniId) {
             $totalMunis = $isMuni ? 1 : Municipality::count();
 
-            $spotQuery = DB::table('tourist_spots');
+            $spotQuery = DB::table('tourist_spots')->where('status', '!=', 'draft');
             if ($isMuni) $spotQuery->where('municipality_id', $muniId);
             $row = $spotQuery->selectRaw("COUNT(*) as total, SUM(status='approved') as approved, AVG(rating) as avg_rating")->first();
 
             // Real-time spots added in last 30 days
-            $newSpotsQuery = DB::table('tourist_spots')->where('created_at', '>=', now()->subDays(30));
+            $newSpotsQuery = DB::table('tourist_spots')->where('status', '!=', 'draft')->where('created_at', '>=', now()->subDays(30));
             if ($isMuni) $newSpotsQuery->where('municipality_id', $muniId);
             $newSpotsCount = $newSpotsQuery->count();
 

@@ -58,9 +58,9 @@ return new class extends Migration
             DB::statement("ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('tourist', 'pitco', 'lupto', 'municipal', '') OR role IS NULL)");
         } catch (\Exception $e) {}
 
-        // tourist_spots.status: moderation status ('pending', 'approved', 'rejected')
+        // tourist_spots.status: moderation status ('draft', 'pending', 'approved', 'rejected')
         try {
-            DB::statement("ALTER TABLE tourist_spots ADD CONSTRAINT tourist_spots_status_check CHECK (status IN ('pending', 'approved', 'rejected'))");
+            DB::statement("ALTER TABLE tourist_spots ADD CONSTRAINT tourist_spots_status_check CHECK (status IN ('draft', 'pending', 'approved', 'rejected'))");
         } catch (\Exception $e) {}
 
         // merch_reservations.status: only 'pending', 'claimed', 'cancelled'

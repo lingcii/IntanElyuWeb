@@ -81,9 +81,6 @@ ob_start();
                         <i class="fas fa-satellite"></i> Satellite
                     </button>
                 </div>
-                <button data-action="open-create-form" class="btn btn-primary" style="margin-left: auto;">
-                    <i class="fas fa-plus"></i> Add Spot
-                </button>
             </div>
         </div>
         

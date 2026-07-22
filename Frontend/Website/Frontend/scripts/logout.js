@@ -23,24 +23,32 @@
     }
 
     /**
-     * Perform logout: call the API endpoint to invalidate the Laravel session,
-     * then redirect to logout.php to destroy the PHP session.
+     * Perform instant logout: dispatches the API logout request non-blocking with keepalive: true,
+     * and instantly redirects to logout.php to destroy the PHP session without waiting for network latency.
      */
-    async function doLogout() {
+    function doLogout() {
+        const redirectUrl = getLoginUrl();
+
+        // Non-blocking background API fetch so user does NOT wait for cloud network latency
         try {
             const base = window.API_CONFIG ? window.API_CONFIG.BASE_URL : '';
             if (base) {
-                await fetch(`${base}/api/auth/logout`, {
+                fetch(`${base}/api/auth/logout`, {
                     method: 'POST',
                     credentials: 'include',
                     headers: { 'Accept': 'application/json' },
-                });
+                    keepalive: true,
+                }).catch(function () {});
             }
-        } catch (_) {
-            // Network error is non-fatal — still redirect to clear PHP session
-        } finally {
-            window.location.href = getLoginUrl();
-        }
+        } catch (_) {}
+
+        // Clear local storage / session storage tokens if present
+        try {
+            sessionStorage.clear();
+        } catch (_) {}
+
+        // Instant redirect to clear PHP session and open login.php
+        window.location.href = redirectUrl;
     }
     
     // Show logout confirmation modal

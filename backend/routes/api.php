@@ -8,7 +8,7 @@ use App\Http\Controllers\LeaderboardController;
 use App\Http\Controllers\MapController;
 use App\Http\Controllers\MunicipalityController;
 use App\Http\Controllers\NotificationController;
-use App\Http\Controllers\Pitco\ArchiveManagementController;
+use App\Http\Controllers\Picto\ArchiveManagementController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ReportGeneratorController;
 use App\Http\Controllers\SettingsController;
@@ -56,6 +56,9 @@ Route::middleware('auth.session')->group(function () {
     //  SHARED TOURIST SPOTS (all roles - PICTO: read-only; LUPTO/MUNICIPAL: full CRUD)
     // ─────────────────────────────────────────────────────────────────────────
     Route::prefix('tourist-spots')->group(function () {
+        Route::get('/draft',          [TouristSpotController::class, 'getDraft']);
+        Route::post('/draft',         [TouristSpotController::class, 'saveDraft']);
+        Route::delete('/draft/{id}',  [TouristSpotController::class, 'deleteDraft']);
         Route::get('/',               [TouristSpotController::class, 'index']);
         Route::get('/{id}',           [TouristSpotController::class, 'show']);
         Route::post('/upload-image',  [TouristSpotController::class, 'uploadImage']);

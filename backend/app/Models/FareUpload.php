@@ -11,7 +11,7 @@ class FareUpload extends Model
     protected $fillable = [
         'file_name', 'file_path', 'file_size', 'mime_type', 'file_type',
         'uploaded_by', 'status', 'total_records', 'valid_records',
-        'invalid_records', 'fare_guide_id'
+        'invalid_records', 'fare_guide_id', 'error_message', 'processed_at'
     ];
     
     public function uploader()

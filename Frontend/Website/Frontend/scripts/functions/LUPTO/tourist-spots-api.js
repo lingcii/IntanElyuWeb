@@ -1124,7 +1124,7 @@ function showSpotLightbox(images, initialIndex = 0, title = '') {
         };
 
         if (closeBtn) closeBtn.addEventListener('click', closeLightbox);
-        
+
         lightbox.onclick = (e) => {
             if (e.target === lightbox || e.target.classList.contains('spot-lightbox-content')) {
                 closeLightbox();
@@ -1183,7 +1183,7 @@ function setupGalleryKeyboardNav(images, getCurrentIndex, updateGalleryFn) {
     activeModalKeyHandler = (e) => {
         const spotModal = document.getElementById('spotModal');
         const lightbox = document.getElementById('spotLightbox');
-        
+
         if (lightbox && lightbox.classList.contains('active')) return;
 
         if (spotModal && spotModal.classList.contains('active')) {
@@ -1213,7 +1213,7 @@ window.openSpotModal = async function openSpotModal(spotId) {
     modal.classList.add('active');
     const modalTitleEl = document.getElementById('modalTitle');
     if (modalTitleEl) modalTitleEl.textContent = 'Loading...';
-    
+
     document.getElementById('modalBody').innerHTML = '<div class="spot-modal-loading-box"><i class="fas fa-spinner fa-spin"></i></div>';
 
     try {
@@ -1267,8 +1267,8 @@ window.openSpotModal = async function openSpotModal(spotId) {
                             <div class="detail-label">Category</div>
                             <div class="category-badges">
                                 ${(spot.category || 'Other').split(',').map(c => c.trim()).filter(Boolean).map(c =>
-                                    `<span class="cat-pill">${escapeHtml(c)}</span>`
-                                ).join('')}
+            `<span class="cat-pill">${escapeHtml(c)}</span>`
+        ).join('')}
                             </div>
                         </div>
                         <div class="spot-detail-card">
@@ -1422,6 +1422,19 @@ window.handleDragLeave = function (e) {
 };
 
 async function processImageFiles(files) {
+    const maxAllowed = 3;
+    const currentCount = uploadedImages.length;
+    if (currentCount >= maxAllowed) {
+        showToast('Maximum of 3 images allowed per tourist spot.', 'danger');
+        return;
+    }
+
+    let availableSlots = maxAllowed - currentCount;
+    if (files.length > availableSlots) {
+        showToast(`Maximum of 3 images allowed. Only the first ${availableSlots} image(s) will be added.`, 'warning');
+        files = Array.from(files).slice(0, availableSlots);
+    }
+
     // Filter valid files first
     const validFiles = [];
     for (const file of files) {
@@ -1903,27 +1916,138 @@ function formatFeesShort(spot) {
 // FORM OPERATIONS - CREATE/EDIT/SAVE
 // ════════════════════════════════════════════════════════════════════════════════
 
-window.openCreateForm = function () {
+function buildCurrentFormDraftPayload() {
+    const spotName = document.getElementById('spotName')?.value || '';
+    const spotCategory = document.getElementById('spotCategory')?.value || '';
+    const spotClassification = document.getElementById('spotClassification')?.value || 'EXISTING';
+    const spotFee = parseFloat(document.getElementById('spotFee')?.value) || 0;
+    const environmentalFee = parseFloat(document.getElementById('environmentalFee')?.value) || 0;
+    const feeTypes = getFeeTypesArray();
+    const lat = parseFloat(document.getElementById('spotLatitude')?.value) || null;
+    const lng = parseFloat(document.getElementById('spotLongitude')?.value) || null;
+    const barangay = document.getElementById('spotBarangay')?.value || null;
+    const description = document.getElementById('spotDescription')?.value || '';
+    const municipalityId = parseInt(document.getElementById('spotMunicipality')?.value) || null;
+    const openingTime = document.getElementById('spotOpeningTime')?.value || null;
+    const closingTime = document.getElementById('spotClosingTime')?.value || null;
+    const isMaintenance = document.getElementById('spotIsMaintenance')?.checked ? 1 : 0;
+    const points = parseInt(document.getElementById('spotPoints')?.value) || 50;
+
+    const cleanImages = uploadedImages
+        .filter(img => !img.isLoading && img.photo_url && !img.photo_url.startsWith('blob:'))
+        .map(img => ({ photo_url: img.photo_url, filename: img.filename || '' }));
+
+    return {
+        id: window.DraftManager?.getActiveDraftId() || null,
+        name: spotName || 'Untitled Draft',
+        category: spotCategory || 'Other',
+        classification_status: spotClassification,
+        entrance_fee: spotFee,
+        environmental_fee: environmentalFee,
+        fee_types: feeTypes,
+        latitude: lat,
+        longitude: lng,
+        barangay: barangay,
+        description: description,
+        municipality_id: municipalityId,
+        images: cleanImages,
+        opening_time: openingTime,
+        closing_time: closingTime,
+        is_maintenance: isMaintenance,
+        points: points
+    };
+}
+
+async function saveDraftFromForm(silent = false) {
+    if (!window.DraftManager) return;
+    const payload = buildCurrentFormDraftPayload();
+    const res = await window.DraftManager.saveDraft(payload);
+    if (res && res.success) {
+        window.DraftManager.setDirty(false);
+        if (!silent && typeof showToast === 'function') {
+            const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            showToast(`Draft saved successfully at ${timeStr}`, 'success');
+        }
+    }
+    return res;
+}
+
+function restoreDraftData(draft) {
+    initBlankCreateForm();
+    if (!draft) return;
+
+    window.DraftManager?.setActiveDraftId(draft.id);
+
+    if (draft.name && draft.name !== 'Untitled Draft') {
+        document.getElementById('spotName').value = draft.name;
+        document.getElementById('nameCharCount').textContent = draft.name.length;
+    }
+    if (draft.category) setSelectedCategories(draft.category);
+    if (draft.classification_status) {
+        const formStatus = statusDisplayMap[draft.classification_status] || draft.classification_status;
+        const sel = document.getElementById('spotClassification');
+        if (sel) sel.value = formStatus;
+    }
+
+    if (draft.entrance_fee) document.getElementById('spotFee').value = draft.entrance_fee;
+    if (draft.environmental_fee) document.getElementById('environmentalFee').value = draft.environmental_fee;
+    if (draft.fee_types) setFeeTypesFromData(draft.fee_types);
+
+    if (draft.latitude) document.getElementById('spotLatitude').value = draft.latitude;
+    if (draft.longitude) document.getElementById('spotLongitude').value = draft.longitude;
+    if (draft.description) {
+        document.getElementById('spotDescription').value = draft.description;
+        document.getElementById('descCharCount').textContent = draft.description.length;
+    }
+
+    if (draft.municipality_id) {
+        document.getElementById('spotMunicipality').value = draft.municipality_id;
+        onMunicipalityChange(draft.municipality_id);
+        if (draft.barangay) {
+            setTimeout(() => {
+                const bSel = document.getElementById('spotBarangay');
+                if (bSel) bSel.value = draft.barangay;
+            }, 60);
+        }
+    }
+
+    if (draft.opening_time) document.getElementById('spotOpeningTime').value = draft.opening_time;
+    if (draft.closing_time) document.getElementById('spotClosingTime').value = draft.closing_time;
+    if (draft.is_maintenance) document.getElementById('spotIsMaintenance').checked = true;
+    if (draft.points !== undefined) document.getElementById('spotPoints').value = draft.points;
+
+    if (draft.images && draft.images.length) {
+        uploadedImages = draft.images.map(i => ({ photo_url: i.photo_url, filename: i.filename || '' }));
+        renderImagePreviews();
+    }
+
+    document.getElementById('spotFormModal').classList.add('active');
+    setTimeout(initModalMap, 200);
+
+    window.DraftManager?.setDirty(false);
+    attachFormDirtyListeners();
+    window.DraftManager?.startAutoSave(() => saveDraftFromForm(true));
+}
+
+function initBlankCreateForm() {
     uploadedImages = [];
     pendingSaveData = null;
+    window.DraftManager?.setActiveDraftId(null);
+    window.DraftManager?.setDirty(false);
+
     document.getElementById('formModalTitle').textContent = 'Add New Spot';
     document.getElementById('spotId').value = '';
     document.getElementById('spotName').value = '';
     document.getElementById('nameCharCount').textContent = '0';
-    document.getElementById('spotPoints').value = '';
-    setSelectedCategories('');
-    const classificationSelect = document.getElementById('spotClassification');
-    const isPicto = window.userRole === 'picto';
-    classificationSelect.innerHTML = `
-        <option value="">— Select Status —</option>
-        <option value="EXISTING">Existing</option>
-        ${isPicto ? `
-        <option value="EMERGING">Emerging</option>
-        <option value="POTENTIAL">Potential</option>
-        ` : ''}
-    `;
-    classificationSelect.value = 'EXISTING';
     document.getElementById('spotPoints').value = '50';
+    setSelectedCategories('');
+
+    const classificationSelect = document.getElementById('spotClassification');
+    if (classificationSelect) {
+        classificationSelect.innerHTML = `<option value="">— Select Status —</option><option value="EXISTING">Existing</option>`;
+        classificationSelect.value = 'EXISTING';
+    }
+
     document.getElementById('spotFee').value = '0';
     document.getElementById('environmentalFee').value = '0';
     document.querySelectorAll('.fee-type-chk').forEach(chk => chk.checked = false);
@@ -1942,8 +2066,6 @@ window.openCreateForm = function () {
     document.getElementById('spotClosingTime').value = '17:00';
     document.getElementById('spotIsMaintenance').checked = false;
     document.getElementById('imagePreviews').innerHTML = '';
-
-    // Hide under maintenance field in add mode
     document.getElementById('maintenance-field').style.display = 'none';
 
     window.lastValidSpotCoords = { lat: null, lng: null };
@@ -1954,6 +2076,52 @@ window.openCreateForm = function () {
 
     document.getElementById('spotFormModal').classList.add('active');
     setTimeout(initModalMap, 200);
+
+    attachFormDirtyListeners();
+    window.DraftManager?.startAutoSave(() => saveDraftFromForm(true));
+}
+
+function attachFormDirtyListeners() {
+    const form = document.getElementById('spotForm');
+    if (!form || form.dataset.dirtyBound) return;
+    form.dataset.dirtyBound = 'true';
+
+    form.querySelectorAll('input, select, textarea').forEach(el => {
+        el.addEventListener('input', () => window.DraftManager?.setDirty(true));
+        el.addEventListener('change', () => window.DraftManager?.setDirty(true));
+    });
+}
+
+window.openCreateForm = async function () {
+    if (window.userRole === 'picto') return;
+    if (window.DraftManager) window.DraftManager.ensureModals();
+
+    const draft = await window.DraftManager?.fetchDraft();
+    if (draft) {
+        const modal = document.getElementById('draftFoundModal');
+        if (modal) {
+            window.DraftManager.setPendingDraft(draft);
+            modal.classList.add('active');
+
+            document.getElementById('btnContinueDraft').onclick = () => {
+                modal.classList.remove('active');
+                restoreDraftData(draft);
+            };
+            document.getElementById('btnStartNewDraft').onclick = () => {
+                modal.classList.remove('active');
+                initBlankCreateForm();
+            };
+            document.getElementById('btnDeleteDraft').onclick = async () => {
+                modal.classList.remove('active');
+                await window.DraftManager.deleteDraft(draft.id);
+                if (typeof showToast === 'function') showToast('Draft deleted successfully', 'info');
+                initBlankCreateForm();
+            };
+            return;
+        }
+    }
+
+    initBlankCreateForm();
 };
 
 window.editSpot = async function (spotId) {
@@ -2158,11 +2326,45 @@ window.useCurrentLocation = function () {
     }
 };
 
-window.closeFormModal = function () {
+window.attemptCloseFormModal = function () {
+    const isAddingNewSpot = !document.getElementById('spotId')?.value;
+    if (isAddingNewSpot && window.DraftManager?.isDirty()) {
+        const confirmModal = document.getElementById('saveAsDraftConfirmModal');
+        if (confirmModal) {
+            confirmModal.classList.add('active');
+
+            document.getElementById('btnConfirmSaveDraft').onclick = async () => {
+                confirmModal.classList.remove('active');
+                await saveDraftFromForm(false);
+                forceCloseFormModal();
+            };
+            document.getElementById('btnConfirmDiscardDraft').onclick = () => {
+                confirmModal.classList.remove('active');
+                window.DraftManager.setDirty(false);
+                forceCloseFormModal();
+            };
+            document.getElementById('btnConfirmContinueEditing').onclick = () => {
+                confirmModal.classList.remove('active');
+            };
+            return;
+        }
+    }
+
+    forceCloseFormModal();
+};
+
+function forceCloseFormModal() {
     uploadedImages = [];
     pendingSaveData = null;
+    window.DraftManager?.stopAutoSave();
+    window.DraftManager?.setActiveDraftId(null);
+    window.DraftManager?.setDirty(false);
+
     document.getElementById('spotFormModal')?.classList.remove('active');
     document.getElementById('duplicateSpotNameModal')?.classList.remove('active');
+    document.getElementById('saveAsDraftConfirmModal')?.classList.remove('active');
+    document.getElementById('draftFoundModal')?.classList.remove('active');
+
     const spotIdEl = document.getElementById('spotId');
     if (spotIdEl) spotIdEl.value = '';
     const spotNameEl = document.getElementById('spotName');
@@ -2172,7 +2374,9 @@ window.closeFormModal = function () {
         modalMap = null;
         modalMarker = null;
     }
-};
+}
+
+window.closeFormModal = window.attemptCloseFormModal;
 
 // ════════════════════════════════════════════════════════════════════════════════
 // FORM SUBMISSION WITH CONFIRMATION
@@ -2382,6 +2586,10 @@ window.confirmSaveSpot = async function () {
         void 0;
 
         if (res && (res.success || res.message)) {
+            window.DraftManager?.setDirty(false);
+            window.DraftManager?.setActiveDraftId(null);
+            window.DraftManager?.stopAutoSave();
+
             const saveData = pendingSaveData;
             setConfirmLoading(false);
             closeSaveConfirmModal();
@@ -2405,7 +2613,8 @@ window.confirmSaveSpot = async function () {
                     status: saveData.status || (window.userRole === 'municipal' ? 'pending' : 'approved'),
                     images: saveData.images || [],
                     photo_url: saveData.images && saveData.images[0] ? saveData.images[0].photo_url : '',
-                    municipality_name: document.getElementById('spotMunicipality')?.options[document.getElementById('spotMunicipality')?.selectedIndex]?.text || ''
+                    municipality_name: document.getElementById('spotMunicipality')?.options[document.getElementById('spotMunicipality')?.selectedIndex]?.text || '',
+                    created_at: new Date().toISOString()
                 };
                 if (window.touristSpotsData) window.touristSpotsData.unshift(newSpot);
                 if (window.touristSpotsAll) window.touristSpotsAll.unshift(newSpot);
@@ -2453,7 +2662,7 @@ window.confirmSaveSpot = async function () {
 // ════════════════════════════════════════════════════════════════════════════════
 
 const sortSpotsPendingFirst = (arr) => {
-    if (!arr) return;
+    if (!arr || !Array.isArray(arr)) return;
     arr.sort((a, b) => {
         const statusA = a.status || '';
         const statusB = b.status || '';
@@ -2462,7 +2671,13 @@ const sortSpotsPendingFirst = (arr) => {
 
         const timeA = new Date(a.created_at || 0).getTime();
         const timeB = new Date(b.created_at || 0).getTime();
-        return timeB - timeA;
+        if (timeA !== timeB && !isNaN(timeA) && !isNaN(timeB) && timeA > 0 && timeB > 0) {
+            return timeB - timeA;
+        }
+
+        const idA = parseInt(a.id) || 0;
+        const idB = parseInt(b.id) || 0;
+        return idB - idA;
     });
 };
 
@@ -2722,8 +2937,8 @@ export async function initializeAll(spotsData, municipalData) {
 
     startKpiAutoRefresh();
 
-    // Initialize decline modal (LUPTO and PICTO)
-    if (window.userRole === 'lupto' || window.userRole === 'picto') {
+    // Initialize decline modal (LUPTO only)
+    if (window.userRole === 'lupto') {
         try { initDeclineModal(); } catch (e) { console.error('initDeclineModal failed:', e); }
     }
 
@@ -2895,7 +3110,7 @@ function renderCardsGrid(spotsData) {
             html += `<div class="spot-image-placeholder"><i class="fas fa-image"></i><span>No image yet</span></div>`;
         }
         html += `</div>`;
-        if (approvalStatus !== 'pending') {
+        if (window.userRole !== 'picto' && approvalStatus !== 'pending') {
             html += `<div class="card-actions-dropdown">`;
             html += `<button class="dropdown-toggle" id="card-dropdown-${spot.id}"><i class="fas fa-ellipsis-v"></i></button>`;
             html += `<div class="dropdown-menu" id="card-menu-${spot.id}">`;
@@ -2918,7 +3133,7 @@ function renderCardsGrid(spotsData) {
         }
         html += `</div>`;
         html += `<p>${desc}${(spot.description || '').length > 100 ? '...' : ''}</p>`;
-        if (approvalStatus === 'pending' && (window.userRole === 'lupto' || window.userRole === 'picto')) {
+        if (approvalStatus === 'pending' && window.userRole === 'lupto') {
             html += `
             <div class="pending-card-actions" style="margin-top: auto; padding-top: 12px; border-top: 1px solid #F1F5F9;">
                 <button class="pending-btn-approve" onclick="window.approvePendingSpot(${spot.id})" title="Approve">
@@ -2989,7 +3204,7 @@ function renderTableRows(spotsData) {
         html += `<td>${feeDisplay}</td>`;
         html += `<td>${date}</td>`;
         html += `<td style="text-align:right;">`;
-        if (approvalStatus !== 'pending') {
+        if (window.userRole !== 'picto' && approvalStatus !== 'pending') {
             html += `<div class="table-actions-dropdown">`;
             html += `<button class="dropdown-toggle" id="tbl-dropdown-${spot.id}"><i class="fas fa-ellipsis-v"></i></button>`;
             html += `<div class="dropdown-menu" id="tbl-menu-${spot.id}">`;

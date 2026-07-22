@@ -16,6 +16,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Schema;
 use App\Services\CacheInvalidationService;
 
 class DashboardController extends Controller
@@ -26,7 +27,7 @@ class DashboardController extends Controller
      */
     private function dashboardFingerprint(bool $isMuni, int $municipalityId): string
     {
-        $query = DB::table('tourist_spots');
+        $query = DB::table('tourist_spots')->where('status', '!=', 'draft');
         if ($isMuni && $municipalityId) {
             $query->where('municipality_id', $municipalityId);
         }
@@ -38,14 +39,14 @@ class DashboardController extends Controller
         )->first();
 
         $fareCount = DB::table('fare_guides')->count();
-        $alertCount = DB::table('alerts')->where('is_read', false)->count();
+        $alertCount = DB::table('alerts')->where('is_active', true)->count();
         $activityCount = DB::table('activity_logs')->count();
 
         return md5(json_encode([$counts, $fareCount, $alertCount, $activityCount]));
     }
 
     /**
-     * GET /api/{role}/dashboard/poll
+     * GET /api/{role}/dashboard
      * Returns a cheap fingerprint hash for polling — no heavy data loading.
      * Frontend compares this to its last known hash and only does a full
      * refresh when the hash changes.
@@ -71,12 +72,12 @@ class DashboardController extends Controller
         $municipalityId = (int) $request->session()->get('user_municipality_id', 0);
         $isMuni         = in_array($role, User::$MUNICIPAL_ROLES) && $municipalityId;
 
-        $cacheKey = "dashboard:data:{$role}:{$municipalityId}:v3";
+        $cacheKey = "dashboard:data:{$role}:{$municipalityId}:v5";
         $cacheTtl = $isMuni ? 120 : 120;
 
         $payload = Cache::remember($cacheKey, $cacheTtl, function () use ($isMuni, $municipalityId) {
-            // 1. Tourist Spots counts
-            $spotCountsQuery = DB::table('tourist_spots');
+            // 1. Tourist Spots counts (exclude drafts)
+            $spotCountsQuery = DB::table('tourist_spots')->where('status', '!=', 'draft');
             if ($isMuni) {
                 $spotCountsQuery->where('municipality_id', $municipalityId);
             }
@@ -143,7 +144,8 @@ class DashboardController extends Controller
             $monthlyVisits = (int) $spotsVisitsQuery->sum('visits');
 
             // 6. User points total
-            $totalPoints = (int) DB::table('user_points')->sum('total_points');
+            $pointsCol = Schema::hasColumn('user_points', 'total_points') ? 'total_points' : (Schema::hasColumn('user_points', 'points') ? 'points' : null);
+            $totalPoints = $pointsCol ? (int) DB::table('user_points')->sum($pointsCol) : 0;
 
             $kpis = [
                 'total_municipalities'  => $isMuni ? 1 : Municipality::count(),
@@ -192,7 +194,7 @@ class DashboardController extends Controller
             $recentAlerts = [];
             $recentActivities = [];
             if (!$isMuni) {
-                $recentAlerts    = Alert::where('is_read', false)->latest()->take(5)->get(['id', 'message', 'type', 'created_at'])->toArray();
+                $recentAlerts    = Alert::where('is_active', true)->latest()->take(5)->get(['id', 'title', 'message', 'type', 'created_at'])->toArray();
                 $recentActivities = ActivityLog::with('user:id,name,email,role,avatar,municipality_id')->latest()->take(4)->get()->toArray();
             }
 
@@ -246,7 +248,7 @@ class DashboardController extends Controller
 
         // For municipal dashboard, fetch recent alerts and activities in real-time
         if ($isMuni) {
-            $recentAlerts    = Alert::where('is_read', false)->latest()->take(5)->get(['id', 'message', 'type', 'created_at']);
+            $recentAlerts    = Alert::where('is_active', true)->latest()->take(5)->get(['id', 'title', 'message', 'type', 'created_at']);
             $recentActivities = ActivityLog::with('user:id,name,email,role,avatar,municipality_id')->latest()->take(4)->get();
             $payload['alerts'] = $recentAlerts->toArray();
             $payload['recent_activities'] = $recentActivities->toArray();

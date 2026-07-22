@@ -10,6 +10,17 @@ class LeaderboardController extends Controller
 {
     private function rankedCte(): string
     {
+        $hasTotalPts = \Illuminate\Support\Facades\Schema::hasColumn('user_points', 'total_points');
+        $hasPts = \Illuminate\Support\Facades\Schema::hasColumn('user_points', 'points');
+        $ptsExpr = $hasTotalPts ? 'up.total_points' : ($hasPts ? 'up.points' : '0');
+
+        $hasCompActInUp = \Illuminate\Support\Facades\Schema::hasColumn('user_points', 'completed_activities');
+        $hasCompActInU  = \Illuminate\Support\Facades\Schema::hasColumn('users', 'completed_activities');
+        $actExpr = $hasCompActInUp ? 'up.completed_activities' : ($hasCompActInU ? 'u.completed_activities' : '0');
+
+        $hasPtsSince = \Illuminate\Support\Facades\Schema::hasColumn('user_points', 'points_since');
+        $sinceExpr = $hasPtsSince ? 'up.points_since' : 'u.created_at';
+
         return "
             WITH ranked AS (
                 SELECT
@@ -19,15 +30,15 @@ class LeaderboardController extends Controller
                     u.avatar                                          AS avatar,
                     m.name                                            AS municipality_name,
                     u.last_activity                                   AS last_activity_date,
-                    COALESCE(up.total_points, 0)                      AS total_points,
-                    COALESCE(up.completed_activities, 0)              AS completed_activities,
-                    COALESCE(up.points_since, u.created_at)           AS points_since,
+                    COALESCE({$ptsExpr}, 0)                           AS total_points,
+                    COALESCE({$actExpr}, 0)                           AS completed_activities,
+                    COALESCE({$sinceExpr}, u.created_at)              AS points_since,
                     0                                                 AS spots_managed,
                     ROW_NUMBER() OVER (
                         ORDER BY
-                            COALESCE(up.total_points, 0)               DESC,
-                            COALESCE(up.completed_activities, 0)        DESC,
-                            COALESCE(up.points_since, u.created_at)     ASC
+                            COALESCE({$ptsExpr}, 0)                    DESC,
+                            COALESCE({$actExpr}, 0)                    DESC,
+                            COALESCE({$sinceExpr}, u.created_at)       ASC
                     ) AS user_rank
                 FROM users u
                 LEFT JOIN user_points up ON up.user_id = u.id
@@ -50,12 +61,20 @@ class LeaderboardController extends Controller
     public function kpis(): JsonResponse
     {
         $kpis = \Illuminate\Support\Facades\Cache::remember('leaderboard:kpis', 60, function () {
+            $hasTotalPts = \Illuminate\Support\Facades\Schema::hasColumn('user_points', 'total_points');
+            $hasPts = \Illuminate\Support\Facades\Schema::hasColumn('user_points', 'points');
+            $ptsExpr = $hasTotalPts ? 'up.total_points' : ($hasPts ? 'up.points' : '0');
+
+            $hasCompActInUp = \Illuminate\Support\Facades\Schema::hasColumn('user_points', 'completed_activities');
+            $hasCompActInU  = \Illuminate\Support\Facades\Schema::hasColumn('users', 'completed_activities');
+            $actExpr = $hasCompActInUp ? 'up.completed_activities' : ($hasCompActInU ? 'u.completed_activities' : '0');
+
             $kpi = DB::selectOne("
                 SELECT
                     COUNT(u.id)                               AS total_users,
-                    COALESCE(SUM(up.total_points), 0)         AS grand_points,
-                    COALESCE(SUM(up.completed_activities), 0) AS total_activities,
-                    COALESCE(MAX(up.total_points), 0)         AS highest_points
+                    COALESCE(SUM({$ptsExpr}), 0)              AS grand_points,
+                    COALESCE(SUM({$actExpr}), 0)              AS total_activities,
+                    COALESCE(MAX({$ptsExpr}), 0)              AS highest_points
                 FROM users u
                 LEFT JOIN user_points up ON up.user_id = u.id
                 WHERE u.role = 'tourist' AND u.status = 'active'
