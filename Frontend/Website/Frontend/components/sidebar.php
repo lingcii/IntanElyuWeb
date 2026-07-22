@@ -12,6 +12,7 @@ function mtoSections() {
         'MAIN MENU' => [
             ['href' => 'dashboard.php',       'icon' => 'fa-gauge-high',      'label' => 'Dashboard Overview'],
             ['href' => 'tourist-spots.php',   'icon' => 'fa-location-dot',    'label' => 'Tourist Spots'],
+            ['href' => 'feedback.php',        'icon' => 'fa-comments',        'label' => 'Feedback'],
         ],
         'SETTINGS & PRIVACY' => [
             ['href' => 'report-generator.php','icon' => 'fa-file-pen',        'label' => 'Reports Management'],
@@ -37,6 +38,7 @@ $sidebarConfig = [
             'MAIN MENU' => [
                 ['href' => 'dashboard.php',       'icon' => 'fa-gauge-high',             'label' => 'Dashboard'],
                 ['href' => 'tourist-spots.php',   'icon' => 'fa-location-dot',           'label' => 'Manage Tourist Spots'],
+                ['href' => 'feedback.php',        'icon' => 'fa-comments',               'label' => 'Feedback'],
                 ['href' => 'fare-data.php',       'icon' => 'fa-money-bill-trend-up',    'label' => 'Transportation Fare'],
                 ['href' => 'analytics.php',       'icon' => 'fa-chart-simple',           'label' => 'Analytics'],
                 ['href' => 'leaderboard.php',     'icon' => 'fa-trophy',                 'label' => 'Leaderboard'],
@@ -60,6 +62,7 @@ $sidebarConfig = [
             'MAIN MENU' => [
                 ['href' => 'dashboard.php',            'icon' => 'fa-gauge-high',             'label' => 'Dashboard'],
                 ['href' => 'tourist-spots.php',        'icon' => 'fa-location-dot',           'label' => 'Manage Tourist Spots'],
+                ['href' => 'feedback.php',             'icon' => 'fa-comments',               'label' => 'Feedback'],
                 ['href' => 'fare-data.php',            'icon' => 'fa-money-bill-trend-up',    'label' => 'Transportation Fare'],
                 ['href' => 'analytics.php',            'icon' => 'fa-chart-simple',           'label' => 'Analytics'],
                 ['href' => 'leaderboard.php',          'icon' => 'fa-trophy',                 'label' => 'Leaderboard'],

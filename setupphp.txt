@@ -8,10 +8,11 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 
 cd backend
 php artisan serve --host=127.0.0.1 --port=8000
-
+ php artisan storage:link ----for images
 
 cd Frontend\Website\Frontend
 php -S localhost:8080
+
 
 
 git add .

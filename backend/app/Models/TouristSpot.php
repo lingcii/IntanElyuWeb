@@ -94,4 +94,9 @@ class TouristSpot extends Model
     {
         return $this->hasMany(TouristSpotAudit::class, 'spot_id');
     }
+
+    public function feedbacks()
+    {
+        return $this->hasMany(SiteFeedback::class, 'tourist_spot_id');
+    }
 }

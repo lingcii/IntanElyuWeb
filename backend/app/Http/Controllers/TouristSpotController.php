@@ -119,10 +119,16 @@ class TouristSpotController extends Controller
         $file     = $request->file('image');
         $filename = 'spot_' . uniqid() . '.' . $file->extension();
         
-        // Ensure directory exists
+        // Ensure directory exists and is writable
         $directory = storage_path('app/public/' . self::UPLOAD_DIR);
         if (!is_dir($directory)) {
-            mkdir($directory, 0755, true);
+            mkdir($directory, 0777, true);
+        }
+        if (!is_writable($directory)) {
+            @chmod($directory, 0777);
+            if (str_starts_with(PHP_OS, 'WIN')) {
+                @exec('attrib -r "' . $directory . '" /d');
+            }
         }
         
         $file->move($directory, $filename);
@@ -483,9 +489,14 @@ class TouristSpotController extends Controller
     private function setPhotoUrl(TouristSpot $spot): TouristSpot
     {
         $images = $spot->images;
-        if ($images->isNotEmpty()) {
+        if ($images && $images->isNotEmpty()) {
             $primary = $images->firstWhere('is_primary', 1) ?? $images->first();
             $spot->photo_url = $this->normalizePhotoUrl($primary->photo_url);
+            foreach ($images as $img) {
+                if (isset($img->photo_url)) {
+                    $img->photo_url = $this->normalizePhotoUrl($img->photo_url);
+                }
+            }
         } elseif ($spot->photo_url) {
             $spot->photo_url = $this->normalizePhotoUrl($spot->photo_url);
         } else {

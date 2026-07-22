@@ -15,15 +15,14 @@ if (!preg_match('/^[a-zA-Z0-9_\-\.]+$/', $filename)) {
 
 // List of possible directories to check for the image
 // __DIR__ = .../Frontend/Website/Frontend/api
-// Primary: local Frontend images folder (avoids OneDrive ACL issues on backend/storage)
-// Fallbacks: legacy backend storage paths for older uploaded images
+// Primary: backend Laravel storage (main image storage after migration)
+// Fallbacks: legacy paths for backward compatibility
 $directories = [
-    __DIR__ . '/../images/tourist_spots/',                              // primary upload location
-    __DIR__ . '/../images/',                                            // fallback: bare images dir
-    __DIR__ . '/../../../../backend/storage/app/public/tourist_spots/', // Laravel storage fallback
+    __DIR__ . '/../../../../backend/storage/app/public/tourist_spots/', // PRIMARY: Laravel storage
     __DIR__ . '/../../../../backend/storage/app/public/',
     __DIR__ . '/../../../../backend/public/storage/tourist_spots/',
     __DIR__ . '/../../../../backend/public/uploads/tourist_spots/',
+    __DIR__ . '/../images/',                                            // fallback: bare images dir
 ];
 
 $imagePath = null;

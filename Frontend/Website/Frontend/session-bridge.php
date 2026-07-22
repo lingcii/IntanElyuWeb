@@ -1,9 +1,14 @@
 <?php
 session_start();
 
+if (isset($_SESSION['user_role']) && $_SESSION['user_role'] === 'pitco') {
+    $_SESSION['user_role'] = 'picto';
+}
+
 // Check if PHP session has user data
 if (!isset($_SESSION['user_id'])) {
-    header('Location: login.php');
+    $loginRedirect = str_contains($_SERVER['SCRIPT_NAME'] ?? '', '/views/') ? '../../login.php' : 'login.php';
+    header('Location: ' . $loginRedirect);
     exit;
 }
 

@@ -168,16 +168,13 @@ ob_start();
         </div>
     </div>
 
-    <!-- Spot Detail Modal -->
+    <!-- Spot Detail Modal (50% | 50% Split Layout) -->
     <div class="modal" id="spotModal">
-        <div class="modal-content" style="max-width:680px;">
-            <div class="modal-header">
-                <h2 id="modalTitle">Spot Details</h2>
-                <button class="modal-close" id="closeSpotModal">&times;</button>
-            </div>
-            <div class="modal-body" id="modalBody">
-                <div style="text-align:center;padding:40px;color:#9CA3AF;">
-                    <i class="fas fa-spinner fa-spin" style="font-size:24px;"></i>
+        <div class="modal-content spot-view-split-card">
+            <button class="modal-close-btn spot-modal-close-btn" id="closeSpotModal" type="button"><i class="fas fa-times"></i></button>
+            <div id="modalBody" class="spot-modal-body-wrapper">
+                <div class="spot-modal-loading-box">
+                    <i class="fas fa-spinner fa-spin"></i>
                 </div>
             </div>
         </div>
@@ -524,7 +521,6 @@ ob_start();
         window.touristSpotsData = [];
         window.municipalitiesData = [];
         window.municipalityData = { id: <?= (int)$muniId ?>, name: '<?= htmlspecialchars($muniName) ?>', latitude: 16.5, longitude: 120.3 };
-        window.TOURIST_SPOT_UPLOAD_URL = new URL('../../api/upload-spot-image.php', window.location.href).href;
     </script>
     <script src="../../scripts/la-union-boundaries.js?v=<?= time() ?>"></script>
     <script src="../../scripts/functions/MUNICIPAL/map-view-api.js?v=<?= time() ?>"></script>

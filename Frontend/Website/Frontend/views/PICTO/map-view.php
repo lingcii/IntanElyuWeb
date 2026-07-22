@@ -2,7 +2,7 @@
 require_once __DIR__ . '/../../session-bridge.php';
 require_once __DIR__ . '/../../laravel-api-bridge.php';
 // Check role
-if ($_SESSION['user_role'] !== 'picto') {
+if ($_SESSION['user_role'] !== 'picto' && $_SESSION['user_role'] !== 'pitco') {
     header('Location: ../../login.php');
     exit;
 }

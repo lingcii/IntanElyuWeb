@@ -86,4 +86,9 @@ class User extends Authenticatable
     {
         return $this->hasMany(Itinerary::class);
     }
+
+    public function feedbacks()
+    {
+        return $this->hasMany(SiteFeedback::class);
+    }
 }

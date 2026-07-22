@@ -18,6 +18,8 @@ use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\LogoutController;
 use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\Auth\SessionController;
+use App\Http\Controllers\Admin\FeedbackManagementController;
+use App\Http\Controllers\FeedbackController;
 
 use Illuminate\Support\Facades\Route;
 
@@ -167,6 +169,14 @@ Route::middleware('auth.session')->group(function () {
             Route::get('/top3',   [LeaderboardController::class, 'top3']);
             Route::get('/kpis',   [LeaderboardController::class, 'kpis']);
         });
+
+        // Feedback Module
+        Route::prefix('feedback')->group(function () {
+            Route::get('/dashboard-stats',   [FeedbackManagementController::class, 'dashboardStats']);
+            Route::get('/gallery',           [FeedbackManagementController::class, 'gallery']);
+            Route::get('/table',             [FeedbackManagementController::class, 'table']);
+            Route::get('/spot-details/{id}', [FeedbackManagementController::class, 'spotDetails']);
+        });
     });
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -255,6 +265,14 @@ Route::middleware('auth.session')->group(function () {
             Route::put('/profile',  [SettingsController::class, 'updateProfile']);
             Route::put('/password', [SettingsController::class, 'updatePassword']);
         });
+
+        // Feedback Module
+        Route::prefix('feedback')->group(function () {
+            Route::get('/dashboard-stats',   [FeedbackManagementController::class, 'dashboardStats']);
+            Route::get('/gallery',           [FeedbackManagementController::class, 'gallery']);
+            Route::get('/table',             [FeedbackManagementController::class, 'table']);
+            Route::get('/spot-details/{id}', [FeedbackManagementController::class, 'spotDetails']);
+        });
     });
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -333,6 +351,22 @@ Route::middleware('auth.session')->group(function () {
             Route::put('/profile',  [SettingsController::class, 'updateProfile']);
             Route::put('/password', [SettingsController::class, 'updatePassword']);
         });
+
+        // Feedback Module
+        Route::prefix('feedback')->group(function () {
+            Route::get('/dashboard-stats',   [FeedbackManagementController::class, 'dashboardStats']);
+            Route::get('/gallery',           [FeedbackManagementController::class, 'gallery']);
+            Route::get('/table',             [FeedbackManagementController::class, 'table']);
+            Route::get('/spot-details/{id}', [FeedbackManagementController::class, 'spotDetails']);
+        });
+    });
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  TOURIST (mobile / public tourist endpoints)
+    // ─────────────────────────────────────────────────────────────────────────
+    Route::prefix('tourist')->group(function () {
+        Route::get('/feedback',  [FeedbackController::class, 'index']);
+        Route::post('/feedback', [FeedbackController::class, 'store']);
     });
 });
 

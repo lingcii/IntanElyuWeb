@@ -56,8 +56,8 @@ if (document.readyState === 'loading') {
 
 
 function getSpotImageUploadUrl() {
-    if (window.TOURIST_SPOT_UPLOAD_URL) return window.TOURIST_SPOT_UPLOAD_URL;
-    return new URL('../../api/upload-spot-image.php', window.location.href).href;
+    // Upload directly to Laravel backend — images stored in backend/storage/app/public/tourist_spots/
+    return window.API_CONFIG.BASE_URL + '/api/tourist-spots/upload-image';
 }
 
 // ── Map/Form State ──────────────────────────────────────────────────────────
@@ -442,7 +442,7 @@ export const uploadImage = async (file) => {
     const formData = new FormData();
     formData.append('image', processedFile);
     const response = await fetch(getSpotImageUploadUrl(), {
-        method: 'POST', credentials: 'same-origin',
+        method: 'POST', credentials: 'include',
         headers: { 'Accept': 'application/json' }, body: formData
     });
     const text = await response.text();
@@ -659,18 +659,282 @@ export function setupDropdownListeners() {
     });
 }
 
+// GALLERY SLIDER & LIGHTBOX ENGINE
+let activeLightboxKeyHandler = null;
+let activeModalKeyHandler = null;
+
+function renderSpotGallery(rightPanelEl, spot) {
+    if (!rightPanelEl) return;
+
+    let images = [];
+    if (Array.isArray(spot.images) && spot.images.length > 0) {
+        images = spot.images.map(img => typeof img === 'string' ? img : (img.photo_url || img.url)).filter(Boolean);
+    }
+    if (images.length === 0 && spot.photo_url) {
+        images.push(spot.photo_url);
+    }
+    images = Array.from(new Set(images));
+
+    if (images.length === 0) {
+        rightPanelEl.innerHTML = `
+            <div class="spot-gallery-empty">
+                <i class="fas fa-image"></i>
+                <p>No Image Available.</p>
+            </div>
+        `;
+        return;
+    }
+
+    let currentIndex = 0;
+    const hasMultiple = images.length > 1;
+
+    rightPanelEl.innerHTML = `
+        <div class="spot-gallery-container ${hasMultiple ? 'has-thumbs' : ''}">
+            <div class="spot-gallery-main">
+                <span class="spot-gallery-badge">
+                    <i class="fas fa-camera"></i> <span class="spot-gallery-idx">1</span> / ${images.length}
+                </span>
+                <button type="button" class="spot-gallery-fullscreen-btn" title="View Fullscreen">
+                    <i class="fas fa-expand"></i>
+                </button>
+                <img src="${escapeHtml(images[0])}" 
+                     alt="${escapeHtml(spot.name || 'Tourist Spot')}" 
+                     class="spot-gallery-main-img" 
+                     onerror="this.src='../../assets/images/default-spot.jpg';">
+
+                ${hasMultiple ? `
+                    <button type="button" class="spot-gallery-arrow prev" aria-label="Previous image">
+                        <i class="fas fa-chevron-left"></i>
+                    </button>
+                    <button type="button" class="spot-gallery-arrow next" aria-label="Next image">
+                        <i class="fas fa-chevron-right"></i>
+                    </button>
+                ` : ''}
+            </div>
+
+            ${hasMultiple ? `
+                <div class="spot-gallery-thumbs">
+                    ${images.map((img, idx) => `
+                        <div class="spot-thumb-item ${idx === 0 ? 'active' : ''}" data-index="${idx}">
+                            <img src="${escapeHtml(img)}" alt="Thumbnail ${idx + 1}" onerror="this.src='../../assets/images/default-spot.jpg';">
+                        </div>
+                    `).join('')}
+                </div>
+            ` : ''}
+        </div>
+    `;
+
+    const mainImgEl = rightPanelEl.querySelector('.spot-gallery-main-img');
+    const indexEl = rightPanelEl.querySelector('.spot-gallery-idx');
+    const thumbsContainer = rightPanelEl.querySelector('.spot-gallery-thumbs');
+    const prevBtn = rightPanelEl.querySelector('.spot-gallery-arrow.prev');
+    const nextBtn = rightPanelEl.querySelector('.spot-gallery-arrow.next');
+    const expandBtn = rightPanelEl.querySelector('.spot-gallery-fullscreen-btn');
+
+    function updateGallery(newIndex) {
+        if (newIndex < 0) newIndex = images.length - 1;
+        if (newIndex >= images.length) newIndex = 0;
+        currentIndex = newIndex;
+
+        if (mainImgEl) {
+            mainImgEl.classList.add('fade-out');
+            setTimeout(() => {
+                mainImgEl.src = images[currentIndex];
+                mainImgEl.classList.remove('fade-out');
+            }, 120);
+        }
+
+        if (indexEl) {
+            indexEl.textContent = currentIndex + 1;
+        }
+
+        if (thumbsContainer) {
+            const thumbItems = thumbsContainer.querySelectorAll('.spot-thumb-item');
+            thumbItems.forEach((t, i) => {
+                if (i === currentIndex) {
+                    t.classList.add('active');
+                    t.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+                } else {
+                    t.classList.remove('active');
+                }
+            });
+        }
+    }
+
+    if (prevBtn) {
+        prevBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            updateGallery(currentIndex - 1);
+        });
+    }
+
+    if (nextBtn) {
+        nextBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            updateGallery(currentIndex + 1);
+        });
+    }
+
+    if (thumbsContainer) {
+        thumbsContainer.addEventListener('click', (e) => {
+            const thumb = e.target.closest('.spot-thumb-item');
+            if (thumb) {
+                const idx = parseInt(thumb.dataset.index, 10);
+                if (!isNaN(idx)) updateGallery(idx);
+            }
+        });
+    }
+
+    const openLightbox = () => showSpotLightbox(images, currentIndex, spot.name);
+    if (mainImgEl) mainImgEl.addEventListener('click', openLightbox);
+    if (expandBtn) expandBtn.addEventListener('click', openLightbox);
+
+    setupGalleryKeyboardNav(images, () => currentIndex, (idx) => updateGallery(idx));
+}
+
+function showSpotLightbox(images, initialIndex = 0, title = '') {
+    if (!images || images.length === 0) return;
+
+    let lightbox = document.getElementById('spotLightbox');
+    if (!lightbox) {
+        lightbox = document.createElement('div');
+        lightbox.id = 'spotLightbox';
+        lightbox.className = 'spot-lightbox-backdrop';
+        document.body.appendChild(lightbox);
+    }
+
+    let currentIndex = initialIndex;
+
+    const renderLightbox = () => {
+        const hasMultiple = images.length > 1;
+        lightbox.innerHTML = `
+            <button type="button" class="spot-lightbox-close" id="spotLightboxClose" title="Close (Esc)">
+                <i class="fas fa-times"></i>
+            </button>
+            <div class="spot-lightbox-content">
+                <img src="${escapeHtml(images[currentIndex])}" alt="${escapeHtml(title || 'Spot View')}" class="spot-lightbox-img" id="spotLightboxImg">
+            </div>
+            ${hasMultiple ? `
+                <button type="button" class="spot-lightbox-arrow prev" id="spotLightboxPrev">
+                    <i class="fas fa-chevron-left"></i>
+                </button>
+                <button type="button" class="spot-lightbox-arrow next" id="spotLightboxNext">
+                    <i class="fas fa-chevron-right"></i>
+                </button>
+                <div class="spot-lightbox-counter">${currentIndex + 1} / ${images.length}</div>
+            ` : ''}
+        `;
+
+        lightbox.classList.add('active');
+
+        const closeBtn = lightbox.querySelector('#spotLightboxClose');
+        const imgEl = lightbox.querySelector('#spotLightboxImg');
+        const prevBtn = lightbox.querySelector('#spotLightboxPrev');
+        const nextBtn = lightbox.querySelector('#spotLightboxNext');
+
+        const closeLightbox = () => {
+            lightbox.classList.remove('active');
+            if (activeLightboxKeyHandler) {
+                document.removeEventListener('keydown', activeLightboxKeyHandler);
+                activeLightboxKeyHandler = null;
+            }
+        };
+
+        if (closeBtn) closeBtn.addEventListener('click', closeLightbox);
+        
+        lightbox.onclick = (e) => {
+            if (e.target === lightbox || e.target.classList.contains('spot-lightbox-content')) {
+                closeLightbox();
+            }
+        };
+
+        if (imgEl) {
+            imgEl.addEventListener('click', (e) => {
+                e.stopPropagation();
+                imgEl.classList.toggle('zoomed');
+            });
+        }
+
+        if (prevBtn) {
+            prevBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                currentIndex = (currentIndex - 1 + images.length) % images.length;
+                renderLightbox();
+            });
+        }
+
+        if (nextBtn) {
+            nextBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                currentIndex = (currentIndex + 1) % images.length;
+                renderLightbox();
+            });
+        }
+
+        if (activeLightboxKeyHandler) {
+            document.removeEventListener('keydown', activeLightboxKeyHandler);
+        }
+        activeLightboxKeyHandler = (e) => {
+            if (!lightbox.classList.contains('active')) return;
+            if (e.key === 'Escape') {
+                closeLightbox();
+            } else if (e.key === 'ArrowLeft' && images.length > 1) {
+                currentIndex = (currentIndex - 1 + images.length) % images.length;
+                renderLightbox();
+            } else if (e.key === 'ArrowRight' && images.length > 1) {
+                currentIndex = (currentIndex + 1) % images.length;
+                renderLightbox();
+            }
+        };
+        document.addEventListener('keydown', activeLightboxKeyHandler);
+    };
+
+    renderLightbox();
+}
+
+function setupGalleryKeyboardNav(images, getCurrentIndex, updateGalleryFn) {
+    if (activeModalKeyHandler) {
+        document.removeEventListener('keydown', activeModalKeyHandler);
+    }
+
+    activeModalKeyHandler = (e) => {
+        const spotModal = document.getElementById('spotModal');
+        const lightbox = document.getElementById('spotLightbox');
+        
+        if (lightbox && lightbox.classList.contains('active')) return;
+
+        if (spotModal && spotModal.classList.contains('active')) {
+            if (e.key === 'ArrowLeft' && images.length > 1) {
+                updateGalleryFn(getCurrentIndex() - 1);
+            } else if (e.key === 'ArrowRight' && images.length > 1) {
+                updateGalleryFn(getCurrentIndex() + 1);
+            } else if (e.key === 'Escape') {
+                if (typeof window.closeSpotModal === 'function') {
+                    window.closeSpotModal();
+                } else {
+                    spotModal.classList.remove('active');
+                }
+            }
+        }
+    };
+
+    document.addEventListener('keydown', activeModalKeyHandler);
+}
+
 // ── SPOT DETAIL MODAL ────────────────────────────────────────────────────────
 window.openSpotModal = async function (spotId) {
     const modal = document.getElementById('spotModal');
     if (!modal) return;
     modal.classList.add('active');
-    document.getElementById('modalTitle').textContent = 'Loading...';
-    document.getElementById('modalBody').innerHTML = '<div style="text-align:center;padding:40px;color:#9CA3AF;"><i class="fas fa-spinner fa-spin" style="font-size:24px;"></i></div>';
+    const modalTitleEl = document.getElementById('modalTitle');
+    if (modalTitleEl) modalTitleEl.textContent = 'Loading...';
+
+    document.getElementById('modalBody').innerHTML = '<div class="spot-modal-loading-box"><i class="fas fa-spinner fa-spin"></i></div>';
 
     try {
         let spot = window.touristSpotsAll?.find(s => s.id == spotId);
         if (!spot) spot = await window.getSpot(spotId);
-        document.getElementById('modalTitle').textContent = spot.name;
+        if (modalTitleEl) modalTitleEl.textContent = spot.name;
         const style = spot.classification_status ? getClassificationStyle(spot.classification_status) : null;
         const formattedDate = new Date(spot.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
@@ -681,45 +945,94 @@ window.openSpotModal = async function (spotId) {
         }
 
         document.getElementById('modalBody').innerHTML = `
-            ${spot.photo_url ? `<div style="height:200px;border-radius:10px;overflow:hidden;margin-bottom:16px;"><img src="${escapeHtml(spot.photo_url)}" alt="${escapeHtml(spot.name)}" style="width:100%;height:100%;object-fit:cover;" onerror="this.parentElement.style.display='none';"></div>` : ''}
-            <div style="display:flex;gap:8px;align-items:center;margin-bottom:16px;flex-wrap:wrap;">
-                <span style="font-size:13px;color:#6B7280;"><i class="fas fa-map-marker-alt"></i> ${escapeHtml(spot.municipality_name)}, La Union</span>
-                ${style ? `<span style="font-size:13px;font-weight:700;padding:4px 12px;border-radius:20px;background:${style.bg};color:${style.text};">${style.label}</span>` : ''}
-                ${spot.status ? `<span style="font-size:13px;font-weight:700;padding:4px 12px;border-radius:20px;background:${spot.status === 'approved' ? '#10B981' : spot.status === 'pending' ? '#F59E0B' : '#DC2626'};color:#FFFFFF;">${spot.status === 'approved' ? 'Approved' : spot.status === 'pending' ? 'Pending' : 'Rejected'}</span>` : ''}
-                ${spot.is_maintenance ? '<span style="font-size:13px;font-weight:700;padding:4px 12px;border-radius:20px;background:#F59E0B;color:#92400E;"><i class="fas fa-exclamation-triangle"></i> Under Maintenance</span>' : ''}
+            <div class="spot-modal-split-container">
+                <!-- Left Panel (50%): Details -->
+                <div class="spot-modal-left-panel">
+                    <div>
+                        <h2 class="spot-modal-title">${escapeHtml(spot.name)}</h2>
+                        <div class="spot-modal-badges">
+                            <span class="spot-modal-badge muni-badge"><i class="fas fa-map-marker-alt"></i> ${escapeHtml(spot.municipality_name || 'La Union')}, La Union</span>
+                            ${style ? `<span class="spot-modal-badge" style="background:${style.bg};color:${style.text};font-weight:700;">${style.label}</span>` : ''}
+                            ${spot.status ? `<span class="spot-modal-badge" style="background:${spot.status === 'approved' ? '#10B981' : spot.status === 'pending' ? '#F59E0B' : '#DC2626'};color:#FFFFFF;font-weight:700;">${spot.status === 'approved' ? 'Approved' : spot.status === 'pending' ? 'Pending' : 'Rejected'}</span>` : ''}
+                            ${spot.is_maintenance ? '<span class="spot-modal-badge" style="background:#F59E0B;color:#92400E;font-weight:700;"><i class="fas fa-exclamation-triangle"></i> Under Maintenance</span>' : ''}
+                        </div>
+                    </div>
+
+                    ${spot.status === 'rejected' && spot.rejection_reason ? `
+                        <div class="spot-rejection-box">
+                            <div class="rejection-title"><i class="fas fa-exclamation-circle"></i> Rejection Reason</div>
+                            <p class="rejection-text">${escapeHtml(spot.rejection_reason)}</p>
+                        </div>
+                    ` : ''}
+
+                    <div class="spot-details-grid">
+                        <div class="spot-detail-card">
+                            <div class="detail-label">Category</div>
+                            <div class="category-badges">
+                                ${(spot.category || 'Other').split(',').map(c => c.trim()).filter(Boolean).map(c =>
+                                    `<span class="cat-pill">${escapeHtml(c)}</span>`
+                                ).join('')}
+                            </div>
+                        </div>
+                        <div class="spot-detail-card">
+                            <div class="detail-label">Fees</div>
+                            <div class="detail-val">${formatFeesDisplay(spot)}</div>
+                        </div>
+                        <div class="spot-detail-card points-card">
+                            <div class="detail-label points-label">⭐ Points</div>
+                            <div class="points-val">${spot.points !== undefined ? spot.points : 0} Points</div>
+                        </div>
+                        <div class="spot-detail-card">
+                            <div class="detail-label">Opening Time</div>
+                            <div class="detail-val">${fmTime(spot.opening_time)}</div>
+                        </div>
+                        <div class="spot-detail-card">
+                            <div class="detail-label">Closing Time</div>
+                            <div class="detail-val">${fmTime(spot.closing_time)}</div>
+                        </div>
+                        ${spot.latitude ? `
+                            <div class="spot-detail-card">
+                                <div class="detail-label">Latitude</div>
+                                <div class="detail-val"><i class="fas fa-map-pin"></i> ${parseFloat(spot.latitude).toFixed(6)}</div>
+                            </div>
+                        ` : ''}
+                        ${spot.longitude ? `
+                            <div class="spot-detail-card">
+                                <div class="detail-label">Longitude</div>
+                                <div class="detail-val"><i class="fas fa-map-pin"></i> ${parseFloat(spot.longitude).toFixed(6)}</div>
+                            </div>
+                        ` : ''}
+                        <div class="spot-detail-card">
+                            <div class="detail-label">Submitted</div>
+                            <div class="detail-val">${formattedDate}</div>
+                        </div>
+                        ${spot.status === 'approved' ? `
+                            <div class="spot-detail-card approved-by-card">
+                                <div class="detail-label approved-by-label"><i class="fas fa-user-check"></i> Approved By</div>
+                                <div class="approved-by-val">${escapeHtml(spot.approver?.name || (spot.approved_by ? 'User #' + spot.approved_by : 'N/A'))}</div>
+                            </div>
+                            <div class="spot-detail-card approved-by-card">
+                                <div class="detail-label approved-by-label"><i class="fas fa-calendar-check"></i> Approved At</div>
+                                <div class="approved-by-val">${spot.approved_at ? new Date(spot.approved_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'N/A'}</div>
+                            </div>
+                        ` : ''}
+                    </div>
+
+                    <div class="spot-description-box">
+                        <div class="detail-label">Description</div>
+                        <p class="description-text">${escapeHtml(spot.description) || 'No description provided.'}</p>
+                    </div>
+                </div>
+
+                <!-- Right Panel (50%): Interactive Image Gallery -->
+                <div class="spot-modal-right-panel" id="spotModalRightPanel"></div>
             </div>
-            ${spot.status === 'rejected' && spot.rejection_reason ? `
-                <div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;padding:12px;margin-bottom:16px;">
-                    <div style="font-size:11px;color:#B91C1C;font-weight:700;text-transform:uppercase;margin-bottom:4px;"><i class="fas fa-exclamation-circle"></i> Rejection Reason</div>
-                    <p style="font-size:13px;color:#991B1B;margin:0;line-height:1.5;">${escapeHtml(spot.rejection_reason)}</p>
-                </div>
-            ` : ''}
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
-                <div style="background:#F8FAFC;border-radius:8px;padding:12px;"><div style="font-size:11px;color:#6B7280;font-weight:700;text-transform:uppercase;margin-bottom:6px;">Category</div><div style="display:flex;flex-wrap:wrap;gap:5px;">${(spot.category || 'Other').split(',').map(c => c.trim()).filter(Boolean).map(c => `<span style="display:inline-block;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:600;background:#DBEAFE;color:#2563EB;">${escapeHtml(c)}</span>`).join('')}</div></div>
-                <div style="background:#F8FAFC;border-radius:8px;padding:12px;"><div style="font-size:11px;color:#6B7280;font-weight:700;text-transform:uppercase;margin-bottom:4px;">Fees</div>${formatFeesDisplay(spot)}</div>
-                <div style="background:#FEF3C7;border-radius:8px;padding:12px;border:1px solid #FDE68A;">
-                    <div style="font-size:11px;color:#D97706;font-weight:700;text-transform:uppercase;margin-bottom:4px;">⭐ Points</div>
-                    <div style="font-size:14px;font-weight:700;color:#D97706;">${spot.points !== undefined ? spot.points : 0} Points</div>
-                </div>
-                <div style="background:#F8FAFC;border-radius:8px;padding:12px;"><div style="font-size:11px;color:#6B7280;font-weight:700;text-transform:uppercase;margin-bottom:4px;">Opening Time</div><div style="font-size:14px;font-weight:600;">${fmTime(spot.opening_time)}</div></div>
-                <div style="background:#F8FAFC;border-radius:8px;padding:12px;"><div style="font-size:11px;color:#6B7280;font-weight:700;text-transform:uppercase;margin-bottom:4px;">Closing Time</div><div style="font-size:14px;font-weight:600;">${fmTime(spot.closing_time)}</div></div>
-                ${spot.latitude ? `<div style="background:#F8FAFC;border-radius:8px;padding:12px;"><div style="font-size:11px;color:#6B7280;font-weight:700;text-transform:uppercase;margin-bottom:4px;">Latitude</div><div style="font-size:14px;font-weight:600;"><i class="fas fa-map-pin"></i> ${parseFloat(spot.latitude).toFixed(6)}</div></div>` : ''}
-                ${spot.longitude ? `<div style="background:#F8FAFC;border-radius:8px;padding:12px;"><div style="font-size:11px;color:#6B7280;font-weight:700;text-transform:uppercase;margin-bottom:4px;">Longitude</div><div style="font-size:14px;font-weight:600;"><i class="fas fa-map-pin"></i> ${parseFloat(spot.longitude).toFixed(6)}</div></div>` : ''}
-                <div style="background:#F8FAFC;border-radius:8px;padding:12px;"><div style="font-size:11px;color:#6B7280;font-weight:700;text-transform:uppercase;margin-bottom:4px;">Submitted</div><div style="font-size:14px;font-weight:600;">${formattedDate}</div></div>
-                ${spot.status === 'approved' ? `
-                <div style="background:#ECFDF5;border:1px solid #A7F3D0;border-radius:8px;padding:12px;">
-                    <div style="font-size:11px;color:#065F46;font-weight:700;text-transform:uppercase;margin-bottom:4px;"><i class="fas fa-user-check"></i> Approved By</div>
-                    <div style="font-size:14px;font-weight:600;color:#065F46;">${escapeHtml(spot.approver?.name || (spot.approved_by ? 'User #' + spot.approved_by : 'N/A'))}</div>
-                </div>
-                <div style="background:#ECFDF5;border:1px solid #A7F3D0;border-radius:8px;padding:12px;">
-                    <div style="font-size:11px;color:#065F46;font-weight:700;text-transform:uppercase;margin-bottom:4px;"><i class="fas fa-calendar-check"></i> Approved At</div>
-                    <div style="font-size:14px;font-weight:600;color:#065F46;">${spot.approved_at ? new Date(spot.approved_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'N/A'}</div>
-                </div>
-                ` : ''}
-            </div>
-            <div style="margin-bottom:20px;"><div style="font-size:11px;color:#6B7280;font-weight:700;text-transform:uppercase;margin-bottom:8px;">Description</div><p style="color:#4B5563;line-height:1.6;margin:0;">${escapeHtml(spot.description) || 'No description provided.'}</p></div>`;
+        `;
+
+        renderSpotGallery(document.getElementById('spotModalRightPanel'), spot);
     } catch (err) {
-        document.getElementById('modalBody').innerHTML = '<p style="color:#DC2626;">Failed to load spot details.</p>';
+        console.error(err);
+        document.getElementById('modalBody').innerHTML = '<p style="color:#DC2626;padding:20px;">Failed to load spot details.</p>';
     }
 };
 
@@ -1206,7 +1519,12 @@ window.updateMapMarkerFromInput = function () {
 window.closeFormModal = function () {
     uploadedImages = [];
     pendingSaveData = null;
-    document.getElementById('spotFormModal').classList.remove('active');
+    document.getElementById('spotFormModal')?.classList.remove('active');
+    document.getElementById('duplicateSpotNameModal')?.classList.remove('active');
+    const spotIdEl = document.getElementById('spotId');
+    if (spotIdEl) spotIdEl.value = '';
+    const spotNameEl = document.getElementById('spotName');
+    if (spotNameEl) spotNameEl.value = '';
     if (modalMap) { modalMap.remove(); modalMap = null; modalMarker = null; }
 };
 
@@ -1576,10 +1894,13 @@ export async function initializeAll(spotsData, municipalData) {
     document.getElementById('spotName')?.addEventListener('input', function () { document.getElementById('nameCharCount').textContent = this.value.length; });
 
     const checkDuplicateName = () => {
+        const spotFormModal = document.getElementById('spotFormModal');
+        if (!spotFormModal || !spotFormModal.classList.contains('active')) return;
+
         const spotNameVal = (document.getElementById('spotName')?.value || '').trim();
         if (!spotNameVal) return;
 
-        const currentSpotId = document.getElementById('spotId').value;
+        const currentSpotId = document.getElementById('spotId')?.value;
         const isDuplicate = (window.touristSpotsAll || []).some(spot => {
             if (currentSpotId && String(spot.id) === String(currentSpotId)) {
                 return false;

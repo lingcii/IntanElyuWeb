@@ -8,6 +8,7 @@ if (isset($_SESSION['user_id'])) {
     $role = $_SESSION['user_role'] ?? '';
     if ($role === 'pitco') {
         $role = 'picto';
+        $_SESSION['user_role'] = 'picto';
     }
     
     if ($role === 'picto') {
@@ -78,7 +79,7 @@ if (isset($_SESSION['user_id'])) {
                     
                     <div class="left-quote">
                         <span class="quote-bar"></span>
-                        <p class="quote-text">"Discover, Preserve, and Promote the Beauty of San Fernando City."</p>
+                        <p class="quote-text">"Discover, Preserve, and Promote the Beauty of La Union."</p>
                     </div>
                 </div>
 

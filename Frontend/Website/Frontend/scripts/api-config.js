@@ -1,4 +1,4 @@
-﻿(function () {
+(function () {
     /**
      * api-config.js
      * Central configuration for all API calls.
@@ -20,13 +20,9 @@
 }
 window.__API_CONFIG_LOADED__ = true;
 
-/**
- * Backend Configuration
- * Set USE_RAILWAY to:
- *  - true  = Use Railway backend
- *  - false = Use local Laravel (php artisan serve)
- */
-const USE_RAILWAY = true;
+const IS_LOCAL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+
+const USE_RAILWAY = !IS_LOCAL;
 
 const LOCAL_BASE_URL =
     `${window.location.protocol}//${window.location.hostname}:8000`;
@@ -115,11 +111,13 @@ const baseUrl = USE_RAILWAY
             if (/^https?:\/\//i.test(url)) {
                 return url;
             }
+            // Route all serve-image URLs through the Laravel backend (port 8000)
+            // Images are stored in backend/storage/app/public/tourist_spots/
             if (url.startsWith('/api/serve-image.php')) {
-                return this.FRONTEND_BASE_URL + url.substring(1);
+                return this.BASE_URL + url;
             }
             if (url.startsWith('api/serve-image.php')) {
-                return this.FRONTEND_BASE_URL + url;
+                return this.BASE_URL + '/' + url;
             }
             return url;
         },

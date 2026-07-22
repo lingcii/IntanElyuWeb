@@ -295,6 +295,9 @@
 
     // ========== Spot Modal Functions ==========
     window.openModal = async function (spotId) {
+        if (typeof window.openSpotModal === 'function') {
+            return window.openSpotModal(spotId);
+        }
         document.getElementById('spotModal').classList.add('active');
         try {
             const spot = await getSpot(spotId);
@@ -485,7 +488,12 @@
     };
 
     window.closeFormModal = function () {
-        document.getElementById('spotFormModal').classList.remove('active');
+        document.getElementById('spotFormModal')?.classList.remove('active');
+        document.getElementById('duplicateSpotNameModal')?.classList.remove('active');
+        const spotIdEl = document.getElementById('spotId');
+        if (spotIdEl) spotIdEl.value = '';
+        const spotNameEl = document.getElementById('spotName');
+        if (spotNameEl) spotNameEl.value = '';
     };
 
     window.toggleFeeTypesDropdown = function (e) {

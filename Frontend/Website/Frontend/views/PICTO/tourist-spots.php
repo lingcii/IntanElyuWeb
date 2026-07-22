@@ -1,7 +1,7 @@
 <?php
 require_once __DIR__ . '/../../session-bridge.php';
 require_once __DIR__ . '/../../laravel-api-bridge.php';
-if ($_SESSION['user_role'] !== 'picto') {
+if ($_SESSION['user_role'] !== 'picto' && $_SESSION['user_role'] !== 'pitco') {
     header('Location: ../../login.php');
     exit;
 }
@@ -173,16 +173,13 @@ ob_start();
     </div>
 </div>
 
-<!-- -- Spot Detail Modal  -->
+<!-- Spot Detail Modal (50% | 50% Split Layout) -->
 <div class="modal" id="spotModal">
-    <div class="modal-content" style="max-width:680px;">
-        <div class="modal-header">
-            <h2 id="modalTitle">Spot Details</h2>
-            <button class="modal-close" id="closeSpotModal">&times;</button>
-        </div>
-        <div class="modal-body" id="modalBody">
-            <div style="text-align:center;padding:40px;color:#9CA3AF;">
-                <i class="fas fa-spinner fa-spin" style="font-size:24px;"></i>
+    <div class="modal-content spot-view-split-card">
+        <button class="modal-close-btn spot-modal-close-btn" id="closeSpotModal" type="button"><i class="fas fa-times"></i></button>
+        <div id="modalBody" class="spot-modal-body-wrapper">
+            <div class="spot-modal-loading-box">
+                <i class="fas fa-spinner fa-spin"></i>
             </div>
         </div>
     </div>
