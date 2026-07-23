@@ -40,44 +40,52 @@ class AnalyticsController extends Controller
     {
         $isMuni = $this->isMunicipal();
         $muniId = $isMuni ? $this->municipalityId() : 0;
-        $cacheKey = $this->scopeKey('analytics:summary-v8');
+        $cacheKey = $this->scopeKey('analytics:summary-v9');
         if ($request->has('refresh') || $request->has('nocache')) {
             Cache::forget($cacheKey);
         }
 
         $data = Cache::remember($cacheKey, 3600, function () use ($isMuni, $muniId) {
-            $totalMunis = $isMuni ? 1 : Municipality::count();
+            $currentYear = now()->year;
 
+            // ── Spots aggregate (single query)
             $spotQuery = DB::table('tourist_spots')->where('status', '!=', 'draft');
             if ($isMuni) $spotQuery->where('municipality_id', $muniId);
-            $row = $spotQuery->selectRaw("COUNT(*) as total, SUM(status='approved') as approved, AVG(rating) as avg_rating")->first();
+            $row = $spotQuery->selectRaw(
+                "COUNT(*) as total,
+                 SUM(status='approved') as approved,
+                 AVG(rating) as avg_rating,
+                 SUM(CASE WHEN created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY) THEN 1 ELSE 0 END) as new_spots,
+                 category as top_cat_raw"
+            )->first();
 
-            // Real-time spots added in last 30 days
-            $newSpotsQuery = DB::table('tourist_spots')->where('status', '!=', 'draft')->where('created_at', '>=', now()->subDays(30));
-            if ($isMuni) $newSpotsQuery->where('municipality_id', $muniId);
-            $newSpotsCount = $newSpotsQuery->count();
+            // Top category (separate because GROUP BY needed)
+            $topCatQuery = DB::table('tourist_spots')->selectRaw('category, COUNT(*) as cnt');
+            if ($isMuni) $topCatQuery->where('municipality_id', $muniId);
+            $topCat = $topCatQuery->groupBy('category')->orderByDesc('cnt')->first();
 
-            // Real-time Total tourists sum
-            $visitsQuery = DB::table('analytics');
-            if ($isMuni) $visitsQuery->where('municipality_id', $muniId);
-            $totalVisits = $visitsQuery->sum('visits');
+            // ── Analytics aggregates (single query covering all years needed)
+            $muniFilter = $isMuni ? "AND municipality_id = {$muniId}" : '';
+            $analyticsRow = DB::selectOne("
+                SELECT
+                    COALESCE(SUM(visits),0) as total_visits,
+                    COALESCE(SUM(CASE WHEN year = {$currentYear} THEN visits ELSE 0 END),0) as this_year,
+                    COALESCE(SUM(CASE WHEN year = " . ($currentYear - 1) . " THEN visits ELSE 0 END),0) as prev_year
+                FROM analytics
+                WHERE 1=1 {$muniFilter}
+            ");
 
-            // Real-time YoY visits calculation
-            $currentYear = now()->year;
-            $yQuery = DB::table('analytics')->where('year', $currentYear);
-            if ($isMuni) $yQuery->where('municipality_id', $muniId);
-            $thisYearVisits = $yQuery->sum('visits');
-
-            $pyQuery = DB::table('analytics')->where('year', $currentYear - 1);
-            if ($isMuni) $pyQuery->where('municipality_id', $muniId);
-            $prevYearVisits = $pyQuery->sum('visits');
+            $totalVisits        = (int) ($analyticsRow->total_visits ?? 0);
+            $thisYearVisits     = (int) ($analyticsRow->this_year ?? 0);
+            $prevYearVisits     = (int) ($analyticsRow->prev_year ?? 0);
+            $totalAnalyticsVisits = $totalVisits;
 
             $visitsYoY = 0.0;
             if ($prevYearVisits > 0) {
                 $visitsYoY = round((($thisYearVisits - $prevYearVisits) / $prevYearVisits) * 100, 1);
             }
 
-            // Real-time MoM latest trend growth percentage
+            // ── MoM trend (2 most recent months)
             $lastMonthsQuery = DB::table('analytics')->where('year', $currentYear);
             if ($isMuni) $lastMonthsQuery->where('municipality_id', $muniId);
             $lastMonths = $lastMonthsQuery->selectRaw('month, SUM(visits) as v')->groupBy('month')->orderByDesc('month')->limit(2)->get();
@@ -85,25 +93,24 @@ class AnalyticsController extends Controller
             $monthPct = 0.0;
             $prevMonthName = '';
             if ($lastMonths->count() >= 2) {
-                $curM = $lastMonths[0];
+                $curM  = $lastMonths[0];
                 $prevM = $lastMonths[1];
                 if ($prevM->v > 0) {
                     $monthPct = round((($curM->v - $prevM->v) / $prevM->v) * 100, 1);
                 }
-                $monthsList = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+                $monthsList    = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
                 $prevMonthName = $monthsList[($prevM->month - 1)] ?? '';
             }
 
-            // Real-time top category
-            $topCatQuery = DB::table('tourist_spots')->selectRaw('category, COUNT(*) as cnt');
-            if ($isMuni) $topCatQuery->where('municipality_id', $muniId);
-            $topCat = $topCatQuery->groupBy('category')->orderByDesc('cnt')->first();
-            $topCatName = $topCat->category ?? 'None';
-            $topCatCount = (int) ($topCat->cnt ?? 0);
+            // ── Users (single query)
+            $usersRow = DB::selectOne("
+                SELECT
+                    COUNT(*) as total,
+                    SUM(CASE WHEN created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY) THEN 1 ELSE 0 END) as new_30d
+                FROM users WHERE role = 'tourist'
+            ");
 
-            $totalUsers = DB::table('users')->where('role', 'tourist')->count();
-            $newUsersCount = DB::table('users')->where('role', 'tourist')->where('created_at', '>=', now()->subDays(30))->count();
-
+            // ── Most visited municipality & spot
             $mvMuniQuery = Municipality::leftJoin('tourist_spots as ts', 'ts.municipality_id', '=', 'municipalities.id')
                 ->selectRaw('municipalities.name, COALESCE(SUM(ts.visits),0) as v')
                 ->groupBy('municipalities.id', 'municipalities.name');
@@ -114,35 +121,235 @@ class AnalyticsController extends Controller
             if ($isMuni) $mvSpotQuery->where('municipality_id', $muniId);
             $mvSpot = $mvSpotQuery->orderByDesc('visits')->first(['name', 'visits']);
 
-            $analyticsQuery = Analytics::query();
-            if ($isMuni) $analyticsQuery->where('municipality_id', $muniId);
-            $totalAnalyticsVisits = $analyticsQuery->sum('visits');
-
-            $approvedCount = (int) ($row->approved ?? 0);
+            $totalMunis = $isMuni ? 1 : Municipality::count();
 
             return [
                 'total_municipalities'   => (int) $totalMunis,
                 'total_spots'            => (int) ($row->total ?? 0),
-                'approved_spots'         => $approvedCount,
-                'total_visits'           => (int) $totalVisits,
-                'total_analytics_visits' => (int) $totalAnalyticsVisits,
-                'total_users'            => (int) $totalUsers,
-                'new_users_30d'          => (int) $newUsersCount,
+                'approved_spots'         => (int) ($row->approved ?? 0),
+                'total_visits'           => $totalVisits,
+                'total_analytics_visits' => $totalAnalyticsVisits,
+                'total_users'            => (int) ($usersRow->total ?? 0),
+                'new_users_30d'          => (int) ($usersRow->new_30d ?? 0),
                 'most_visited_muni'      => $mvMuni->name ?? '—',
                 'most_visited_muni_v'    => (int) ($mvMuni->v ?? 0),
                 'most_visited_spot'      => $mvSpot->name ?? '—',
                 'most_visited_spot_v'    => (int) ($mvSpot->visits ?? 0),
                 'avg_rating'             => round((float) ($row->avg_rating ?? 0), 2),
-                'new_spots_30d'          => $newSpotsCount,
+                'new_spots_30d'          => (int) ($row->new_spots ?? 0),
                 'visits_yoy_pct'         => $visitsYoY,
                 'visits_month_pct'       => $monthPct,
                 'visits_prev_month'      => $prevMonthName,
-                'top_category'           => $topCatName,
-                'top_category_cnt'       => $topCatCount,
+                'top_category'           => $topCat->category ?? 'None',
+                'top_category_cnt'       => (int) ($topCat->cnt ?? 0),
             ];
         });
 
         return $this->etagResponse($request, ['success' => true, 'summary' => $data]);
+    }
+
+    /**
+     * Consolidated dashboard endpoint — returns summary + chart_data + monthly_trend + top_spots
+     * in one single cached HTTP request, replacing 4 separate API calls from the frontend.
+     */
+    public function dashboard(Request $request): JsonResponse
+    {
+        $year   = (int) $request->get('year', now()->year);
+        $muniId = (int) $request->get('municipality_id', 0);
+        $isMuni = $this->isMunicipal();
+        $scopedMuniId = $isMuni ? $this->municipalityId() : 0;
+        $effectiveMuniId = $isMuni ? $scopedMuniId : $muniId;
+
+        $cacheKey = $this->scopeKey("analytics:dashboard-v3:{$year}:{$effectiveMuniId}");
+        if ($request->has('refresh') || $request->has('nocache')) {
+            Cache::forget($cacheKey);
+        }
+
+        $data = Cache::remember($cacheKey, 1800, function () use ($year, $isMuni, $scopedMuniId, $effectiveMuniId) {
+            $currentYear  = now()->year;
+            $muniFilter   = $effectiveMuniId ? "AND municipality_id = {$effectiveMuniId}" : '';
+
+            // ── 1. SUMMARY (collapsed into 3 queries instead of ~10)
+            $spotQuery = DB::table('tourist_spots')->where('status', '!=', 'draft');
+            if ($effectiveMuniId) $spotQuery->where('municipality_id', $effectiveMuniId);
+            $spotRow = $spotQuery->selectRaw(
+                "COUNT(*) as total,
+                 SUM(status='approved') as approved,
+                 AVG(rating) as avg_rating,
+                 SUM(CASE WHEN created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY) THEN 1 ELSE 0 END) as new_spots"
+            )->first();
+
+            $topCatQuery = DB::table('tourist_spots')->selectRaw('category, COUNT(*) as cnt');
+            if ($effectiveMuniId) $topCatQuery->where('municipality_id', $effectiveMuniId);
+            $topCat = $topCatQuery->groupBy('category')->orderByDesc('cnt')->first();
+
+            $analyticsRow = DB::selectOne("
+                SELECT
+                    COALESCE(SUM(visits),0) as total_visits,
+                    COALESCE(SUM(CASE WHEN year = {$currentYear} THEN visits ELSE 0 END),0) as this_year,
+                    COALESCE(SUM(CASE WHEN year = " . ($currentYear - 1) . " THEN visits ELSE 0 END),0) as prev_year
+                FROM analytics WHERE 1=1 {$muniFilter}
+            ");
+            $thisYearVisits = (int) ($analyticsRow->this_year ?? 0);
+            $prevYearVisits = (int) ($analyticsRow->prev_year ?? 0);
+            $visitsYoY = $prevYearVisits > 0
+                ? round((($thisYearVisits - $prevYearVisits) / $prevYearVisits) * 100, 1)
+                : 0.0;
+
+            $lastMonthsQuery = DB::table('analytics')->where('year', $currentYear);
+            if ($effectiveMuniId) $lastMonthsQuery->where('municipality_id', $effectiveMuniId);
+            $lastMonths = $lastMonthsQuery->selectRaw('month, SUM(visits) as v')->groupBy('month')->orderByDesc('month')->limit(2)->get();
+            $monthPct = 0.0; $prevMonthName = '';
+            if ($lastMonths->count() >= 2) {
+                $curM = $lastMonths[0]; $prevM = $lastMonths[1];
+                if ($prevM->v > 0) $monthPct = round((($curM->v - $prevM->v) / $prevM->v) * 100, 1);
+                $ml = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+                $prevMonthName = $ml[($prevM->month - 1)] ?? '';
+            }
+
+            $usersRow = DB::selectOne("
+                SELECT COUNT(*) as total,
+                       SUM(CASE WHEN created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY) THEN 1 ELSE 0 END) as new_30d
+                FROM users WHERE role = 'tourist'
+            ");
+
+            $mvMuniQ = Municipality::leftJoin('tourist_spots as ts','ts.municipality_id','=','municipalities.id')
+                ->selectRaw('municipalities.name, COALESCE(SUM(ts.visits),0) as v')
+                ->groupBy('municipalities.id','municipalities.name');
+            if ($effectiveMuniId) $mvMuniQ->where('municipalities.id', $effectiveMuniId);
+            $mvMuni = $mvMuniQ->orderByDesc('v')->first();
+
+            $mvSpotQ = TouristSpot::query();
+            if ($effectiveMuniId) $mvSpotQ->where('municipality_id', $effectiveMuniId);
+            $mvSpot = $mvSpotQ->orderByDesc('visits')->first(['name','visits']);
+
+            $totalMunis = $effectiveMuniId ? 1 : Municipality::count();
+
+            $summary = [
+                'total_municipalities'   => (int) $totalMunis,
+                'total_spots'            => (int) ($spotRow->total ?? 0),
+                'approved_spots'         => (int) ($spotRow->approved ?? 0),
+                'total_visits'           => (int) ($analyticsRow->total_visits ?? 0),
+                'total_analytics_visits' => (int) ($analyticsRow->total_visits ?? 0),
+                'total_users'            => (int) ($usersRow->total ?? 0),
+                'new_users_30d'          => (int) ($usersRow->new_30d ?? 0),
+                'most_visited_muni'      => $mvMuni->name ?? '—',
+                'most_visited_muni_v'    => (int) ($mvMuni->v ?? 0),
+                'most_visited_spot'      => $mvSpot->name ?? '—',
+                'most_visited_spot_v'    => (int) ($mvSpot->visits ?? 0),
+                'avg_rating'             => round((float) ($spotRow->avg_rating ?? 0), 2),
+                'new_spots_30d'          => (int) ($spotRow->new_spots ?? 0),
+                'visits_yoy_pct'         => $visitsYoY,
+                'visits_month_pct'       => $monthPct,
+                'visits_prev_month'      => $prevMonthName,
+                'top_category'           => $topCat->category ?? 'None',
+                'top_category_cnt'       => (int) ($topCat->cnt ?? 0),
+            ];
+
+            // ── 2. MONTHLY TREND
+            $curQ = Analytics::where('year', $year);
+            $preQ = Analytics::where('year', $year - 1);
+            if ($effectiveMuniId) { $curQ->where('municipality_id', $effectiveMuniId); $preQ->where('municipality_id', $effectiveMuniId); }
+            $trendCurrent  = $curQ->selectRaw('month, SUM(visits) as visits')->groupBy('month')->orderBy('month')->get();
+            $trendPrevious = $preQ->selectRaw('month, SUM(visits) as visits')->groupBy('month')->orderBy('month')->get();
+
+            // ── 3. CHART DATA
+            $tsVisitsSub = DB::table('tourist_spots')
+                ->selectRaw('municipality_id, COALESCE(SUM(visits), 0) as spot_visits')
+                ->groupBy('municipality_id');
+            $anVisitsSub = DB::table('analytics')
+                ->where('year', $year)
+                ->selectRaw('municipality_id, COALESCE(SUM(visits), 0) as analytics_visits')
+                ->groupBy('municipality_id');
+            $muniStatsQuery = Municipality::leftJoinSub($anVisitsSub,'an','an.municipality_id','=','municipalities.id')
+                ->leftJoinSub($tsVisitsSub,'ts','ts.municipality_id','=','municipalities.id')
+                ->selectRaw('municipalities.id, municipalities.name, GREATEST(COALESCE(an.analytics_visits,0), COALESCE(ts.spot_visits,0)) as total_visits');
+            if ($effectiveMuniId) $muniStatsQuery->where('municipalities.id', $effectiveMuniId);
+            $muniStats = $muniStatsQuery->groupBy('municipalities.id','municipalities.name','an.analytics_visits','ts.spot_visits')->get();
+
+            $spotCounts = DB::table('tourist_spots')->selectRaw('municipality_id, COUNT(*) as count')->groupBy('municipality_id')->pluck('count','municipality_id');
+            $muniStats->map(function($item) use ($spotCounts) {
+                $item->spot_count    = (int) ($spotCounts[$item->id] ?? 0);
+                $item->total_visits  = (int) $item->total_visits;
+                return $item;
+            });
+            $visitsByMuni = $muniStats->sortByDesc('total_visits')->take(10)->values();
+            $spotsByMuni  = $muniStats->sortByDesc('spot_count')->take(10)->values();
+
+            $spotsQ = TouristSpot::query();
+            if ($effectiveMuniId) $spotsQ->where('municipality_id', $effectiveMuniId);
+            $allSpots = $spotsQ->get(['category','rating','visits','classification_status']);
+
+            $catAgg = [];
+            foreach ($allSpots as $spot) {
+                $rawCats = array_map('trim', explode(',', $spot->category ?? 'Other'));
+                foreach ($rawCats as $cat) {
+                    if ($cat === '') $cat = 'Other';
+                    if (!isset($catAgg[$cat])) $catAgg[$cat] = ['category'=>$cat,'cnt'=>0,'sum_rating'=>0,'rating_count'=>0,'total_visits'=>0];
+                    $catAgg[$cat]['cnt']++;
+                    $catAgg[$cat]['total_visits'] += (int)($spot->visits ?? 0);
+                    if ($spot->rating !== null) { $catAgg[$cat]['sum_rating'] += (float)$spot->rating; $catAgg[$cat]['rating_count']++; }
+                }
+            }
+            $catDist = collect(array_values($catAgg))->map(function($c){
+                $c['avg_rating'] = $c['rating_count'] > 0 ? round($c['sum_rating']/$c['rating_count'],2) : 0;
+                unset($c['sum_rating'],$c['rating_count']); return (object)$c;
+            })->sortByDesc('cnt')->values();
+
+            $classAgg = [];
+            foreach ($allSpots as $spot) {
+                $rawStatus = strtoupper(trim($spot->classification_status ?? ''));
+                $cls = TouristSpot::$STATUS_MAP[$rawStatus] ?? ($rawStatus ?: 'POTENTIAL');
+                if (!isset($classAgg[$cls])) $classAgg[$cls] = ['cls'=>$cls,'cnt'=>0,'sum_rating'=>0,'rating_count'=>0];
+                $classAgg[$cls]['cnt']++;
+                if ($spot->rating !== null) { $classAgg[$cls]['sum_rating'] += (float)$spot->rating; $classAgg[$cls]['rating_count']++; }
+            }
+            $classDist = collect(array_values($classAgg))->map(function($c){
+                $c['avg_rating'] = $c['rating_count'] > 0 ? round($c['sum_rating']/$c['rating_count'],2) : 0;
+                unset($c['sum_rating'],$c['rating_count']); return (object)$c;
+            })->sortByDesc('cnt')->values();
+
+            $monthlyQ = Analytics::where('year', $year);
+            if ($effectiveMuniId) $monthlyQ->where('municipality_id', $effectiveMuniId);
+            $monthly = $monthlyQ->selectRaw('month, SUM(visits) as total_visits, SUM(transport_car) as car, SUM(transport_bus) as bus, SUM(transport_van) as van, SUM(transport_other) as other')
+                ->groupBy('month')->orderBy('month')->get();
+
+            $transportQ = Analytics::where('year', $year);
+            if ($effectiveMuniId) $transportQ->where('municipality_id', $effectiveMuniId);
+            $transport = $transportQ->selectRaw('SUM(transport_car) as car, SUM(transport_bus) as bus, SUM(transport_van) as van, SUM(transport_other) as other, SUM(visits) as total')->first();
+
+            // ── 4. TOP SPOTS
+            $topSpotsQ = TouristSpot::select([
+                'id','name','municipality_id','barangay','category','classification_status',
+                'entrance_fee','visits','rating','photo_url','status','points','created_at'
+            ])->with('municipality:id,name');
+            if ($effectiveMuniId) $topSpotsQ->where('municipality_id', $effectiveMuniId);
+            $topSpots = $topSpotsQ->orderByDesc('visits')->limit(10)->get()->values()->map(function($r,$i){
+                $r->rank = $i + 1; return $r;
+            });
+
+            // ── 5. FILTER OPTIONS
+            $munisQ = Municipality::orderBy('name');
+            if ($effectiveMuniId) $munisQ->where('id', $effectiveMuniId);
+            $munis = $munisQ->get(['id','name']);
+
+            return [
+                'summary'        => $summary,
+                'trend_current'  => json_decode(json_encode($trendCurrent), true),
+                'trend_previous' => json_decode(json_encode($trendPrevious), true),
+                'spots_by_muni'  => json_decode(json_encode($spotsByMuni), true),
+                'visits_by_muni' => json_decode(json_encode($visitsByMuni), true),
+                'cat_dist'       => json_decode(json_encode($catDist), true),
+                'class_dist'     => json_decode(json_encode($classDist), true),
+                'monthly_visits' => json_decode(json_encode($monthly), true),
+                'transport'      => json_decode(json_encode($transport), true),
+                'spots'          => json_decode(json_encode($topSpots), true),
+                'municipalities' => json_decode(json_encode($munis), true),
+                'year'           => $year,
+            ];
+        });
+
+        return response()->json(['success' => true] + $data);
     }
 
     public function topMunicipalities(Request $request): JsonResponse
@@ -261,19 +468,26 @@ class AnalyticsController extends Controller
         $isMuni = $this->isMunicipal();
         $muniId = $isMuni ? $this->municipalityId() : 0;
 
-        $cacheKey = $this->scopeKey("analytics:chart-data-v7:{$year}:{$month}");
+        $cacheKey = $this->scopeKey("analytics:chart-data-v10:{$year}:{$month}");
         if ($request->has('refresh') || $request->has('nocache')) {
             Cache::forget($cacheKey);
         }
 
         $data = Cache::remember($cacheKey, 3600, function () use ($year, $month, $isMuni, $muniId) {
-            $muniStatsQuery = Municipality::leftJoin('analytics as a', function($join) use ($year) {
-                $join->on('a.municipality_id', '=', 'municipalities.id')
-                     ->where('a.year', '=', $year);
-            })
-            ->selectRaw('municipalities.id, municipalities.name, COALESCE(SUM(a.visits),0) as total_visits');
+            $tsVisitsSub = DB::table('tourist_spots')
+                ->selectRaw('municipality_id, COALESCE(SUM(visits), 0) as spot_visits')
+                ->groupBy('municipality_id');
+
+            $anVisitsSub = DB::table('analytics')
+                ->where('year', $year)
+                ->selectRaw('municipality_id, COALESCE(SUM(visits), 0) as analytics_visits')
+                ->groupBy('municipality_id');
+
+            $muniStatsQuery = Municipality::leftJoinSub($anVisitsSub, 'an', 'an.municipality_id', '=', 'municipalities.id')
+                ->leftJoinSub($tsVisitsSub, 'ts', 'ts.municipality_id', '=', 'municipalities.id')
+                ->selectRaw('municipalities.id, municipalities.name, GREATEST(COALESCE(an.analytics_visits, 0), COALESCE(ts.spot_visits, 0)) as total_visits');
             if ($isMuni) $muniStatsQuery->where('municipalities.id', $muniId);
-            $muniStats = $muniStatsQuery->groupBy('municipalities.id', 'municipalities.name')->get();
+            $muniStats = $muniStatsQuery->groupBy('municipalities.id', 'municipalities.name', 'an.analytics_visits', 'ts.spot_visits')->get();
 
             $spotCounts = DB::table('tourist_spots')
                 ->selectRaw('municipality_id, COUNT(*) as count')
@@ -281,7 +495,8 @@ class AnalyticsController extends Controller
                 ->pluck('count', 'municipality_id');
 
             $muniStats->map(function($item) use ($spotCounts) {
-                $item->spot_count = $spotCounts[$item->id] ?? 0;
+                $item->spot_count = (int) ($spotCounts[$item->id] ?? 0);
+                $item->total_visits = (int) $item->total_visits;
                 return $item;
             });
 
@@ -315,10 +530,11 @@ class AnalyticsController extends Controller
                 return (object) $c;
             })->sortByDesc('cnt')->values();
 
-            // Classification: include ALL spots, treating NULL as 'POTENTIAL'
+            // Classification: include ALL spots, mapping to standard status keys
             $classAgg = [];
             foreach ($allSpots as $spot) {
-                $cls = $spot->classification_status ?: 'POTENTIAL';
+                $rawStatus = strtoupper(trim($spot->classification_status ?? ''));
+                $cls = TouristSpot::$STATUS_MAP[$rawStatus] ?? ($rawStatus ?: 'POTENTIAL');
                 if (!isset($classAgg[$cls])) {
                     $classAgg[$cls] = ['cls' => $cls, 'cnt' => 0, 'sum_rating' => 0, 'rating_count' => 0];
                 }
@@ -364,7 +580,7 @@ class AnalyticsController extends Controller
             'class_dist'     => $data['class_dist'],
             'transport'      => $data['transport'],
         ]);
-    }
+ }
 
     public function monthlyTrend(Request $request): JsonResponse
     {

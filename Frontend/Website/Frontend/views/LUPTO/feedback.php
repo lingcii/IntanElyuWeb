@@ -29,7 +29,7 @@ ob_start();
 <div class="fb-kpi-grid">
     <div class="fb-kpi-card">
         <div class="fb-kpi-icon blue"><i class="fas fa-location-dot"></i></div>
-        <div class="fb-kpi-info"><h4>Spots Reviewed</h4><span class="fb-kpi-value" data-fb-kpi="spots_reviewed"><i class="fas fa-spinner fa-spin" style="font-size:14px;color:#9CA3AF;"></i></span><div class="fb-kpi-label">Tourist spots with reviews</div></div>
+        <div class="fb-kpi-info"><h4>Sites Reviewed</h4><span class="fb-kpi-value" data-fb-kpi="spots_reviewed"><i class="fas fa-spinner fa-spin" style="font-size:14px;color:#9CA3AF;"></i></span><div class="fb-kpi-label">Tourist sites with reviews</div></div>
     </div>
     <div class="fb-kpi-card">
         <div class="fb-kpi-icon teal"><i class="fas fa-comment-dots"></i></div>
@@ -57,8 +57,40 @@ ob_start();
         <i class="fas fa-search"></i>
         <input type="text" id="fb-search-input" class="fb-search-input" placeholder="Search by spot name, municipality, user, or comment…">
     </div>
-    <select id="fb-filter-municipality" class="fb-filter-select"><option value="">All Municipalities</option></select>
-    <select id="fb-filter-category" class="fb-filter-select"><option value="">All Categories</option></select>
+    <select id="fb-filter-municipality" class="fb-filter-select">
+        <option value="">All Municipalities</option>
+        <option value="Agoo">Agoo</option>
+        <option value="Aringay">Aringay</option>
+        <option value="Bacnotan">Bacnotan</option>
+        <option value="Bagulin">Bagulin</option>
+        <option value="Balaoan">Balaoan</option>
+        <option value="Bangar">Bangar</option>
+        <option value="Bauang">Bauang</option>
+        <option value="Burgos">Burgos</option>
+        <option value="Caba">Caba</option>
+        <option value="Luna">Luna</option>
+        <option value="Naguilian">Naguilian</option>
+        <option value="Pugo">Pugo</option>
+        <option value="Rosario">Rosario</option>
+        <option value="San Fernando">San Fernando</option>
+        <option value="San Gabriel">San Gabriel</option>
+        <option value="San Juan">San Juan</option>
+        <option value="Santo Tomas">Santo Tomas</option>
+        <option value="Santol">Santol</option>
+        <option value="Sudipen">Sudipen</option>
+        <option value="Tubao">Tubao</option>
+    </select>
+    <select id="fb-filter-category" class="fb-filter-select">
+        <option value="">All Categories</option>
+        <option value="Beach">Beach</option>
+        <option value="Mountain">Mountain</option>
+        <option value="Waterfalls">Waterfalls</option>
+        <option value="Eco-Park">Eco-Park</option>
+        <option value="Cultural">Cultural</option>
+        <option value="Resort">Resort</option>
+        <option value="Historical">Historical</option>
+        <option value="Agri-Tourism">Agri-Tourism</option>
+    </select>
     <select id="fb-filter-rating" class="fb-filter-select" style="min-width:110px;">
         <option value="">All Ratings</option>
         <option value="5">⭐⭐⭐⭐⭐ 5 Star</option>
@@ -67,23 +99,11 @@ ob_start();
         <option value="2">⭐⭐ 2 Star</option>
         <option value="1">⭐ 1 Star</option>
     </select>
-    <select id="fb-sort-select" class="fb-filter-select" style="min-width:150px;">
-        <option value="newest" selected>Newest First</option>
-        <option value="most_reviewed">Most Reviewed</option>
-        <option value="highest_rated">Highest Rated</option>
-        <option value="lowest_rated">Lowest Rated</option>
-        <option value="oldest">Oldest First</option>
-        <option value="alphabetical">A – Z</option>
-    </select>
     <span id="fb-date-filters" style="display:none; display:flex; gap:6px; align-items:center;">
         <input type="date" id="fb-date-from" class="fb-date-input" title="From date">
         <span style="font-size:12px;color:#94a3b8;">to</span>
         <input type="date" id="fb-date-to" class="fb-date-input" title="To date">
     </span>
-    <div class="fb-view-toggle">
-        <button id="fb-btn-gallery" class="fb-view-btn active" onclick="window.switchFeedbackView('gallery')" title="Gallery View"><i class="fas fa-th-large"></i> Gallery</button>
-        <button id="fb-btn-table"   class="fb-view-btn"        onclick="window.switchFeedbackView('table')"   title="Table View"><i class="fas fa-table"></i> Table</button>
-    </div>
 </div>
 
 <!-- Gallery View -->
@@ -96,7 +116,7 @@ ob_start();
 <div id="fb-table-section" style="display:none;">
     <div class="fb-table-wrap">
         <table class="fb-table">
-            <thead><tr><th>Tourist Spot</th><th>Municipality</th><th>Rating</th><th>Comment</th><th>Tourist / User</th><th>Date Submitted</th><th></th></tr></thead>
+            <thead><tr><th>Tourist Site</th><th>Municipality</th><th>Rating</th><th>Comment</th><th>Tourist / User</th><th>Date Submitted</th><th></th></tr></thead>
             <tbody id="fb-table-body"><tr><td colspan="7" style="text-align:center;padding:30px;color:#94a3b8;"><i class="fas fa-spinner fa-spin"></i> Loading…</td></tr></tbody>
         </table>
     </div>

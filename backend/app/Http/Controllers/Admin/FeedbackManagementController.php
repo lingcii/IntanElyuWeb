@@ -198,7 +198,11 @@ class FeedbackManagementController extends Controller
         if ($municipalityId) {
             $query->where('municipality_id', $municipalityId);
         } elseif ($municipality) {
-            $query->where('municipality_id', $municipality);
+            if (is_numeric($municipality)) {
+                $query->where('municipality_id', $municipality);
+            } else {
+                $query->whereHas('municipality', fn($q) => $q->where('name', 'like', "%{$municipality}%"));
+            }
         }
 
         if ($search) {
@@ -253,21 +257,17 @@ class FeedbackManagementController extends Controller
             ];
         });
 
-        // Load all municipalities for filter dropdown (only for province-wide roles)
-        $municipalities = null;
-        if (!$municipalityId) {
-            $municipalities = Cache::remember('feedback_meta_muni', 600, function () {
-                return Municipality::orderBy('name')->select('id', 'name')->get();
-            });
-        }
+        // Load all municipalities for filter dropdown
+        $municipalities = Cache::remember('feedback_meta_muni', 600, function () {
+            return Municipality::orderBy('name')->select('id', 'name')->get();
+        });
 
         // Load all categories for filter dropdown
-        $cacheCatKey = 'feedback_meta_cat_v2_' . ($municipalityId ?? 'all');
-        $categories = Cache::remember($cacheCatKey, 600, function () use ($municipalityId) {
+        $categories = Cache::remember('feedback_meta_cat_all', 600, function () {
             return TouristSpot::query()
                 ->whereNotIn('status', ['draft', 'rejected', 'pending'])
-                ->when($municipalityId, fn($q) => $q->where('municipality_id', $municipalityId))
                 ->whereNotNull('category')
+                ->where('category', '!=', '')
                 ->distinct()
                 ->orderBy('category')
                 ->pluck('category');
@@ -394,96 +394,99 @@ class FeedbackManagementController extends Controller
     public function spotDetails(Request $request, $id)
     {
         $municipalityId = $this->getScopedMunicipalityId($request);
-
-        $spot = TouristSpot::with(['municipality', 'images'])
-            ->withAvg(['feedbacks' => fn($q) => $q->whereNotNull('rating')], 'rating')
-            ->withCount(['feedbacks' => fn($q) => $q->whereNotNull('rating')])
-            ->find($id);
-
-        if (!$spot) {
-            return response()->json(['error' => 'Tourist spot not found.'], 404);
-        }
-
-        // Security: municipal users can only access their own municipality's spots
-        if ($municipalityId && $spot->municipality_id !== $municipalityId) {
-            return response()->json(['error' => 'Forbidden.'], 403);
-        }
-
-        // Rating breakdown
-        $breakdown = SiteFeedback::where('tourist_spot_id', $id)
-            ->whereNotNull('rating')
-            ->select('rating', DB::raw('COUNT(*) as count'))
-            ->groupBy('rating')
-            ->pluck('count', 'rating');
-
-        $ratingBreakdown = [];
-        for ($i = 5; $i >= 1; $i--) {
-            $ratingBreakdown[$i] = (int) ($breakdown[$i] ?? 0);
-        }
-
-        // Cover image
-        $coverImage = $spot->images->where('is_primary', true)->first()?->photo_url
-            ?? $spot->images->first()?->photo_url
-            ?? $spot->photo_url;
-
-        // All gallery images
-        $galleryImages = $spot->images->map(fn($img) => $img->photo_url)->values();
-
-        // Paginated reviews
+        $page = (int) $request->get('page', 1);
         $perPage = min((int) $request->get('per_page', 10), 50);
         $sort    = $request->get('sort', 'newest');
 
-        $reviewsQuery = SiteFeedback::with(['user', 'images'])
-            ->where('tourist_spot_id', $id)
-            ->whereNotNull('rating');
+        $cacheKey = "spot_details_{$id}_m" . ($municipalityId ?? '0') . "_p{$page}_pp{$perPage}_s{$sort}";
 
-        switch ($sort) {
-            case 'oldest':
-                $reviewsQuery->orderBy('created_at', 'asc');
-                break;
-            case 'highest_rated':
-                $reviewsQuery->orderByDesc('rating');
-                break;
-            case 'lowest_rated':
-                $reviewsQuery->orderBy('rating');
-                break;
-            default:
-                $reviewsQuery->orderByDesc('created_at');
-        }
+        return Cache::remember($cacheKey, 15, function () use ($request, $id, $municipalityId, $perPage, $sort) {
+            $spot = TouristSpot::with(['municipality', 'images'])
+                ->withAvg(['feedbacks' => fn($q) => $q->whereNotNull('rating')], 'rating')
+                ->withCount(['feedbacks' => fn($q) => $q->whereNotNull('rating')])
+                ->find($id);
 
-        $paginated = $reviewsQuery->paginate($perPage);
+            if (!$spot) {
+                return response()->json(['error' => 'Tourist spot not found.'], 404);
+            }
 
-        $reviews = collect($paginated->items())->map(fn($fb) => [
-            'id'           => $fb->id,
-            'rating'       => $fb->rating,
-            'comment'      => $fb->testimony,
-            'crowd_level'  => $fb->crowd_level,
-            'cleanliness'  => $fb->cleanliness_level,
-            'safety'       => $fb->safety_level,
-            'user_name'    => $fb->user?->name ?? 'Anonymous',
-            'user_avatar'  => $fb->user?->avatar,
-            'date'         => $fb->created_at?->format('M d, Y'),
-            'date_raw'     => $fb->created_at?->toISOString(),
-            'images'       => $fb->images->map(fn($img) => $img->image_path)->values(),
-        ]);
+            // Security: municipal users can only access their own municipality's spots
+            if ($municipalityId && $spot->municipality_id !== $municipalityId) {
+                return response()->json(['error' => 'Forbidden.'], 403);
+            }
 
-        return response()->json([
-            'spot' => [
-                'id'            => $spot->id,
-                'name'          => $spot->name,
-                'municipality'  => $spot->municipality?->name,
-                'category'      => $spot->category,
-                'description'   => $spot->description,
-                'cover_image'   => $coverImage,
-                'gallery'       => $galleryImages,
-                'avg_rating'    => round((float) $spot->feedbacks_avg_rating, 2),
-                'total_reviews' => (int) $spot->feedbacks_count,
-            ],
-            'rating_breakdown' => $ratingBreakdown,
-            'reviews'          => $reviews,
-            'current_page'     => $paginated->currentPage(),
-            'last_page'        => $paginated->lastPage(),
-            'total_reviews'    => $paginated->total(),
-        ]);
+            // Rating breakdown
+            $breakdown = SiteFeedback::where('tourist_spot_id', $id)
+                ->whereNotNull('rating')
+                ->select('rating', DB::raw('COUNT(*) as count'))
+                ->groupBy('rating')
+                ->pluck('count', 'rating');
+
+            $ratingBreakdown = [];
+            for ($i = 5; $i >= 1; $i--) {
+                $ratingBreakdown[$i] = (int) ($breakdown[$i] ?? 0);
+            }
+
+            // Cover image
+            $coverImage = $spot->images->where('is_primary', true)->first()?->photo_url
+                ?? $spot->images->first()?->photo_url
+                ?? $spot->photo_url;
+
+            // All gallery images
+            $galleryImages = $spot->images->map(fn($img) => $img->photo_url)->values();
+
+            $reviewsQuery = SiteFeedback::with(['user', 'images'])
+                ->where('tourist_spot_id', $id)
+                ->whereNotNull('rating');
+
+            switch ($sort) {
+                case 'oldest':
+                    $reviewsQuery->orderBy('created_at', 'asc');
+                    break;
+                case 'highest_rated':
+                    $reviewsQuery->orderByDesc('rating');
+                    break;
+                case 'lowest_rated':
+                    $reviewsQuery->orderBy('rating');
+                    break;
+                default:
+                    $reviewsQuery->orderByDesc('created_at');
+            }
+
+            $paginated = $reviewsQuery->paginate($perPage);
+
+            $reviews = collect($paginated->items())->map(fn($fb) => [
+                'id'           => $fb->id,
+                'rating'       => $fb->rating,
+                'comment'      => $fb->testimony,
+                'crowd_level'  => $fb->crowd_level,
+                'cleanliness'  => $fb->cleanliness_level,
+                'safety'       => $fb->safety_level,
+                'user_name'    => $fb->user?->name ?? 'Anonymous',
+                'user_avatar'  => $fb->user?->avatar,
+                'date'         => $fb->created_at?->format('M d, Y'),
+                'date_raw'     => $fb->created_at?->toISOString(),
+                'images'       => $fb->images->map(fn($img) => $img->image_path)->values(),
+            ]);
+
+            return response()->json([
+                'spot' => [
+                    'id'            => $spot->id,
+                    'name'          => $spot->name,
+                    'municipality'  => $spot->municipality?->name,
+                    'category'      => $spot->category,
+                    'description'   => $spot->description,
+                    'cover_image'   => $coverImage,
+                    'gallery'       => $galleryImages,
+                    'avg_rating'    => round((float) $spot->feedbacks_avg_rating, 2),
+                    'total_reviews' => (int) $spot->feedbacks_count,
+                ],
+                'rating_breakdown' => $ratingBreakdown,
+                'reviews'          => $reviews,
+                'current_page'     => $paginated->currentPage(),
+                'last_page'        => $paginated->lastPage(),
+                'total_reviews'    => $paginated->total(),
+            ]);
+        });
     }
 }

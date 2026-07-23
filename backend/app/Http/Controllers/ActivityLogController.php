@@ -79,6 +79,7 @@ class ActivityLogController extends Controller
         }
 
         $paginator = $query->paginate($perPage, ['*'], 'page', $page);
+        $stats     = $this->computeStats();
 
         return response()->json([
             'logs' => $paginator->items(),
@@ -90,6 +91,7 @@ class ActivityLogController extends Controller
                 'from'         => $paginator->firstItem(),
                 'to'           => $paginator->lastItem(),
             ],
+            'stats' => $stats,
         ]);
     }
 
@@ -99,36 +101,7 @@ class ActivityLogController extends Controller
      */
     public function stats(): JsonResponse
     {
-        $stats = Cache::remember(self::CACHE_KEY_STATS, 30, function () {
-            $today = today();
-
-            $todayStats = DB::table('activity_logs')
-                ->whereDate('created_at', $today)
-                ->selectRaw("
-                    COUNT(*) as logs_today,
-                    COUNT(CASE WHEN action = 'Tourist Spot Approved' THEN 1 END) as approvals_today,
-                    COUNT(CASE WHEN action = 'Tourist Spot Rejected' THEN 1 END) as rejections_today
-                ")
-                ->first();
-
-            $activeUsers24h = DB::table('activity_logs')
-                ->where('created_at', '>=', now()->subHours(24))
-                ->whereNotNull('user_id')
-                ->distinct()
-                ->count('user_id');
-
-            $totalLogs = DB::table('activity_logs')->count();
-
-            return [
-                'logs_today'         => (int) ($todayStats->logs_today ?? 0),
-                'approvals_today'    => (int) ($todayStats->approvals_today ?? 0),
-                'rejections_today'   => (int) ($todayStats->rejections_today ?? 0),
-                'active_users_24h'   => (int) $activeUsers24h,
-                'total_logs'         => (int) $totalLogs,
-            ];
-        });
-
-        return response()->json($stats);
+        return response()->json($this->computeStats());
     }
 
     /**
@@ -210,17 +183,27 @@ class ActivityLogController extends Controller
 
     private function computeStats(): array
     {
-        $today = today();
+        return Cache::remember(self::CACHE_KEY_STATS, 15, function () {
+            $today  = today()->toDateString();
+            $sub24h = now()->subHours(24)->toDateTimeString();
 
-        return [
-            'logs_today' => ActivityLog::whereDate('created_at', $today)->count(),
-            'approvals_today' => ActivityLog::whereDate('created_at', $today)
-                ->whereIn('action', ['Tourist Spot Approved'])->count(),
-            'rejections_today' => ActivityLog::whereDate('created_at', $today)
-                ->whereIn('action', ['Tourist Spot Rejected'])->count(),
-            'active_users_24h' => ActivityLog::where('created_at', '>=', now()->subHours(24))
-                ->whereNotNull('user_id')->distinct('user_id')->count('user_id'),
-            'total_logs' => ActivityLog::count(),
-        ];
+            $row = DB::selectOne("
+                SELECT
+                    COUNT(CASE WHEN DATE(created_at) = ? THEN 1 END) as logs_today,
+                    COUNT(CASE WHEN DATE(created_at) = ? AND action = 'Tourist Spot Approved' THEN 1 END) as approvals_today,
+                    COUNT(CASE WHEN DATE(created_at) = ? AND action = 'Tourist Spot Rejected' THEN 1 END) as rejections_today,
+                    COUNT(DISTINCT CASE WHEN created_at >= ? AND user_id IS NOT NULL THEN user_id END) as active_users_24h,
+                    COUNT(*) as total_logs
+                FROM activity_logs
+            ", [$today, $today, $today, $sub24h]);
+
+            return [
+                'logs_today'       => (int) ($row->logs_today ?? 0),
+                'approvals_today'  => (int) ($row->approvals_today ?? 0),
+                'rejections_today' => (int) ($row->rejections_today ?? 0),
+                'active_users_24h' => (int) ($row->active_users_24h ?? 0),
+                'total_logs'       => (int) ($row->total_logs ?? 0),
+            ];
+        });
     }
 }

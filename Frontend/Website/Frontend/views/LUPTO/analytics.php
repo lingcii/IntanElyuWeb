@@ -45,7 +45,7 @@ ob_start();
         <div class="pa-kpi-trend green" id="kpiSpotsBadge">—</div>
         <div class="pa-kpi-icon green"><i class="fas fa-location-dot"></i></div>
         <div class="pa-kpi-info">
-            <h4>Total Tourist Spots</h4>
+            <h4>Total Tourist Sites</h4>
             <p id="kpiSpots">—</p>
             <small>Across <span id="kpiMunisCount">X</span> municipalities</small>
         </div>
@@ -159,7 +159,7 @@ ob_start();
 <div class="card" style="margin-bottom:20px;">
     <div class="card-header">
         <div class="pa-section-header">
-            <h3 class="pa-section-title"><i class="fas fa-map-location-dot"></i> Top Tourist Spots</h3>
+            <h3 class="pa-section-title"><i class="fas fa-map-location-dot"></i> Top Tourist Sites</h3>
             <div class="pa-cat-tabs" id="categoryTabs" style="display:flex; align-items:center; gap:8px; flex-wrap:nowrap;">
                 <button class="pa-cat-tab active" data-category="all" onclick="filterTableCategory('all')">All</button>
                 <button class="pa-cat-tab" data-category="Beach" onclick="filterTableCategory('Beach')">Beach</button>

@@ -1,4 +1,4 @@
-﻿(function () {
+(function () {
     /**
      * LUPTO/PICTO Dashboard API
      * Fetches real-time data from database via a single Laravel API endpoint for maximum speed and efficiency.
@@ -327,7 +327,11 @@
             : spots;
 
         // ── KPIs ──
-        var totalSpots = filtered.length;
+        var totalSpots = muniName
+            ? filtered.length
+            : (currentDashboardData && currentDashboardData.kpis
+                ? (currentDashboardData.kpis.total_tourist_spots ?? currentDashboardData.kpis.totalTouristSpots ?? filtered.length)
+                : filtered.length);
 
         var elSpots = container.querySelector('[data-kpi="total-tourist-spots"] .lupto-kpi-value');
 

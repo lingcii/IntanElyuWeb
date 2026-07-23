@@ -79,11 +79,18 @@
             </div>`).join('');
     }
 
-    // ── API Fetch ─────────────────────────────────────────────────────────────
-    async function apiFetch(url) {
+    // ── API Fetch with Memory Cache ──────────────────────────────────────────
+    const apiCacheMap = new Map();
+    async function apiFetch(url, useCache = true) {
+        if (useCache && apiCacheMap.has(url)) {
+            const entry = apiCacheMap.get(url);
+            if (Date.now() - entry.time < 30000) return entry.data;
+        }
         const res = await fetch(url, { credentials: 'include', headers: { Accept: 'application/json' } });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res.json();
+        const data = await res.json();
+        if (useCache) apiCacheMap.set(url, { time: Date.now(), data });
+        return data;
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -317,21 +324,29 @@
     }
 
     function populateFilterDropdowns() {
-        // Municipality dropdown
-        const muniSel = document.getElementById('fb-filter-municipality');
-        if (muniSel && muniSel.options.length <= 1 && galleryData.municipalities.length) {
+        const tab = document.getElementById('spa-tab-feedback.php') || document;
+        const muniSel = tab.querySelector('#fb-filter-municipality') || document.getElementById('fb-filter-municipality');
+        if (muniSel && galleryData.municipalities?.length) {
+            const currentVal = muniSel.value;
+            const existing = new Set(Array.from(muniSel.options).map(o => o.value));
             galleryData.municipalities.forEach(m => {
-                const opt = new Option(m.name, m.id);
-                muniSel.appendChild(opt);
+                const val = String(m.id);
+                if (!existing.has(val) && !existing.has(m.name)) {
+                    muniSel.appendChild(new Option(m.name, m.id));
+                }
             });
+            if (currentVal) muniSel.value = currentVal;
         }
-        // Category dropdown
-        const catSel = document.getElementById('fb-filter-category');
-        if (catSel && catSel.options.length <= 1 && galleryData.categories.length) {
+        const catSel = tab.querySelector('#fb-filter-category') || document.getElementById('fb-filter-category');
+        if (catSel && galleryData.categories?.length) {
+            const currentVal = catSel.value;
+            const existing = new Set(Array.from(catSel.options).map(o => o.value));
             galleryData.categories.forEach(c => {
-                const opt = new Option(c, c);
-                catSel.appendChild(opt);
+                if (!existing.has(c)) {
+                    catSel.appendChild(new Option(c, c));
+                }
             });
+            if (currentVal) catSel.value = currentVal;
         }
     }
 
@@ -454,7 +469,7 @@
             overlay.className = 'fb-modal-overlay';
             overlay.innerHTML = `<div class="fb-modal" id="fb-modal-inner" role="dialog" aria-modal="true">
                 <div class="fb-modal-header">
-                    <h2 class="fb-modal-header-title"><i class="fas fa-comments"></i> Tourist Spot Feedback</h2>
+                    <h2 class="fb-modal-header-title"><i class="fas fa-comments"></i> Tourist Site Feedback</h2>
                     <button class="fb-modal-close" onclick="window.closeFeedbackModal()" aria-label="Close"><i class="fas fa-times"></i></button>
                 </div>
                 <div class="fb-modal-body" id="fb-modal-body">
@@ -572,7 +587,7 @@
                     <!-- Rating breakdown -->
                     <ul class="fb-breakdown-list">${breakdownHtml}</ul>
                 </div>
-                        ${spot.description ? `<p style="font-size:13px;color:#475569;margin:0 0 18px;line-height:1.7;">${escHtml(spot.description)}</p>` : ''}
+            </div>
 
             <div class="fb-reviews-header">
                 <h3 class="fb-reviews-title"><i class="fas fa-list-ul"></i> All Reviews</h3>

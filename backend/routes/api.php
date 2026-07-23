@@ -98,6 +98,7 @@ Route::middleware('auth.session')->group(function () {
                 Route::get('/chart-data',           [AnalyticsController::class, 'chartData']);
                 Route::get('/monthly-trend',        [AnalyticsController::class, 'monthlyTrend']);
                 Route::get('/filter-options',       [AnalyticsController::class, 'filterOptions']);
+                Route::get('/dashboard-data',       [AnalyticsController::class, 'dashboard']);
                 Route::get('/full',                 [AnalyticsController::class, 'full']);
                 Route::get('/export',               [AnalyticsController::class, 'export']);
             });
@@ -209,6 +210,7 @@ Route::middleware('auth.session')->group(function () {
             Route::get('/chart-data',           [AnalyticsController::class, 'chartData']);
             Route::get('/monthly-trend',        [AnalyticsController::class, 'monthlyTrend']);
             Route::get('/filter-options',       [AnalyticsController::class, 'filterOptions']);
+            Route::get('/dashboard-data',       [AnalyticsController::class, 'dashboard']);
             Route::get('/full',                 [AnalyticsController::class, 'full']);
             Route::get('/export',               [AnalyticsController::class, 'export']);
         });
@@ -294,6 +296,7 @@ Route::middleware('auth.session')->group(function () {
             Route::get('/chart-data',           [AnalyticsController::class, 'chartData']);
             Route::get('/monthly-trend',        [AnalyticsController::class, 'monthlyTrend']);
             Route::get('/filter-options',       [AnalyticsController::class, 'filterOptions']);
+            Route::get('/dashboard-data',       [AnalyticsController::class, 'dashboard']);
             Route::get('/full',                 [AnalyticsController::class, 'full']);
             Route::get('/export',               [AnalyticsController::class, 'export']);
         });

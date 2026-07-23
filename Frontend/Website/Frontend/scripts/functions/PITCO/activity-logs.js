@@ -1,4 +1,4 @@
-﻿/**
+/**
  * PICTO/LUPTO/MUNICIPAL Activity Logs — Enterprise SSE Real-Time Module
  *
  * Features:
@@ -96,7 +96,7 @@ class ActivityLogsModule {
         this.setupUIEventHandlers();
         this.showSkeletonLoader();
         try {
-            await Promise.all([this.fetchStats(), this.fetchLogs()]);
+            await this.fetchLogs();
             this.connectSSE();
             this.startSyncTimer();
         } catch (err) {
@@ -135,6 +135,10 @@ class ActivityLogsModule {
         const params = this.buildQueryParams();
         try {
             const data = await window.API_CONFIG.get(`${this.apiBase}/activity-logs`, params);
+
+            if (data.stats) {
+                this.animateStats(data.stats);
+            }
 
             if (append) {
                 this.allLogs = [...this.allLogs, ...data.logs];
@@ -1104,8 +1108,17 @@ class ActivityLogsModule {
 }
 
 // ── BOOTSTRAP ──────────────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', () => {
+function _initActivityLogs() {
+    if (window.activityLogsModule) {
+        try { window.activityLogsModule.destroy(); } catch (e) {}
+    }
     const module = new ActivityLogsModule();
     window.activityLogsModule = module;
     module.init();
-});
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', _initActivityLogs);
+} else {
+    _initActivityLogs();
+}

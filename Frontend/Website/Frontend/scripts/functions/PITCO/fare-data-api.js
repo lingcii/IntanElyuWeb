@@ -144,15 +144,29 @@ async function fd_loadGuides() {
         if (vehicleFilter) {
             const activeVal = vehicleFilter.value;
             const distinctTypes = [...new Set(_allGuides.map(g => g.vehicle_type).filter(Boolean))];
-            distinctTypes.sort();
+            
+            const labels = {
+                'MPUJ': 'MPUJ (Modern PUJ)',
+                'TPUJ': 'TPUJ (Traditional PUJ)',
+                'PUB_Aircon': 'PUB Aircon',
+                'PUB_Regular': 'PUB Regular',
+                'PUB_Ordinary': 'PUB Ordinary',
+                'TAXI': 'TAXI',
+                'UVE': 'UVE (UV Express)',
+                'Tricycle': 'Tricycle',
+                'Van': 'Van'
+            };
+
+            const defaultTypes = ['MPUJ', 'TPUJ', 'PUB_Aircon', 'PUB_Regular', 'TAXI', 'UVE', 'Tricycle', 'Van'];
+            const allTypes = [...new Set([...defaultTypes, ...distinctTypes])];
 
             let html = '<option value="">All Vehicle Types</option>';
-            distinctTypes.forEach(type => {
-                const label = type.replace(/_/g, ' ');
+            allTypes.forEach(type => {
+                const label = labels[type] || type.replace(/_/g, ' ');
                 html += `<option value="${type}">${label}</option>`;
             });
             vehicleFilter.innerHTML = html;
-            vehicleFilter.value = activeVal;
+            if (activeVal) vehicleFilter.value = activeVal;
         }
 
         fd_updateActiveBadges(_allGuides);

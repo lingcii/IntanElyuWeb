@@ -124,8 +124,10 @@
 }
 .fb-search-wrap {
     position: relative;
-    flex: 1;
+    flex: 0 1 320px;
+    max-width: 320px;
     min-width: 180px;
+    margin-right: auto;
 }
 .fb-search-wrap i {
     position: absolute;
@@ -687,10 +689,10 @@
 .fb-reviews-header {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: flex-start;
     margin-bottom: 14px;
     flex-wrap: wrap;
-    gap: 8px;
+    gap: 10px;
 }
 .fb-reviews-title {
     font-size: 14px;

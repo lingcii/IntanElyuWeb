@@ -28,6 +28,7 @@
             'monthly_trend': `${MA_API}/analytics/monthly-trend`,
             'filter_options': `${MA_API}/analytics/filter-options`,
             'full': `${MA_API}/analytics/full`,
+            'dashboard_data': `${MA_API}/analytics/dashboard-data`,
             'export': `${MA_API}/analytics/export`,
         };
         const base = map[action] || `${MA_API}/analytics/${action.replace(/_/g, '-')}`;
@@ -50,7 +51,8 @@
     let _forceNextFetches = false;
 
     function _initAnalytics() {
-        refreshAnalytics();
+        for (const key in _apiCache) delete _apiCache[key];
+        refreshAnalytics(true);
         window.refreshAnalytics = refreshAnalytics;
         window.refreshAll = refreshAnalytics;
         startAutoRefresh();
@@ -68,55 +70,155 @@
 
         if (!_forceNextFetches && _apiCache[url]) {
             const cached = _apiCache[url];
-            if (Date.now() - cached.timestamp < 600000) { // 10 minutes cache
+            if (Date.now() - cached.timestamp < 1200000 && cached.data && cached.data.success) { // 20 minutes cache
                 return cached.data;
             }
+            delete _apiCache[url];
         }
 
         try {
             const data = await window.API_CONFIG.fetch(url);
-            _apiCache[url] = {
-                data: data,
-                timestamp: Date.now()
-            };
+            if (data && data.success) {
+                _apiCache[url] = { data, timestamp: Date.now() };
+            }
             return data;
         } catch (e) {
+            delete _apiCache[url];
             throw new Error('Network error: ' + e.message);
         }
     }
 
     async function refreshAnalytics(force = false) {
+        const isAnalyticsActive = !!(document.getElementById('spotTable') || document.getElementById('trendChart') || document.getElementById('categoryTabs'));
+        if (!isAnalyticsActive) return;
+
         const icon = document.getElementById('refreshIcon');
         if (icon) icon.classList.add('fa-spin');
 
         if (force) {
-            // Clear frontend cache
-            for (const key in _apiCache) {
-                delete _apiCache[key];
-            }
+            for (const key in _apiCache) delete _apiCache[key];
             _forceNextFetches = true;
         }
 
         try {
-            await Promise.all([
-                loadSummary(),
-                loadChartData(),
-                loadTrendChart(),
-                loadTopSpots(),
-            ]);
+            await loadDashboard();
         } finally {
             _forceNextFetches = false;
         }
 
         if (icon) icon.classList.remove('fa-spin');
 
-        // Update timestamp
         const now = new Date();
         const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
         const lastUpdatedEl = document.getElementById('lastUpdated');
-        if (lastUpdatedEl) {
-            lastUpdatedEl.textContent = `Last updated: ${timeStr}`;
+        if (lastUpdatedEl) lastUpdatedEl.textContent = `Last updated: ${timeStr}`;
+    }
+
+    // Single consolidated fetch replacing 4 separate API calls
+    async function loadDashboard() {
+        const year = document.getElementById('filterYear')?.value || new Date().getFullYear();
+
+        try {
+            const data = await apiFetch('dashboard_data', { year });
+            if (!data || !data.success) return;
+
+            // 1. KPI Summary
+            const s = data.summary;
+            if (s) {
+                const muniName = s.most_visited_muni || 'Your Municipality';
+                setText('muniScopeName', muniName);
+                setText('kpiMuniScope', muniName);
+                setText('kpiSpots', fmtNum(s.total_spots));
+                setText('kpiVisists', fmtNum(s.total_users));
+                setText('kpiSpotsBadge', `↗ +${s.new_spots_30d} new`);
+                setText('kpiVisitsBadge', `↗ +${s.new_users_30d} new`);
+                const momSign = s.visits_month_pct >= 0 ? '+' : '';
+                const momArrow = s.visits_month_pct >= 0 ? '↗' : '↘';
+                setText('kpiMonthlyVisitedBadge', `${momArrow} ${momSign}${s.visits_month_pct}% vs ${s.visits_prev_month}`);
+                setText('kpiTopCategory', escHtml(s.top_category));
+                setText('kpiTopCategoryBadge', `${s.top_category_cnt} spots`);
+            }
+
+            // 2. Classification status
+            buildClassificationStatus(toArr(data.class_dist));
+
+            // 3. Top categories
+            buildTopCategories(toArr(data.cat_dist));
+
+            // 4. Municipality visits chart
+            _muniChartData = toArr(data.visits_by_muni).sort((a, b) => b.total_visits - a.total_visits);
+            buildMuniVisitsChart();
+
+            // 5. Monthly trend
+            _buildTrendChart(data, parseInt(year, 10));
+
+            // 6. Top spots
+            _allSpots = Array.isArray(data.spots) ? data.spots : Object.values(data.spots || {});
+            renderSpotsTable();
+
+        } catch (err) {
+            console.error('[MA] loadDashboard:', err);
         }
+    }
+
+    function _buildTrendChart(data, year) {
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        destroyChart('trendChart');
+        const ctx = document.getElementById('trendChart');
+        if (!ctx) return;
+
+        const currentYear = new Date().getFullYear();
+        const currentMonth = new Date().getMonth() + 1;
+
+        const curVisits = Array(12).fill(0);
+        if (year === currentYear) {
+            for (let i = currentMonth; i < 12; i++) curVisits[i] = null;
+        }
+        const prevVisits = Array(12).fill(0);
+
+        toArr(data.trend_current).forEach(r => {
+            const idx = r.month - 1;
+            if (year === currentYear && r.month > currentMonth) { curVisits[idx] = null; }
+            else { curVisits[idx] = parseInt(r.visits, 10); }
+        });
+        toArr(data.trend_previous).forEach(r => { prevVisits[r.month - 1] = parseInt(r.visits, 10); });
+
+        _trendCurVisits = curVisits; _trendPrevVisits = prevVisits;
+        _trendYear = year; _trendCurrentYear = currentYear; _trendCurrentMonth = currentMonth;
+
+        const activeIdx = (year === currentYear) ? (currentMonth - 2 >= 0 ? currentMonth - 2 : 0) : 11;
+        setText('kpiMonthlyVisited', fmtNum(curVisits[activeIdx] || 0));
+        onMonthFilterChange();
+
+        if (checkEmptyState('trendChart', [...curVisits, ...prevVisits])) return;
+
+        const chartCtx = ctx.getContext('2d');
+        const gradient = chartCtx.createLinearGradient(0, 0, 0, 240);
+        gradient.addColorStop(0, 'rgba(15, 44, 89, 0.15)');
+        gradient.addColorStop(1, 'rgba(15, 44, 89, 0.0)');
+
+        _charts['trendChart'] = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: months,
+                datasets: [
+                    { label: `${year} Visits`, data: curVisits, borderColor: '#0F2C59', backgroundColor: gradient, borderWidth: 3, tension: 0.35, fill: true, pointRadius: 4, pointBackgroundColor: '#0F2C59', pointBorderColor: '#ffffff', pointBorderWidth: 2, pointHoverRadius: 6 },
+                    { label: `${year - 1} Visits`, data: prevVisits, borderColor: '#94a3b8', backgroundColor: 'transparent', borderWidth: 1.5, borderDash: [5, 5], tension: 0.35, fill: false, pointRadius: 0 }
+                ]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: { position: 'top', labels: { color: '#64748b', font: { size: 11 } } },
+                    tooltip: { callbacks: { label: c => ` ${c.dataset.label}: ${c.parsed.y !== null ? fmtNum(c.parsed.y) : '—'} visits` } }
+                },
+                scales: {
+                    y: { beginAtZero: true, grid: { color: '#e2e8f0' }, ticks: { color: '#64748b', font: { size: 10 }, callback: v => fmtK(v) } },
+                    x: { grid: { display: false }, ticks: { color: '#64748b', font: { size: 11 } } }
+                }
+            }
+        });
     }
 
     function clearFilters() {
@@ -151,7 +253,7 @@
 
     function startAutoRefresh() {
         if (_autoRefreshTimer) clearInterval(_autoRefreshTimer);
-        _autoRefreshTimer = setInterval(refreshAnalytics, 30000);
+        _autoRefreshTimer = setInterval(refreshAnalytics, 300000); // 5 minutes
     }
 
     function stopAutoRefresh() {
@@ -368,16 +470,19 @@
 
         const mapping = {
             'EXIST': { label: 'Existing', dot: 'green', fill: 'green' },
+            'EXISTING': { label: 'Existing', dot: 'green', fill: 'green' },
             'EMERGE': { label: 'Emerging', dot: 'blue', fill: 'blue' },
+            'EMERGING': { label: 'Emerging', dot: 'blue', fill: 'blue' },
             'POTENTIAL': { label: 'Potential', dot: 'purple', fill: 'purple' }
         };
 
-        const totalSpots = classes.reduce((sum, c) => sum + c.cnt, 0);
+        const totalSpots = classes.reduce((sum, c) => sum + (c.cnt ?? c.count ?? c.total ?? 0), 0);
 
         container.innerHTML = classes.map(c => {
-            const clsKey = (c.cls || '').toUpperCase();
-            const conf = mapping[clsKey] || { label: c.cls || 'Unknown', dot: 'yellow', fill: 'yellow' };
-            const pct = totalSpots > 0 ? Math.round((c.cnt / totalSpots) * 100) : 0;
+            const clsKey = (c.cls || c.classification_status || c.status || '').toUpperCase();
+            const conf = mapping[clsKey] || { label: c.cls || c.classification_status || 'Unknown', dot: 'yellow', fill: 'yellow' };
+            const count = c.cnt ?? c.count ?? c.total ?? 0;
+            const pct = totalSpots > 0 ? Math.round((count / totalSpots) * 100) : 0;
             const avgRate = c.avg_rating ? parseFloat(c.avg_rating).toFixed(1) : '0.0';
 
             return `
@@ -388,7 +493,7 @@
                     ${conf.label}
                     <span class="pa-quality-trend">★ ${avgRate}</span>
                 </span>
-                <span>${c.cnt} spots (${pct}%)</span>
+                <span>${count} spots (${pct}%)</span>
             </div>
             <div class="pa-quality-bar-track">
                 <div class="pa-quality-bar-fill ${conf.fill}" style="width: ${pct}%"></div>
@@ -422,20 +527,22 @@
         };
 
         const topCats = cats.slice(0, 10);
-        const maxCount = Math.max(...topCats.map(c => c.cnt), 1);
+        const maxCount = Math.max(...topCats.map(c => c.cnt ?? c.count ?? c.total ?? 0), 1);
 
         container.innerHTML = topCats.map((c, i) => {
             const rank = String(i + 1).padStart(2, '0');
-            const colorClass = colorMap[c.category] || 'other';
-            const pct = Math.round((c.cnt / maxCount) * 100);
+            const catName = c.category || c.name || c.cat || 'Other';
+            const count = c.cnt ?? c.count ?? c.total ?? 0;
+            const colorClass = colorMap[catName] || 'other';
+            const pct = Math.round((count / maxCount) * 100);
 
             return `
         <div class="pa-cat-progress-row">
             <span class="pa-cat-rank">${rank}</span>
             <span class="pa-cat-name">
                 <span class="pa-quality-dot bg-${colorClass}"></span>
-                ${c.category}
-                <span class="pa-cat-count">${c.cnt} spots</span>
+                ${catName}
+                <span class="pa-cat-count">${count} spots</span>
             </span>
             <div class="pa-cat-bar-container">
                 <div class="pa-cat-bar-fill bg-${colorClass}" style="width: ${pct}%"></div>
@@ -550,7 +657,7 @@
         if (tbody) tbody.innerHTML = '<tr><td colspan="7" class="pa-loading"><i class="fas fa-spinner fa-spin"></i></td></tr>';
 
         try {
-            const data = await apiFetch('top_spots', { limit: 12 });
+            const data = await apiFetch('top_spots', { limit: 10 });
             _allSpots = Array.isArray(data.spots) ? data.spots : Object.values(data.spots || {});
             renderSpotsTable();
         } catch (err) {
@@ -563,9 +670,10 @@
         const tbody = document.getElementById('spotTableBody');
         if (!tbody) return;
 
-        const filtered = _selectedCategoryTab === 'all'
+        const filtered = (_selectedCategoryTab === 'all'
             ? _allSpots
-            : _allSpots.filter(s => (s.category || '').toLowerCase() === _selectedCategoryTab.toLowerCase());
+            : _allSpots.filter(s => (s.category || '').toLowerCase().includes(_selectedCategoryTab.toLowerCase()))
+        ).slice(0, 10);
 
         if (filtered.length === 0) {
             tbody.innerHTML = '<tr><td colspan="7" class="pa-empty"><p>No tourist spots found for this category.</p></td></tr>';
@@ -638,7 +746,21 @@
     }
 
     // ── Utilities
-    function destroyChart(id) { if (_charts[id]) { _charts[id].destroy(); delete _charts[id]; } }
+    function destroyChart(id) {
+        try {
+            const canvas = document.getElementById(id);
+            if (canvas && typeof Chart !== 'undefined' && Chart.getChart) {
+                const chartInstance = Chart.getChart(canvas) || Chart.getChart(id);
+                if (chartInstance) {
+                    chartInstance.destroy();
+                }
+            }
+        } catch (e) {}
+        if (_charts[id]) {
+            try { _charts[id].destroy(); } catch (e) {}
+            delete _charts[id];
+        }
+    }
     function checkEmptyState(canvasId, values) {
         const canvas = document.getElementById(canvasId);
         if (!canvas) return false;

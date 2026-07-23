@@ -34,7 +34,7 @@ ob_start();
     <div class="lupto-kpi-grid">
         <div class="lupto-kpi-card" data-kpi="total-tourist-spots">
             <div class="lupto-kpi-info">
-                <h4>Total Tourist Spots</h4>
+                <h4>Total Tourist Sites</h4>
                 <span class="lupto-kpi-value"><i class="fas fa-spinner fa-spin" style="font-size:16px;color:#9CA3AF;"></i></span>
                 <!-- <span class="lupto-kpi-trend trend-up"><i class="fas fa-arrow-up"></i> +2 this week</span> -->
             </div>
@@ -139,7 +139,7 @@ ob_start();
         <div class="lupto-chart-card full-width-card" style="grid-column: 1 / -1; margin-top: 20px;">
             <div class="lupto-chart-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; border-bottom: 1px solid var(--border); padding-bottom: 14px;">
                 <h3 style="margin: 0; display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 700; color: #1E293B;">
-                    <i class="fas fa-ranking-star" style="color: #D9A441;"></i> Top Tourist Spots
+                    <i class="fas fa-ranking-star" style="color: #D9A441;"></i> Top Tourist Sites
                 </h3>
                 <!-- Category Filter Pills -->
                 <div class="top-spots-filters" style="display: flex; gap: 8px; align-items: center; overflow-x: auto; max-width: 100%; padding-bottom: 4px;">

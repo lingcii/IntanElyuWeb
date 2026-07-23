@@ -98,6 +98,13 @@ class FareDataController extends Controller
             }
 
             return $query->latest()->get()->map(function ($guide) {
+                if ($guide->vehicle_type === 'PUJ_Aircon') {
+                    $guide->vehicle_type = 'MPUJ';
+                    $guide->save();
+                } elseif ($guide->vehicle_type === 'PUJ_Ordinary') {
+                    $guide->vehicle_type = 'TPUJ';
+                    $guide->save();
+                }
                 $guideArray = $guide->toArray();
                 $guideArray['created_by_name'] = $guide->creator?->name ?? '—';
                 return $guideArray;
@@ -166,7 +173,7 @@ class FareDataController extends Controller
         $request->validate([
             'csv_file'       => 'required|file|max:20480',
             'title'          => 'nullable|string|max:255',
-            'vehicle_type'   => 'nullable|string|in:PUB_Aircon,PUB_Ordinary,PUJ_Aircon,PUJ_Ordinary,Tricycle,Van',
+            'vehicle_type'   => 'nullable|string|in:MPUJ,TPUJ,PUB_Aircon,PUB_Regular,PUB_Ordinary,PUJ_Aircon,PUJ_Ordinary,TAXI,UVE,Tricycle,Van',
             'region'         => 'nullable|string|max:255',
             'effective_date' => 'nullable|date',
         ]);

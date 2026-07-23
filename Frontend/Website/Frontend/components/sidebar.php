@@ -11,7 +11,7 @@ function mtoSections() {
     $sections = [
         'MAIN MENU' => [
             ['href' => 'dashboard.php',       'icon' => 'fa-gauge-high',      'label' => 'Dashboard Overview'],
-            ['href' => 'tourist-spots.php',   'icon' => 'fa-location-dot',    'label' => 'Tourist Spots'],
+            ['href' => 'tourist-spots.php',   'icon' => 'fa-location-dot',    'label' => 'Manage Tourist Sites'],
             ['href' => 'feedback.php',        'icon' => 'fa-comments',        'label' => 'Feedback'],
         ],
         'SETTINGS & PRIVACY' => [
@@ -37,7 +37,7 @@ $sidebarConfig = [
         'sections'  => [
             'MAIN MENU' => [
                 ['href' => 'dashboard.php',       'icon' => 'fa-gauge-high',             'label' => 'Dashboard'],
-                ['href' => 'tourist-spots.php',   'icon' => 'fa-location-dot',           'label' => 'Manage Tourist Spots'],
+                ['href' => 'tourist-spots.php',   'icon' => 'fa-location-dot',           'label' => 'Manage Tourist Sites'],
                 ['href' => 'feedback.php',        'icon' => 'fa-comments',               'label' => 'Feedback'],
                 ['href' => 'fare-data.php',       'icon' => 'fa-money-bill-trend-up',    'label' => 'Transportation Fare'],
                 ['href' => 'analytics.php',       'icon' => 'fa-chart-simple',           'label' => 'Analytics'],
@@ -61,7 +61,7 @@ $sidebarConfig = [
         'sections'  => [
             'MAIN MENU' => [
                 ['href' => 'dashboard.php',            'icon' => 'fa-gauge-high',             'label' => 'Dashboard'],
-                ['href' => 'tourist-spots.php',        'icon' => 'fa-location-dot',           'label' => 'Manage Tourist Spots'],
+                ['href' => 'tourist-spots.php',        'icon' => 'fa-location-dot',           'label' => 'Manage Tourist Sites'],
                 ['href' => 'feedback.php',             'icon' => 'fa-comments',               'label' => 'Feedback'],
                 ['href' => 'fare-data.php',            'icon' => 'fa-money-bill-trend-up',    'label' => 'Transportation Fare'],
                 ['href' => 'analytics.php',            'icon' => 'fa-chart-simple',           'label' => 'Analytics'],

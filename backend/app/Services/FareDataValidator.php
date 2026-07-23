@@ -38,7 +38,7 @@ class FareDataValidator
             $this->addError(null, 'title', 'missing', 'Title is required');
         }
 
-        $validTypes = ['PUB_Aircon', 'PUB_Ordinary', 'PUJ_Aircon', 'PUJ_Ordinary', 'Tricycle', 'Van'];
+        $validTypes = ['MPUJ', 'TPUJ', 'PUB_Aircon', 'PUB_Regular', 'PUB_Ordinary', 'PUJ_Aircon', 'PUJ_Ordinary', 'TAXI', 'UVE', 'Tricycle', 'Van'];
         if (empty($data['vehicle_type'])) {
             $this->addError(null, 'vehicle_type', 'missing', 'Vehicle type is required');
         } elseif (!in_array($data['vehicle_type'], $validTypes)) {

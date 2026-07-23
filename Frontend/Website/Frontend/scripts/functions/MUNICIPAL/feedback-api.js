@@ -53,10 +53,17 @@
         return Array.from({length:n},()=>`<div class="fb-skeleton-card"><div class="fb-skeleton fb-skeleton-img"></div><div style="padding:14px 16px;"><div class="fb-skeleton fb-skeleton-text w80"></div><div class="fb-skeleton fb-skeleton-text w40" style="margin-top:10px;"></div><div class="fb-skeleton fb-skeleton-text w60" style="margin-top:14px;"></div></div></div>`).join('');
     }
 
-    async function apiFetch(url) {
+    const apiCacheMap = new Map();
+    async function apiFetch(url, useCache = true) {
+        if (useCache && apiCacheMap.has(url)) {
+            const entry = apiCacheMap.get(url);
+            if (Date.now() - entry.time < 30000) return entry.data;
+        }
         const res = await fetch(url,{credentials:'include',headers:{Accept:'application/json'}});
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res.json();
+        const data = await res.json();
+        if (useCache) apiCacheMap.set(url, { time: Date.now(), data });
+        return data;
     }
 
     async function loadDashboardStats(silent=false) {
@@ -109,7 +116,34 @@
         el.innerHTML=items.map((s,i)=>`<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #f1f5f9;cursor:pointer;" onclick="window.openFeedbackSpotDetail(${s.id})"><span style="font-size:11px;font-weight:800;color:#94a3b8;width:18px;text-align:center;">${i+1}</span><div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:600;color:#073B6B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(s.name)}</div></div><span style="font-size:13px;font-weight:700;color:#c2410c;flex-shrink:0;">${metric==='avg_rating'?`⭐ ${s.avg_rating.toFixed(2)}`:`${(s.total_reviews).toLocaleString()} <span style="font-weight:400;color:#94a3b8;font-size:11px;">reviews</span>`}</span></div>`).join('');
     }
 
-    function getGalleryFilters(){return{search:document.getElementById('fb-search-input')?.value.trim()||'',category:document.getElementById('fb-filter-category')?.value||'',min_rating:document.getElementById('fb-filter-rating')?.value||'',sort:document.getElementById('fb-sort-select')?.value||'most_reviewed'};}
+    function getGalleryFilters(){return{search:document.getElementById('fb-search-input')?.value.trim()||'',municipality:document.getElementById('fb-filter-municipality')?.value||'',category:document.getElementById('fb-filter-category')?.value||'',min_rating:document.getElementById('fb-filter-rating')?.value||'',sort:document.getElementById('fb-sort-select')?.value||'most_reviewed'};}
+
+    function populateFilterDropdowns() {
+        const tab = document.getElementById('spa-tab-feedback.php') || document;
+        const muniSel = tab.querySelector('#fb-filter-municipality') || document.getElementById('fb-filter-municipality');
+        if (muniSel && galleryData.municipalities?.length) {
+            const currentVal = muniSel.value;
+            const existing = new Set(Array.from(muniSel.options).map(o => o.value));
+            galleryData.municipalities.forEach(m => {
+                const val = String(m.id);
+                if (!existing.has(val) && !existing.has(m.name)) {
+                    muniSel.appendChild(new Option(m.name, m.id));
+                }
+            });
+            if (currentVal) muniSel.value = currentVal;
+        }
+        const catSel = tab.querySelector('#fb-filter-category') || document.getElementById('fb-filter-category');
+        if (catSel && galleryData.categories?.length) {
+            const currentVal = catSel.value;
+            const existing = new Set(Array.from(catSel.options).map(o => o.value));
+            galleryData.categories.forEach(c => {
+                if (!existing.has(c)) {
+                    catSel.appendChild(new Option(c, c));
+                }
+            });
+            if (currentVal) catSel.value = currentVal;
+        }
+    }
 
     async function loadGallery(page=1, silent=false){
         galleryPage=page;
@@ -120,9 +154,9 @@
         const params=new URLSearchParams({page,per_page:15,...getGalleryFilters()});
         try{
             const d=await apiFetch(`${BASE}/feedback/gallery?${params}`);
+            galleryData.municipalities=d.municipalities||[];
             galleryData.categories=d.categories||[];
-            const catSel=document.getElementById('fb-filter-category');
-            if(catSel&&catSel.options.length<=1&&galleryData.categories.length) galleryData.categories.forEach(c=>catSel.appendChild(new Option(c,c)));
+            populateFilterDropdowns();
             renderGallery(grid,d);
         }catch(e){
             if (!grid.querySelector('.fb-spot-card')) {
@@ -158,7 +192,7 @@
         if(!spotId)return;
         detailSpotId=spotId;detailPage=1;detailSort='newest';
         let overlay=document.getElementById('fb-modal-overlay');
-        if(!overlay){overlay=document.createElement('div');overlay.id='fb-modal-overlay';overlay.className='fb-modal-overlay';overlay.innerHTML=`<div class="fb-modal" id="fb-modal-inner" role="dialog" aria-modal="true"><div class="fb-modal-header"><h2 class="fb-modal-header-title"><i class="fas fa-comments"></i> Tourist Spot Feedback</h2><button class="fb-modal-close" onclick="window.closeFeedbackModal()" aria-label="Close"><i class="fas fa-times"></i></button></div><div class="fb-modal-body" id="fb-modal-body"><div class="fb-empty-state"><i class="fas fa-spinner fa-spin"></i><p>Loading…</p></div></div></div>`;document.body.appendChild(overlay);overlay.addEventListener('click',e=>{if(e.target===overlay)window.closeFeedbackModal();});}
+        if(!overlay){overlay=document.createElement('div');overlay.id='fb-modal-overlay';overlay.className='fb-modal-overlay';overlay.innerHTML=`<div class="fb-modal" id="fb-modal-inner" role="dialog" aria-modal="true"><div class="fb-modal-header"><h2 class="fb-modal-header-title"><i class="fas fa-comments"></i> Tourist Site Feedback</h2><button class="fb-modal-close" onclick="window.closeFeedbackModal()" aria-label="Close"><i class="fas fa-times"></i></button></div><div class="fb-modal-body" id="fb-modal-body"><div class="fb-empty-state"><i class="fas fa-spinner fa-spin"></i><p>Loading…</p></div></div></div>`;document.body.appendChild(overlay);overlay.addEventListener('click',e=>{if(e.target===overlay)window.closeFeedbackModal();});}
         else{overlay.style.display='flex';document.getElementById('fb-modal-body').innerHTML=`<div class="fb-empty-state"><i class="fas fa-spinner fa-spin"></i><p>Loading…</p></div>`;}
         document.body.style.overflow='hidden';
         try{const d=await apiFetch(`${BASE}/feedback/spot-details/${spotId}?per_page=10&sort=${detailSort}`);renderModal(d);}
@@ -220,7 +254,7 @@
         const sliderHtml=buildSpotSliderHtml(spot);
         const breakdown=d.rating_breakdown||{};const total=d.total_reviews||0;
         const breakdownHtml=[5,4,3,2,1].map(star=>{const c=breakdown[star]||0;const pct=total>0?Math.round((c/total)*100):0;return`<li class="fb-breakdown-item"><span class="fb-breakdown-label">${star}★</span><div class="fb-breakdown-bar-wrap"><div class="fb-breakdown-bar" style="width:${pct}%;background:linear-gradient(90deg,#c2410c,#EA580C);"></div></div><span class="fb-breakdown-count">${c.toLocaleString()}</span></li>`;}).join('');
-        document.getElementById('fb-modal-body').innerHTML=`<div class="fb-modal-spot-hero">${sliderHtml}<div class="fb-modal-spot-info"><h2 class="fb-modal-spot-name">${escHtml(spot.name)}</h2><div class="fb-modal-spot-meta"><span class="fb-meta-badge muni"><i class="fas fa-location-dot"></i> ${escHtml(spot.municipality||'')}</span><span class="fb-meta-badge cat"><i class="fas fa-tag"></i> ${escHtml(spot.category||'Spot')}</span></div><div class="fb-modal-big-rating"><span class="fb-modal-big-num">${(spot.avg_rating||0).toFixed(1)}</span><div><div class="fb-modal-big-stars">${[1,2,3,4,5].map(i=>`<i class="fas fa-star fb-modal-big-star${i>Math.round(spot.avg_rating||0)?' empty':''}"></i>`).join('')}</div><div class="fb-modal-review-count">${(spot.total_reviews||0).toLocaleString()} reviews</div></div></div><ul class="fb-breakdown-list">${breakdownHtml}</ul></div></div>${spot.description?`<p style="font-size:13px;color:#475569;margin:0 0 18px;line-height:1.7;">${escHtml(spot.description)}</p>`:''}<div class="fb-reviews-header"><h3 class="fb-reviews-title"><i class="fas fa-list-ul"></i> All Reviews</h3><select id="fb-modal-sort" class="fb-filter-select" style="min-width:130px;font-size:12px;padding:6px 10px;"><option value="newest">Newest First</option><option value="oldest">Oldest First</option><option value="highest_rated">Highest Rated</option><option value="lowest_rated">Lowest Rated</option></select></div><div id="fb-modal-reviews-list">${renderReviews(d.reviews)}</div><div id="fb-modal-pagination" style="margin-top:12px;"></div>`;
+        document.getElementById('fb-modal-body').innerHTML=`<div class="fb-modal-spot-hero">${sliderHtml}<div class="fb-modal-spot-info"><h2 class="fb-modal-spot-name">${escHtml(spot.name)}</h2><div class="fb-modal-spot-meta"><span class="fb-meta-badge muni"><i class="fas fa-location-dot"></i> ${escHtml(spot.municipality||'')}</span><span class="fb-meta-badge cat"><i class="fas fa-tag"></i> ${escHtml(spot.category||'Spot')}</span></div><div class="fb-modal-big-rating"><span class="fb-modal-big-num">${(spot.avg_rating||0).toFixed(1)}</span><div><div class="fb-modal-big-stars">${[1,2,3,4,5].map(i=>`<i class="fas fa-star fb-modal-big-star${i>Math.round(spot.avg_rating||0)?' empty':''}"></i>`).join('')}</div><div class="fb-modal-review-count">${(spot.total_reviews||0).toLocaleString()} reviews</div></div></div><ul class="fb-breakdown-list">${breakdownHtml}</ul></div></div><div class="fb-reviews-header"><h3 class="fb-reviews-title"><i class="fas fa-list-ul"></i> All Reviews</h3><select id="fb-modal-sort" class="fb-filter-select" style="min-width:130px;font-size:12px;padding:6px 10px;"><option value="newest">Newest First</option><option value="oldest">Oldest First</option><option value="highest_rated">Highest Rated</option><option value="lowest_rated">Lowest Rated</option></select></div><div id="fb-modal-reviews-list">${renderReviews(d.reviews)}</div><div id="fb-modal-pagination" style="margin-top:12px;"></div>`;
         renderPagination('fb-modal-pagination',d.current_page,d.last_page,loadMoreReviews);
         const sortSel=document.getElementById('fb-modal-sort');if(sortSel)sortSel.addEventListener('change',()=>{detailSort=sortSel.value;loadMoreReviews(1);});
     }

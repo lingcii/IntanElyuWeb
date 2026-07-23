@@ -99,10 +99,12 @@ ob_start();
         </div>
         <select class="fd-filter-select" id="fdVehicleFilter" onchange="fd_filterGuides()" aria-label="Vehicle type">
             <option value="">All Vehicle Types</option>
+            <option value="MPUJ">MPUJ (Modern PUJ)</option>
+            <option value="TPUJ">TPUJ (Traditional PUJ)</option>
             <option value="PUB_Aircon">PUB Aircon</option>
-            <option value="PUB_Ordinary">PUB Ordinary</option>
-            <option value="PUJ_Aircon">PUJ Aircon</option>
-            <option value="PUJ_Ordinary">PUJ Ordinary</option>
+            <option value="PUB_Regular">PUB Regular</option>
+            <option value="TAXI">TAXI</option>
+            <option value="UVE">UVE (UV Express)</option>
             <option value="Tricycle">Tricycle</option>
             <option value="Van">Van</option>
         </select>

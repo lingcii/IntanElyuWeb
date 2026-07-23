@@ -66,17 +66,27 @@ class FareCSVParser
                 $metadata['title'] = trim($lineStr);
             }
             if (empty($metadata['vehicle_type'])) {
-                if (stripos($lineStr, 'PUB') !== false && stripos($lineStr, 'Aircon') !== false) {
+                if (stripos($lineStr, 'MPUJ') !== false) {
+                    $metadata['vehicle_type'] = 'MPUJ';
+                } elseif (stripos($lineStr, 'TPUJ') !== false) {
+                    $metadata['vehicle_type'] = 'TPUJ';
+                } elseif (stripos($lineStr, 'TAXI') !== false || stripos($lineStr, 'Taxi') !== false) {
+                    $metadata['vehicle_type'] = 'TAXI';
+                } elseif (stripos($lineStr, 'UVE') !== false || stripos($lineStr, 'UV Express') !== false) {
+                    $metadata['vehicle_type'] = 'UVE';
+                } elseif (stripos($lineStr, 'PUB') !== false && (stripos($lineStr, 'Aircon') !== false || stripos($lineStr, 'Air-con') !== false)) {
                     $metadata['vehicle_type'] = 'PUB_Aircon';
+                } elseif (stripos($lineStr, 'PUB') !== false && (stripos($lineStr, 'Regular') !== false || stripos($lineStr, 'Ordinary') !== false)) {
+                    $metadata['vehicle_type'] = 'PUB_Regular';
                 } elseif (stripos($lineStr, 'PUB') !== false) {
-                    $metadata['vehicle_type'] = 'PUB_Ordinary';
-                } elseif (stripos($lineStr, 'MPUJ') !== false || (stripos($lineStr, 'PUJ') !== false && (stripos($lineStr, 'Aircon') !== false || stripos($lineStr, 'Modern') !== false))) {
-                    $metadata['vehicle_type'] = 'PUJ_Aircon';
-                } elseif (stripos($lineStr, 'TPUJ') !== false || stripos($lineStr, 'PUJ') !== false) {
-                    $metadata['vehicle_type'] = 'PUJ_Ordinary';
+                    $metadata['vehicle_type'] = 'PUB_Regular';
+                } elseif (stripos($lineStr, 'PUJ') !== false && (stripos($lineStr, 'Aircon') !== false || stripos($lineStr, 'Modern') !== false)) {
+                    $metadata['vehicle_type'] = 'MPUJ';
+                } elseif (stripos($lineStr, 'PUJ') !== false) {
+                    $metadata['vehicle_type'] = 'TPUJ';
                 } elseif (stripos($lineStr, 'Tricycle') !== false) {
                     $metadata['vehicle_type'] = 'Tricycle';
-                } elseif (stripos($lineStr, 'Van') !== false || stripos($lineStr, 'UV') !== false) {
+                } elseif (stripos($lineStr, 'Van') !== false) {
                     $metadata['vehicle_type'] = 'Van';
                 }
             }
@@ -106,30 +116,46 @@ class FareCSVParser
         }
 
         // Set fallbacks for metadata if still empty
-        $name = $originalFileName ?? basename($filePath);
+        $name = strtolower($originalFileName ?? basename($filePath));
         if (empty($metadata['vehicle_type'])) {
-            if (stripos($name, 'mpuj') !== false) {
-                $metadata['vehicle_type'] = 'PUJ_Aircon';
-            } elseif (stripos($name, 'tpuj') !== false) {
-                $metadata['vehicle_type'] = 'PUJ_Ordinary';
-            } elseif (stripos($name, 'puj_aircon') !== false) {
-                $metadata['vehicle_type'] = 'PUJ_Aircon';
-            } elseif (stripos($name, 'puj') !== false) {
-                $metadata['vehicle_type'] = 'PUJ_Ordinary';
-            } elseif (stripos($name, 'pub_aircon') !== false || (stripos($name, 'pub') !== false && stripos($name, 'aircon') !== false)) {
+            if (str_contains($name, 'mpuj')) {
+                $metadata['vehicle_type'] = 'MPUJ';
+            } elseif (str_contains($name, 'tpuj')) {
+                $metadata['vehicle_type'] = 'TPUJ';
+            } elseif (str_contains($name, 'taxi')) {
+                $metadata['vehicle_type'] = 'TAXI';
+            } elseif (str_contains($name, 'uve') || str_contains($name, 'uv_express')) {
+                $metadata['vehicle_type'] = 'UVE';
+            } elseif (str_contains($name, 'pub_aircon') || (str_contains($name, 'pub') && str_contains($name, 'aircon'))) {
                 $metadata['vehicle_type'] = 'PUB_Aircon';
-            } elseif (stripos($name, 'pub') !== false) {
-                $metadata['vehicle_type'] = 'PUB_Ordinary';
-            } elseif (stripos($name, 'tricycle') !== false) {
+            } elseif (str_contains($name, 'pub_regular') || str_contains($name, 'pub_ordinary') || str_contains($name, 'pub')) {
+                $metadata['vehicle_type'] = 'PUB_Regular';
+            } elseif (str_contains($name, 'puj_aircon')) {
+                $metadata['vehicle_type'] = 'MPUJ';
+            } elseif (str_contains($name, 'puj')) {
+                $metadata['vehicle_type'] = 'TPUJ';
+            } elseif (str_contains($name, 'tricycle')) {
                 $metadata['vehicle_type'] = 'Tricycle';
-            } elseif (stripos($name, 'van') !== false || stripos($name, 'uve') !== false || stripos($name, 'uv_express') !== false) {
+            } elseif (str_contains($name, 'van')) {
                 $metadata['vehicle_type'] = 'Van';
             } else {
-                $metadata['vehicle_type'] = 'PUJ_Ordinary';
+                $metadata['vehicle_type'] = 'MPUJ';
             }
         }
         if (empty($metadata['title'])) {
-            $vehicleLabel = str_replace('_', ' ', $metadata['vehicle_type']);
+            $labels = [
+                'MPUJ'        => 'MPUJ (Modern PUJ)',
+                'TPUJ'        => 'TPUJ (Traditional PUJ)',
+                'PUB_Aircon'  => 'PUB Aircon',
+                'PUB_Regular' => 'PUB Regular',
+                'PUB_Ordinary' => 'PUB Ordinary',
+                'TAXI'        => 'TAXI',
+                'UVE'         => 'UVE (UV Express)',
+                'Tricycle'    => 'Tricycle',
+                'Van'         => 'Van',
+            ];
+            $type = $metadata['vehicle_type'] ?? 'MPUJ';
+            $vehicleLabel = $labels[$type] ?? str_replace('_', ' ', $type);
             $metadata['title'] = $vehicleLabel . " General Fare Guide";
         }
         if (empty($metadata['region'])) {
