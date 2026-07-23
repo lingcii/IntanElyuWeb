@@ -1,4 +1,4 @@
-﻿(function () {
+(function () {
     'use strict';
 
     // Check if we are in one of the views directories
@@ -701,6 +701,7 @@
     };
 
     window.refreshActiveTab = refreshActiveTab;
+    window.switchTab = switchTab;
 
     window.notifyFareDataChanged = function() {
         void 0;

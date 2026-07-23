@@ -2075,7 +2075,7 @@ function initBlankCreateForm() {
     }
 
     document.getElementById('spotFormModal').classList.add('active');
-    setTimeout(initModalMap, 200);
+    setTimeout(initModalMap, 30);
 
     attachFormDirtyListeners();
     window.DraftManager?.startAutoSave(() => saveDraftFromForm(true));
@@ -2103,12 +2103,21 @@ window.openCreateForm = async function () {
             window.DraftManager.setPendingDraft(draft);
             modal.classList.add('active');
 
+            const closeBtn = document.getElementById('btnCloseDraftFoundModal');
+            if (closeBtn) {
+                closeBtn.onclick = () => {
+                    modal.classList.remove('active');
+                };
+            }
             document.getElementById('btnContinueDraft').onclick = () => {
                 modal.classList.remove('active');
                 restoreDraftData(draft);
             };
-            document.getElementById('btnStartNewDraft').onclick = () => {
+            document.getElementById('btnStartNewDraft').onclick = async () => {
                 modal.classList.remove('active');
+                if (draft && draft.id) {
+                    await window.DraftManager?.deleteDraft(draft.id);
+                }
                 initBlankCreateForm();
             };
             document.getElementById('btnDeleteDraft').onclick = async () => {
@@ -2585,9 +2594,18 @@ window.confirmSaveSpot = async function () {
 
         void 0;
 
-        if (res && (res.success || res.message)) {
-            window.DraftManager?.setDirty(false);
+        if (res && (res.success || res.message || res.id)) {
+            const activeDraftId = pendingSaveData.draft_id || window.DraftManager?.getActiveDraftId();
+            if (activeDraftId) {
+                try {
+                    await window.DraftManager?.deleteDraft(activeDraftId);
+                } catch (dErr) {
+                    console.warn('Draft deletion notice:', dErr);
+                }
+            }
             window.DraftManager?.setActiveDraftId(null);
+            window.DraftManager?.setPendingDraft(null);
+            window.DraftManager?.setDirty(false);
             window.DraftManager?.stopAutoSave();
 
             const saveData = pendingSaveData;
@@ -2595,29 +2613,40 @@ window.confirmSaveSpot = async function () {
             closeSaveConfirmModal();
             closeFormModal();
 
-            // Update local memory data instantly
-            const spotId = isEdit ? parseInt(saveData.id) : (res.id || null);
-            if (isEdit) {
-                [window.touristSpotsData, window.touristSpotsAll].forEach(arr => {
-                    if (arr) {
-                        const spot = arr.find(s => s.id === spotId);
-                        if (spot) {
-                            Object.assign(spot, saveData);
+            if (typeof window.invalidateLuptoSpotsCache === 'function') {
+                window.invalidateLuptoSpotsCache();
+            }
+
+            try {
+                const fresh = await window.API_CONFIG.get(API_BASE);
+                const freshSpots = fresh?.data || fresh || [];
+                if (Array.isArray(freshSpots) && freshSpots.length >= 0) {
+                    window.touristSpotsAll = freshSpots;
+                    window.touristSpotsData = freshSpots;
+                }
+            } catch (fetchErr) {
+                console.error('Failed to refresh spots list:', fetchErr);
+                const spotId = isEdit ? parseInt(saveData.id) : (res.id || null);
+                if (isEdit) {
+                    [window.touristSpotsData, window.touristSpotsAll].forEach(arr => {
+                        if (arr) {
+                            const spot = arr.find(s => s.id === spotId);
+                            if (spot) Object.assign(spot, saveData);
                         }
-                    }
-                });
-            } else if (spotId) {
-                const newSpot = {
-                    ...saveData,
-                    id: spotId,
-                    status: saveData.status || (window.userRole === 'municipal' ? 'pending' : 'approved'),
-                    images: saveData.images || [],
-                    photo_url: saveData.images && saveData.images[0] ? saveData.images[0].photo_url : '',
-                    municipality_name: document.getElementById('spotMunicipality')?.options[document.getElementById('spotMunicipality')?.selectedIndex]?.text || '',
-                    created_at: new Date().toISOString()
-                };
-                if (window.touristSpotsData) window.touristSpotsData.unshift(newSpot);
-                if (window.touristSpotsAll) window.touristSpotsAll.unshift(newSpot);
+                    });
+                } else if (spotId) {
+                    const newSpot = res.spot || {
+                        ...saveData,
+                        id: spotId,
+                        status: saveData.status || (window.userRole === 'municipal' ? 'pending' : 'approved'),
+                        images: saveData.images || [],
+                        photo_url: saveData.images && saveData.images[0] ? saveData.images[0].photo_url : '',
+                        municipality_name: document.getElementById('spotMunicipality')?.options[document.getElementById('spotMunicipality')?.selectedIndex]?.text || '',
+                        created_at: new Date().toISOString()
+                    };
+                    if (window.touristSpotsData) window.touristSpotsData.unshift(newSpot);
+                    if (window.touristSpotsAll) window.touristSpotsAll.unshift(newSpot);
+                }
             }
 
             // Sort and render instantly

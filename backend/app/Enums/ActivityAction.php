@@ -33,4 +33,8 @@ class ActivityAction
 
     public const DATA_IMPORTED     = 'Data Imported';
     public const DATA_EXPORTED     = 'Data Exported';
+
+    public const BACKUP_CREATED   = 'Database Backup Created';
+    public const BACKUP_RESTORED  = 'Database Restored';
+    public const BACKUP_DELETED   = 'Backup Deleted';
 }

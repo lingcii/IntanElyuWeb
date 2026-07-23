@@ -20,6 +20,7 @@ use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\Auth\SessionController;
 use App\Http\Controllers\Admin\FeedbackManagementController;
 use App\Http\Controllers\FeedbackController;
+use App\Http\Controllers\BackupController;
 
 use Illuminate\Support\Facades\Route;
 
@@ -165,6 +166,13 @@ Route::middleware('auth.session')->group(function () {
             Route::get('/profile',          [SettingsController::class, 'profile']);
             Route::put('/profile',          [SettingsController::class, 'updateProfile']);
             Route::put('/password',         [SettingsController::class, 'updatePassword']);
+            // Backup
+            Route::get('/backup/list',                [BackupController::class, 'list']);
+            Route::get('/backup/stats',               [BackupController::class, 'stats']);
+            Route::post('/backup/create',             [BackupController::class, 'create']);
+            Route::post('/backup/restore',            [BackupController::class, 'restoreFromFile']);
+            Route::get('/backup/download/{filename}', [BackupController::class, 'download']);
+            Route::delete('/backup/{filename}',       [BackupController::class, 'delete']);
         });
 
         // Leaderboard
@@ -269,6 +277,13 @@ Route::middleware('auth.session')->group(function () {
             Route::get('/profile',  [SettingsController::class, 'profile']);
             Route::put('/profile',  [SettingsController::class, 'updateProfile']);
             Route::put('/password', [SettingsController::class, 'updatePassword']);
+            // Backup
+            Route::get('/backup/list',                [BackupController::class, 'list']);
+            Route::get('/backup/stats',               [BackupController::class, 'stats']);
+            Route::post('/backup/create',             [BackupController::class, 'create']);
+            Route::post('/backup/restore',            [BackupController::class, 'restoreFromFile']);
+            Route::get('/backup/download/{filename}', [BackupController::class, 'download']);
+            Route::delete('/backup/{filename}',       [BackupController::class, 'delete']);
         });
 
         // Feedback Module
@@ -356,6 +371,13 @@ Route::middleware('auth.session')->group(function () {
             Route::get('/profile',  [SettingsController::class, 'profile']);
             Route::put('/profile',  [SettingsController::class, 'updateProfile']);
             Route::put('/password', [SettingsController::class, 'updatePassword']);
+            // Backup (municipal-scoped)
+            Route::get('/backup/list',                [BackupController::class, 'list']);
+            Route::get('/backup/stats',               [BackupController::class, 'stats']);
+            Route::post('/backup/create',             [BackupController::class, 'create']);
+            Route::post('/backup/restore',            [BackupController::class, 'restoreFromFile']);
+            Route::get('/backup/download/{filename}', [BackupController::class, 'download']);
+            Route::delete('/backup/{filename}',       [BackupController::class, 'delete']);
         });
 
         // Feedback Module

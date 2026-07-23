@@ -118,6 +118,9 @@ class ActivityLog extends Model
             'Password Changed'       => 'fa-lock',
             'Data Imported'          => 'fa-file-import',
             'Data Exported'          => 'fa-file-export',
+            'Database Backup Created' => 'fa-database',
+            'Database Restored'       => 'fa-undo-alt',
+            'Backup Deleted'          => 'fa-trash-alt',
         ];
     }
 
@@ -147,6 +150,9 @@ class ActivityLog extends Model
             'Password Changed'       => 'blue',
             'Data Imported'          => 'purple',
             'Data Exported'          => 'purple',
+            'Database Backup Created' => 'blue',
+            'Database Restored'       => 'orange',
+            'Backup Deleted'          => 'red',
         ];
     }
 }

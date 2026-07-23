@@ -75,7 +75,7 @@ ob_start();
         </div>
         <div class="nc-actions">
             <button class="btn-read-all" onclick="markAllRead()"><i class="fas fa-check-double"></i> Mark All Read</button>
-            <button class="btn-clear" onclick="if(confirm('Clear all notifications permanently?'))clearAll()"><i class="fas fa-trash"></i> Clear All</button>
+            <button class="btn-clear" onclick="window.clearAllNotifs()"><i class="fas fa-trash"></i> Clear All</button>
         </div>
     </div>
     <div class="nc-filters">

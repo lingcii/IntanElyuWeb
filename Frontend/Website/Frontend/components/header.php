@@ -188,7 +188,7 @@ function timeAgo($datetime) {
                     </div>
                     <div class="notif-header-actions">
                         <button class="mark-all-read" onclick="window.markAllRead()" title="Mark all as read">Mark all read</button>
-                        <button class="clear-all" onclick="if(confirm('Clear all notifications?'))window.clearAllNotifs()" title="Clear all">Clear</button>
+                        <button class="clear-all" onclick="window.clearAllNotifs()" title="Clear all">Clear</button>
                     </div>
                 </div>
                 <div class="notif-scroll" id="notifItems">
@@ -320,6 +320,29 @@ function timeAgo($datetime) {
     </div>
 </div>
 
+<!-- Delete All Notifications Confirmation Modal -->
+<div class="modal" id="clearNotifsConfirmModal" style="display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.5); z-index: 10500; align-items: center; justify-content: center; backdrop-filter: blur(2px); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
+    <div class="modal-content" style="max-width: 420px; width: 90%; border-radius: 16px; overflow: hidden; background: #fff; box-shadow: 0 20px 60px rgba(0,0,0,0.3); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
+        <div style="background: #FEE2E2; padding: 28px 28px 16px 28px; text-align: center;">
+            <div style="width: 56px; height: 56px; background: #DC2626; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 12px;">
+                <i class="fas fa-trash-can" style="color: white; font-size: 22px;"></i>
+            </div>
+            <h3 style="margin: 0; font-size: 18px; font-weight: 700; color: #991B1B; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">Delete All Notifications</h3>
+        </div>
+        <div style="padding: 20px 28px 28px 28px; text-align: center;">
+            <p style="color: #4B5563; margin: 0 0 24px 0; font-size: 14px; line-height: 1.5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">Are you sure you want to delete all notifications? This action cannot be undone.</p>
+            <div style="display: flex; gap: 12px;">
+                <button type="button" class="btn btn-outline" id="cancelClearNotifsBtn" style="flex: 1; justify-content: center; padding: 12px 20px; border-radius: 8px; font-weight: 600; cursor: pointer; border: 2px solid #E5E7EB; background: white; color: #4B5563; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
+                    Cancel
+                </button>
+                <button type="button" class="btn btn-danger" id="confirmClearNotifsBtn" style="flex: 1; justify-content: center; padding: 12px 20px; border-radius: 8px; font-weight: 600; cursor: pointer; background: #DC2626; border: none; color: white; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
+                    Yes, Delete All
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
 (function () {
     var role = document.querySelector('meta[name="user-role"]') ? '' : '<?= htmlspecialchars($userRole ?? "") ?>';
@@ -334,6 +357,18 @@ function timeAgo($datetime) {
     var notifCountEl = document.getElementById('notifCount');
     if (!notifItemsEl) return;
 
+    function showNotifToast(msg, type) {
+        if (typeof window.showToast === 'function') {
+            window.showToast(msg, type || 'success');
+            return;
+        }
+        var toast = document.createElement('div');
+        toast.className = 'notif-toast-pop';
+        toast.style.cssText = 'position:fixed;bottom:24px;right:24px;background:#1E293B;color:#fff;padding:12px 20px;border-radius:8px;font-size:14px;box-shadow:0 10px 25px rgba(0,0,0,0.2);z-index:11000;display:flex;align-items:center;gap:10px;animation:fadeIn 0.3s ease;';
+        toast.innerHTML = '<i class="fas fa-check-circle" style="color:#10B981;"></i><span>' + esc(msg) + '</span>';
+        document.body.appendChild(toast);
+        setTimeout(function() { toast.remove(); }, 3500);
+    }
 
     function timeAgo(dateStr) {
         if (!dateStr) return '';
@@ -396,20 +431,62 @@ function timeAgo($datetime) {
         });
     }
     window.handleNotifClick = function (el, url, id) {
-        el.classList.remove('unread'); var dot = el.querySelector('.notif-dot'); if (dot) dot.style.display = 'none';
+        el.classList.remove('unread');
+        var dot = el.querySelector('.notif-dot');
+        if (dot) dot.style.display = 'none';
         window.API_CONFIG.patch(API + '/' + id + '/read', {}).catch(function () {});
         fetchNotifications();
-        if (url && url.endsWith('.php')) { window.location.href = url; }
+        if (url) {
+            var targetPage = url.split('?')[0];
+            if (typeof window.switchTab === 'function') {
+                window.switchTab(targetPage);
+            } else if (url.endsWith('.php') || url.includes('.php')) {
+                window.location.href = url;
+            }
+        }
     };
     window.deleteNotif = function (id) {
         window.API_CONFIG.delete(API + '/' + id).then(function () { fetchNotifications(); }).catch(function () {});
     };
     window.markAllRead = function () {
-        window.API_CONFIG.patch(API + '/read-all', {}).then(function () { fetchNotifications(); }).catch(function () {});
+        unreadCount = 0;
+        updateBadge(0);
+        if (notifItemsEl) {
+            var items = notifItemsEl.querySelectorAll('.notif-item.unread');
+            items.forEach(function(item) {
+                item.classList.remove('unread');
+                var dot = item.querySelector('.notif-dot');
+                if (dot) dot.style.display = 'none';
+            });
+        }
+        window.API_CONFIG.patch(API + '/read-all', {}).then(function () {
+            fetchNotifications();
+        }).catch(function () {});
     };
     window.clearAllNotifs = function () {
-        window.API_CONFIG.delete(API + '/clear-all').then(function () { fetchNotifications(); }).catch(function () {});
+        var clearModal = document.getElementById('clearNotifsConfirmModal');
+        if (clearModal) {
+            clearModal.style.display = 'flex';
+        }
     };
+
+    document.addEventListener('click', function(e) {
+        if (e.target && e.target.id === 'cancelClearNotifsBtn') {
+            var clearModal = document.getElementById('clearNotifsConfirmModal');
+            if (clearModal) clearModal.style.display = 'none';
+        }
+        if (e.target && e.target.id === 'confirmClearNotifsBtn') {
+            var clearModal = document.getElementById('clearNotifsConfirmModal');
+            if (clearModal) clearModal.style.display = 'none';
+            window.API_CONFIG.delete(API + '/clear-all').then(function () {
+                updateBadge(0);
+                fetchNotifications();
+                showNotifToast('All notifications have been deleted successfully.', 'success');
+            }).catch(function (err) {
+                console.error('Failed to clear notifications:', err);
+            });
+        }
+    });
     function startSSE() {
         try {
             var es = new EventSource(API + '/stream?last_id=' + lastNotifId, { withCredentials: true });

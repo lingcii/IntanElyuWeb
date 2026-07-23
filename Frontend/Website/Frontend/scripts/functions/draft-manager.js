@@ -24,7 +24,10 @@
         container.innerHTML = `
 <!-- Draft Found Dialog Modal -->
 <div class="modal" id="draftFoundModal" style="z-index: 10500;">
-    <div class="modal-content" style="max-width: 460px; padding: 24px; text-align: center; border-radius: 16px; background: #fff; box-shadow: 0 20px 60px rgba(0,0,0,0.25); margin: auto;">
+    <div class="modal-content" style="max-width: 460px; padding: 24px; text-align: center; border-radius: 16px; background: #fff; box-shadow: 0 20px 60px rgba(0,0,0,0.25); margin: auto; position: relative;">
+        <button type="button" id="btnCloseDraftFoundModal" aria-label="Close" style="position: absolute; top: 16px; right: 16px; width: 32px; height: 32px; border-radius: 50%; background: #F1F5F9; border: none; color: #64748B; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.2s, color 0.2s;" onmouseenter="this.style.background='#E2E8F0';this.style.color='#1E293B'" onmouseleave="this.style.background='#F1F5F9';this.style.color='#64748B'">
+            <i class="fas fa-times"></i>
+        </button>
         <div style="width: 56px; height: 56px; background: #EEF2FF; color: #4F46E5; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px; margin: 0 auto 16px;">
             <i class="fas fa-file-signature"></i>
         </div>
@@ -74,13 +77,28 @@
     }
 
     // ── API Actions ───────────────────────────────────────────────────────────
-    async function fetchActiveDraft() {
+    let _cachedDraft = null;
+    let _draftFetched = false;
+
+    async function fetchActiveDraft(force = false) {
+        if (_draftFetched && !force) return _cachedDraft;
         try {
             const base = getBaseUrl();
             const res = await window.API_CONFIG.get(`${base}/api/tourist-spots/draft`);
-            return res?.draft || null;
+            _cachedDraft = res?.draft || null;
+            _draftFetched = true;
+            if (_cachedDraft?.id) _activeDraftId = _cachedDraft.id;
+            return _cachedDraft;
         } catch (_) {
             return null;
+        }
+    }
+
+    if (typeof document !== 'undefined') {
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => fetchActiveDraft(true));
+        } else {
+            setTimeout(() => fetchActiveDraft(true), 0);
         }
     }
 
@@ -90,6 +108,8 @@
             const res = await window.API_CONFIG.post(`${base}/api/tourist-spots/draft`, payload);
             if (res?.draft?.id) {
                 _activeDraftId = res.draft.id;
+                _cachedDraft = res.draft;
+                _draftFetched = true;
             }
             return res;
         } catch (e) {
@@ -99,11 +119,15 @@
     }
 
     async function deleteDraftApi(draftId) {
+        _activeDraftId = null;
+        _pendingDraft = null;
+        _cachedDraft = null;
+        _draftFetched = true;
+        _isFormDirty = false;
         if (!draftId) return;
         try {
             const base = getBaseUrl();
             await window.API_CONFIG.delete(`${base}/api/tourist-spots/draft/${draftId}`);
-            _activeDraftId = null;
         } catch (e) {
             console.error('Failed to delete draft:', e);
         }
@@ -132,12 +156,9 @@
             }
         },
         startAutoSave: (callback) => {
+            // Disabled background auto-saving to comply with Requirement 3:
+            // Drafts should ONLY be saved when the user intentionally clicks "Save as Draft".
             window.DraftManager.stopAutoSave();
-            _autoSaveTimer = setInterval(() => {
-                if (_isFormDirty && typeof callback === 'function') {
-                    callback();
-                }
-            }, 45000); // Auto-save every 45 seconds
         }
     };
 })();

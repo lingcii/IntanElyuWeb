@@ -1486,46 +1486,77 @@ function restoreDraftData(draft) {
     window.DraftManager?.startAutoSave(() => saveDraftFromForm(true));
 }
 
-function initBlankCreateForm() {
+function resetBlankFormData() {
     uploadedImages = [];
     pendingSaveData = null;
     window.DraftManager?.setActiveDraftId(null);
+    window.DraftManager?.setPendingDraft(null);
     window.DraftManager?.setDirty(false);
 
-    document.getElementById('formModalTitle').textContent = 'Add New Spot';
-    document.getElementById('spotId').value = '';
-    document.getElementById('spotName').value = '';
-    document.getElementById('nameCharCount').textContent = '0';
-    document.getElementById('spotPoints').value = '0';
+    const title = document.getElementById('formModalTitle');
+    if (title) title.textContent = 'Add New Spot';
+
+    const spotIdEl = document.getElementById('spotId');
+    if (spotIdEl) spotIdEl.value = '';
+    const spotNameEl = document.getElementById('spotName');
+    if (spotNameEl) spotNameEl.value = '';
+    const nameCharEl = document.getElementById('nameCharCount');
+    if (nameCharEl) nameCharEl.textContent = '0';
+    const pointsEl = document.getElementById('spotPoints');
+    if (pointsEl) pointsEl.value = '0';
+
     setSelectedCategories('');
-    document.getElementById('spotClassification').value = '';
-    document.getElementById('spotFee').value = '0';
-    document.getElementById('environmentalFee').value = '0';
+    const classEl = document.getElementById('spotClassification');
+    if (classEl) classEl.value = '';
+    const feeEl = document.getElementById('spotFee');
+    if (feeEl) feeEl.value = '0';
+    const envEl = document.getElementById('environmentalFee');
+    if (envEl) envEl.value = '0';
+
     document.querySelectorAll('.fee-type-chk').forEach(chk => chk.checked = false);
-    document.getElementById('feeTypes').value = '';
+    const feeTypesEl = document.getElementById('feeTypes');
+    if (feeTypesEl) feeTypesEl.value = '';
     const label = document.getElementById('feeTypesLabel');
     if (label) { label.textContent = 'No Fees'; label.style.color = '#9CA3AF'; }
-    document.getElementById('entranceFeeField').style.display = 'none';
-    document.getElementById('environmentalFeeField').style.display = 'none';
-    document.getElementById('spotLatitude').value = '';
-    document.getElementById('spotLongitude').value = '';
-    document.getElementById('spotDescription').value = '';
-    document.getElementById('descCharCount').textContent = '0';
-    document.getElementById('spotOpeningTime').value = '08:00';
-    document.getElementById('spotClosingTime').value = '17:00';
-    document.getElementById('spotIsMaintenance').checked = false;
+
+    const entField = document.getElementById('entranceFeeField');
+    if (entField) entField.style.display = 'none';
+    const envField = document.getElementById('environmentalFeeField');
+    if (envField) envField.style.display = 'none';
+
+    const latEl = document.getElementById('spotLatitude');
+    if (latEl) latEl.value = '';
+    const lngEl = document.getElementById('spotLongitude');
+    if (lngEl) lngEl.value = '';
+    const descEl = document.getElementById('spotDescription');
+    if (descEl) descEl.value = '';
+    const descCharEl = document.getElementById('descCharCount');
+    if (descCharEl) descCharEl.textContent = '0';
+
+    const openEl = document.getElementById('spotOpeningTime');
+    if (openEl) openEl.value = '08:00';
+    const closeEl = document.getElementById('spotClosingTime');
+    if (closeEl) closeEl.value = '17:00';
+    const maintEl = document.getElementById('spotIsMaintenance');
+    if (maintEl) maintEl.checked = false;
+
     populateBarangayDropdown();
-    document.getElementById('imagePreviews').innerHTML = '';
-    document.getElementById('maintenance-field').style.display = 'none';
+    const previewsEl = document.getElementById('imagePreviews');
+    if (previewsEl) previewsEl.innerHTML = '';
+    const maintFieldEl = document.getElementById('maintenance-field');
+    if (maintFieldEl) maintFieldEl.style.display = 'none';
 
     window.lastValidSpotCoords = { lat: null, lng: null };
     if (currentBoundaryLayer && modalMap) {
         modalMap.removeLayer(currentBoundaryLayer);
         currentBoundaryLayer = null;
     }
+}
 
-    document.getElementById('spotFormModal').classList.add('active');
-    setTimeout(initModalMap, 200);
+function initBlankCreateForm() {
+    resetBlankFormData();
+    document.getElementById('spotFormModal')?.classList.add('active');
+    setTimeout(initModalMap, 30);
 
     attachFormDirtyListeners();
     window.DraftManager?.startAutoSave(() => saveDraftFromForm(true));
@@ -1553,12 +1584,21 @@ window.openCreateForm = async function () {
             window.DraftManager.setPendingDraft(draft);
             modal.classList.add('active');
 
+            const closeBtn = document.getElementById('btnCloseDraftFoundModal');
+            if (closeBtn) {
+                closeBtn.onclick = () => {
+                    modal.classList.remove('active');
+                };
+            }
             document.getElementById('btnContinueDraft').onclick = () => {
                 modal.classList.remove('active');
                 restoreDraftData(draft);
             };
-            document.getElementById('btnStartNewDraft').onclick = () => {
+            document.getElementById('btnStartNewDraft').onclick = async () => {
                 modal.classList.remove('active');
+                if (draft && draft.id) {
+                    await window.DraftManager?.deleteDraft(draft.id);
+                }
                 initBlankCreateForm();
             };
             document.getElementById('btnDeleteDraft').onclick = async () => {
@@ -1819,7 +1859,7 @@ window.submitSpotForm = async function (e) {
         : false;
 
     pendingSaveData = {
-        id: spotIdVal ? parseInt(spotIdVal) : (window.DraftManager?.getActiveDraftId() || null),
+        id: spotIdVal ? parseInt(spotIdVal) : null,
         draft_id: window.DraftManager?.getActiveDraftId() || null,
         name: document.getElementById('spotName').value,
         category: catVal,
@@ -1909,6 +1949,7 @@ window.confirmSaveSpot = async function () {
     if (!pendingSaveData) { showToast('No data to save', 'danger'); return; }
 
     const isEdit = !!pendingSaveData.id;
+    const activeDraftId = pendingSaveData.draft_id || window.DraftManager?.getActiveDraftId();
     setConfirmLoading(true, isEdit);
 
     try {
@@ -1916,36 +1957,62 @@ window.confirmSaveSpot = async function () {
         if (isEdit) res = await updateSpot(pendingSaveData.id, pendingSaveData);
         else res = await createSpot(pendingSaveData);
 
-        if (res && (res.success || res.message)) {
+        if (res && (res.success || res.message || res.id)) {
             const saveData = pendingSaveData;
             const wasRejected = saveData ? saveData.wasRejected : false;
+
+            // Delete associated draft upon successful submission
+            if (activeDraftId) {
+                try {
+                    await window.DraftManager?.deleteDraft(activeDraftId);
+                } catch (dErr) {
+                    console.warn('Draft cleanup notice:', dErr);
+                }
+            }
+            window.DraftManager?.setActiveDraftId(null);
+            window.DraftManager?.setPendingDraft(null);
+            window.DraftManager?.setDirty(false);
+            window.DraftManager?.stopAutoSave();
+
             setConfirmLoading(false);
             closeSaveConfirmModal();
             closeFormModal();
 
-            // Update local memory data instantly
-            const spotId = isEdit ? parseInt(saveData.id) : (res.id || null);
-            if (isEdit) {
-                [window.touristSpotsData, window.touristSpotsAll].forEach(arr => {
-                    if (arr) {
-                        const spot = arr.find(s => s.id === spotId);
-                        if (spot) {
-                            Object.assign(spot, saveData);
+            // Invalidate cache and fetch fresh spots from backend
+            if (typeof window.invalidateMunicipalSpotsCache === 'function') {
+                window.invalidateMunicipalSpotsCache();
+            }
+
+            try {
+                const fresh = await window.API_CONFIG.get(API_BASE);
+                const freshSpots = fresh?.data || fresh || [];
+                if (Array.isArray(freshSpots) && freshSpots.length >= 0) {
+                    window.touristSpotsAll = freshSpots;
+                    window.touristSpotsData = freshSpots;
+                }
+            } catch (fetchErr) {
+                console.error('Failed to refresh spots list:', fetchErr);
+                const spotId = isEdit ? parseInt(saveData.id) : (res.id || null);
+                if (isEdit) {
+                    [window.touristSpotsData, window.touristSpotsAll].forEach(arr => {
+                        if (arr) {
+                            const spot = arr.find(s => s.id === spotId);
+                            if (spot) Object.assign(spot, saveData);
                         }
-                    }
-                });
-            } else if (spotId) {
-                const newSpot = {
-                    ...saveData,
-                    id: spotId,
-                    status: saveData.status || (window.userRole === 'municipal' ? 'pending' : 'approved'),
-                    images: saveData.images || [],
-                    photo_url: saveData.images && saveData.images[0] ? saveData.images[0].photo_url : '',
-                    municipality_name: window.municipalityData ? window.municipalityData.name : '',
-                    created_at: new Date().toISOString()
-                };
-                if (window.touristSpotsData) window.touristSpotsData.unshift(newSpot);
-                if (window.touristSpotsAll) window.touristSpotsAll.unshift(newSpot);
+                    });
+                } else if (spotId) {
+                    const newSpot = res.spot || {
+                        ...saveData,
+                        id: spotId,
+                        status: saveData.status || (window.userRole === 'municipal' ? 'pending' : 'approved'),
+                        images: saveData.images || [],
+                        photo_url: saveData.images && saveData.images[0] ? saveData.images[0].photo_url : '',
+                        municipality_name: window.municipalityData ? window.municipalityData.name : '',
+                        created_at: new Date().toISOString()
+                    };
+                    if (window.touristSpotsData) window.touristSpotsData.unshift(newSpot);
+                    if (window.touristSpotsAll) window.touristSpotsAll.unshift(newSpot);
+                }
             }
 
             if (typeof sortSpotsPendingFirst === 'function') {
@@ -1976,6 +2043,10 @@ window.confirmSaveSpot = async function () {
             } catch (renderErr) {
                 console.error('Post-save render failed:', renderErr);
             }
+
+            // Completely reset form data so opening form again is blank
+            resetBlankFormData();
+            document.getElementById('spotFormModal')?.classList.remove('active');
 
             try {
                 if (typeof window.notifyTouristSpotChanged === 'function') window.notifyTouristSpotChanged();

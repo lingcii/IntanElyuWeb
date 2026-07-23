@@ -260,12 +260,22 @@ class TouristSpotController extends Controller
     /** DELETE /api/tourist-spots/draft/{id} */
     public function deleteDraft(Request $request, int $id): JsonResponse
     {
-        $draft = TouristSpot::where('id', $id)->where('status', 'draft')->first();
-        if ($draft) {
+        $userId = (int) $request->session()->get('user_id', 0);
+        $muniId = (int) $request->session()->get('user_municipality_id', 0);
+
+        $drafts = TouristSpot::where('status', 'draft')
+            ->where(function ($q) use ($id, $userId, $muniId) {
+                $q->where('id', $id);
+                if ($userId) $q->orWhere('created_by', $userId);
+                if ($muniId) $q->orWhere('municipality_id', $muniId);
+            })->get();
+
+        foreach ($drafts as $draft) {
             $draft->images()->delete();
             $draft->delete();
-            CacheInvalidationService::forgetTouristSpots();
         }
+
+        CacheInvalidationService::forgetTouristSpots();
         return response()->json(['success' => true, 'message' => 'Draft deleted successfully.']);
     }
 
@@ -384,6 +394,20 @@ class TouristSpotController extends Controller
 
             $this->syncImages($spot->id, $data['images'] ?? []);
 
+            // Clean up any remaining draft entries for this user/municipality so drafts are strictly separate
+            $userId = (int) $request->session()->get('user_id', 0);
+            $sessionMuniId = (int) $request->session()->get('user_municipality_id', 0);
+            $draftQuery = TouristSpot::where('status', 'draft')
+                ->where(function($q) use ($userId, $sessionMuniId) {
+                    if ($userId) $q->orWhere('created_by', $userId);
+                    if ($sessionMuniId) $q->orWhere('municipality_id', $sessionMuniId);
+                });
+            $leftoverDrafts = $draftQuery->get();
+            foreach ($leftoverDrafts as $d) {
+                $d->images()->delete();
+                $d->delete();
+            }
+
             // Only increment attraction_count for approved spots (pending spots aren't counted yet)
             if ($initialStatus === 'approved') {
                 Municipality::where('id', $spot->municipality_id)->increment('attraction_count');
@@ -404,25 +428,45 @@ class TouristSpotController extends Controller
         });
 
         try {
-            NotificationService::notifyProvincial(
-                'spot_pending',
-                'New Tourist Spot Pending',
-                "A new tourist spot \"" . $spot->name . "\" has been submitted for approval.",
-                [
-                    'module'            => 'Dashboard',
-                    'action_url'        => 'dashboard.php',
-                    'spot_name'         => $spot->name,
-                    'municipality_name' => $spot->municipality?->name,
-                    'actor_name'        => $request->session()->get('user_name'),
-                ]
-            );
+            if ($role === 'lupto' || $initialStatus === 'approved') {
+                NotificationService::notifyProvincial(
+                    'spot_added',
+                    'New Tourist Spot Added',
+                    "A new tourist spot \"" . $spot->name . "\" has been added.",
+                    [
+                        'module'            => 'TouristSpots',
+                        'action_url'        => 'tourist-spots.php',
+                        'spot_name'         => $spot->name,
+                        'municipality_name' => $spot->municipality?->name,
+                        'actor_name'        => $request->session()->get('user_name'),
+                    ]
+                );
+            } else {
+                NotificationService::notifyProvincial(
+                    'spot_pending',
+                    'New Tourist Spot Pending',
+                    "A new tourist spot \"" . $spot->name . "\" has been submitted for approval.",
+                    [
+                        'module'            => 'TouristSpots',
+                        'action_url'        => 'tourist-spots.php',
+                        'spot_name'         => $spot->name,
+                        'municipality_name' => $spot->municipality?->name,
+                        'actor_name'        => $request->session()->get('user_name'),
+                    ]
+                );
+            }
         } catch (\Exception $e) {
             // Notification failure must not block spot creation
             \Log::warning('Notification failed on spot creation: ' . $e->getMessage());
         }
 
         CacheInvalidationService::invalidateAll($spot->municipality_id);
-        return response()->json(['success' => true, 'message' => 'Tourist spot created successfully.', 'id' => $spot->id], 201);
+        return response()->json([
+            'success' => true,
+            'message' => 'Tourist spot created successfully.',
+            'id' => $spot->id,
+            'spot' => $spot->fresh(['municipality', 'images'])?->toArray()
+        ], 201);
     }
 
     public function update(Request $request, int $id): JsonResponse

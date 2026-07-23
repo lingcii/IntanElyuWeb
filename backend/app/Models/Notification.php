@@ -43,6 +43,12 @@ class Notification extends Model
     public static function typeIcons(): array
     {
         return [
+            'spot_added'             => 'fa-map-pin',
+            'spot_submitted'         => 'fa-paper-plane',
+            'spot_pending'           => 'fa-clock',
+            'spot_approved'          => 'fa-check-circle',
+            'spot_rejected'          => 'fa-times-circle',
+            'spot_revision'          => 'fa-exclamation-triangle',
             'tourist_spot_added'     => 'fa-map-marker-alt',
             'tourist_spot_updated'   => 'fa-edit',
             'tourist_spot_submitted' => 'fa-paper-plane',
@@ -51,27 +57,34 @@ class Notification extends Model
             'tourist_spot_archived'  => 'fa-archive',
             'tourist_spot_restored'  => 'fa-rotate-left',
             'tourist_spot_deleted'   => 'fa-trash',
+            'backup_created'         => 'fa-database',
+            'database_restored'      => 'fa-rotate-left',
+            'system_backup'          => 'fa-database',
+            'system_restore'         => 'fa-rotate-left',
             'user_created'           => 'fa-user-plus',
             'user_updated'           => 'fa-user-edit',
             'user_deleted'           => 'fa-user-slash',
             'user_archived'          => 'fa-folder',
             'user_restored'          => 'fa-user-check',
+            'password_changed'       => 'fa-key',
             'password_reset'         => 'fa-key',
             'user_login'             => 'fa-sign-in-alt',
             'user_logout'            => 'fa-sign-out-alt',
             'municipality_assigned'  => 'fa-building',
             'municipality_updated'   => 'fa-city',
-            'spot_approved'          => 'fa-check-circle',
-            'spot_rejected'          => 'fa-times-circle',
             'system_settings'        => 'fa-cog',
-            'system_backup'          => 'fa-database',
-            'system_restore'         => 'fa-rotate-left',
         ];
     }
 
     public static function typeColors(): array
     {
         return [
+            'spot_added'             => 'blue',
+            'spot_submitted'         => 'yellow',
+            'spot_pending'           => 'yellow',
+            'spot_approved'          => 'green',
+            'spot_rejected'          => 'red',
+            'spot_revision'          => 'orange',
             'tourist_spot_added'     => 'blue',
             'tourist_spot_updated'   => 'blue',
             'tourist_spot_submitted' => 'yellow',
@@ -80,21 +93,22 @@ class Notification extends Model
             'tourist_spot_archived'  => 'orange',
             'tourist_spot_restored'  => 'green',
             'tourist_spot_deleted'   => 'red',
+            'backup_created'         => 'purple',
+            'database_restored'      => 'purple',
+            'system_backup'          => 'purple',
+            'system_restore'         => 'purple',
             'user_created'           => 'blue',
             'user_updated'           => 'blue',
             'user_deleted'           => 'red',
             'user_archived'          => 'orange',
             'user_restored'          => 'green',
+            'password_changed'       => 'blue',
             'password_reset'         => 'blue',
             'user_login'             => 'gray',
             'user_logout'            => 'gray',
             'municipality_assigned'  => 'purple',
             'municipality_updated'   => 'purple',
-            'spot_approved'          => 'green',
-            'spot_rejected'          => 'red',
             'system_settings'        => 'purple',
-            'system_backup'          => 'purple',
-            'system_restore'         => 'purple',
         ];
     }
 
