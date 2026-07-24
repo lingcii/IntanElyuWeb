@@ -11,14 +11,16 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('merch_reservations', function (Blueprint $table) {
-            $table->id();
-            $table->integer('user_id');
-            $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
-            $table->foreignId('merchandise_id')->constrained('merchandises')->onDelete('cascade');
-            $table->enum('status', ['pending', 'claimed', 'cancelled'])->default('pending');
-            $table->timestamps();
-        });
+        if (!Schema::hasTable('merch_reservations')) {
+            Schema::create('merch_reservations', function (Blueprint $table) {
+                $table->id();
+                $table->unsignedBigInteger('user_id');
+                $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
+                $table->foreignId('merchandise_id')->constrained('merchandises')->onDelete('cascade');
+                $table->enum('status', ['pending', 'claimed', 'cancelled'])->default('pending');
+                $table->timestamps();
+            });
+        }
     }
 
     /**

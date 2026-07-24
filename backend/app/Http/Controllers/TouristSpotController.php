@@ -81,10 +81,19 @@ class TouristSpotController extends Controller
                 $query->where('municipality_id', $municipalityId);
             }
 
+            if (in_array($role, ['picto', 'pitco'])) {
+                $query->whereIn('status', ['approved', 'EXIST', 'EXISTING']);
+            }
+
             // Exclude drafts from standard spot list queries
             $query->where('status', '!=', 'draft');
 
             $list = $query->latest()->get();
+            foreach ($list as $spot) {
+                if (in_array(strtoupper($spot->status ?? ''), ['EXIST', 'EXISTING'])) {
+                    $spot->status = 'approved';
+                }
+            }
             return $this->attachPrimaryPhoto($list)->toArray();
         });
 
@@ -183,6 +192,9 @@ class TouristSpotController extends Controller
     {
         $userId = (int) $request->session()->get('user_id', 0);
         $role   = $request->session()->get('user_role', 'lupto');
+        if (in_array($role, ['picto', 'pitco'])) {
+            return response()->json(['error' => 'PICTO users have read-only access to tourist sites.'], 403);
+        }
         $muniId = (int) $request->session()->get('user_municipality_id', 0);
 
         $draftId = $request->input('id');
@@ -260,6 +272,10 @@ class TouristSpotController extends Controller
     /** DELETE /api/tourist-spots/draft/{id} */
     public function deleteDraft(Request $request, int $id): JsonResponse
     {
+        $role   = $request->session()->get('user_role');
+        if (in_array($role, ['picto', 'pitco'])) {
+            return response()->json(['error' => 'PICTO users have read-only access to tourist sites.'], 403);
+        }
         $userId = (int) $request->session()->get('user_id', 0);
         $muniId = (int) $request->session()->get('user_municipality_id', 0);
 
@@ -282,6 +298,9 @@ class TouristSpotController extends Controller
     public function store(Request $request): JsonResponse
     {
         $role = $request->session()->get('user_role');
+        if (in_array($role, ['picto', 'pitco'])) {
+            return response()->json(['error' => 'PICTO users have read-only access to tourist sites.'], 403);
+        }
         if (in_array($role, User::$MUNICIPAL_ROLES)) {
             $request->merge(['points' => 0]);
         }
@@ -359,6 +378,7 @@ class TouristSpotController extends Controller
             $spotData = [
                 'name'                  => $data['name'],
                 'municipality_id'       => $data['municipality_id'],
+                'barangay'              => $data['barangay'] ?? null,
                 'category'              => $data['category'],
                 'entrance_fee'          => $data['entrance_fee'] ?? 0,
                 'environmental_fee'     => $data['environmental_fee'] ?? 0,
@@ -472,6 +492,9 @@ class TouristSpotController extends Controller
     public function update(Request $request, int $id): JsonResponse
     {
         $role = $request->session()->get('user_role');
+        if (in_array($role, ['picto', 'pitco'])) {
+            return response()->json(['error' => 'PICTO users have read-only access to tourist sites.'], 403);
+        }
         if (in_array($role, User::$MUNICIPAL_ROLES)) {
             $municipalityId = (int) $request->session()->get('user_municipality_id', 0);
             $query = TouristSpot::where('id', $id);
@@ -591,6 +614,9 @@ class TouristSpotController extends Controller
     public function destroy(Request $request, int $id): JsonResponse
     {
         $role           = $request->session()->get('user_role');
+        if (in_array($role, ['picto', 'pitco'])) {
+            return response()->json(['error' => 'PICTO users have read-only access to tourist sites.'], 403);
+        }
         $municipalityId = (int) $request->session()->get('user_municipality_id', 0);
 
         $query = TouristSpot::where('id', $id);

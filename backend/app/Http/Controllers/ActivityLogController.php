@@ -111,8 +111,14 @@ class ActivityLogController extends Controller
     public function stream(Request $request)
     {
         $lastId = (int) $request->query('last_id', 0);
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            session_write_close();
+        }
 
         return response()->stream(function () use ($lastId) {
+            if (session_status() === PHP_SESSION_ACTIVE) {
+                session_write_close();
+            }
             $startTime = time();
             $currentLastId = $lastId;
             $lastStatsPush = 0;

@@ -1,23 +1,24 @@
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 
-
-
 .\start-dev.ps1
 
-
+--------------------------------
 
 cd backend
 php artisan serve --host=127.0.0.1 --port=8000
  php artisan storage:link ----for images
 
-cd Frontend\Website\Frontend
+
+cd Frontend\updatedweb\Frontend
 php -S localhost:8080
 
+---------------------------------
 
+git status --Check your modified files
+git add .    --- Add all modified files
+git commit -m "Describe your updates here"     ---Commit your changes with a message
+git push origin vince-web       --push to your remote branch
+git push origin vince-web:main    -- push to main branch
 
-git add .
-
-git commit -m "Configure API for Railway and fix database cache setup"
-
-
-git push origin main
+git pull origin main    --- Pull latest changes before editing 
+git branch   ---Check which branch you are currently on

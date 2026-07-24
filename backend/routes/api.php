@@ -78,18 +78,11 @@ Route::middleware('auth.session')->group(function () {
     Route::prefix('pitco')->middleware('role:picto')->group(function () {
         // Dashboard
         Route::get('/dashboard',                    [DashboardController::class, 'index']);
-        Route::get('/dashboard/pending-spots',      [DashboardController::class, 'pendingSpots']);
-        Route::post('/dashboard/approve-spot',      [DashboardController::class, 'approveSpot']);
-        Route::post('/dashboard/reject-spot',       [DashboardController::class, 'rejectSpot']);
         Route::get('/map',                          [MapController::class, 'luptoMapData']);
 
-        // Tourist Spots (full CRUD)
+        // Tourist Spots (read-only for PICTO)
         Route::get('/tourist-spots',         [TouristSpotController::class, 'index']);
         Route::get('/tourist-spots/{id}',    [TouristSpotController::class, 'show']);
-        Route::post('/tourist-spots',        [TouristSpotController::class, 'store']);
-        Route::put('/tourist-spots/{id}',    [TouristSpotController::class, 'update']);
-        Route::delete('/tourist-spots/{id}', [TouristSpotController::class, 'destroy']);
-        Route::post('/tourist-spots/upload-image', [TouristSpotController::class, 'uploadImage']);
 
         // Analytics
             Route::prefix('analytics')->group(function () {
@@ -145,6 +138,8 @@ Route::middleware('auth.session')->group(function () {
 
         // Reports
         Route::get('/reports', [ReportGeneratorController::class, 'index']);
+        Route::get('/reports/generate', [ReportGeneratorController::class, 'generate']);
+        Route::get('/reports/export', [ReportGeneratorController::class, 'export']);
 
         // Activity Logs
         Route::get('/activity-logs', [ActivityLogController::class, 'index']);
@@ -256,6 +251,8 @@ Route::middleware('auth.session')->group(function () {
 
         // Reports
         Route::get('/reports', [ReportGeneratorController::class, 'index']);
+        Route::get('/reports/generate', [ReportGeneratorController::class, 'generate']);
+        Route::get('/reports/export', [ReportGeneratorController::class, 'export']);
 
         // User Management (full CRUD — can only add municipal users)
         Route::prefix('users')->group(function () {
@@ -365,6 +362,8 @@ Route::middleware('auth.session')->group(function () {
 
         // Reports
         Route::get('/reports', [ReportGeneratorController::class, 'index']);
+        Route::get('/reports/generate', [ReportGeneratorController::class, 'generate']);
+        Route::get('/reports/export', [ReportGeneratorController::class, 'export']);
 
         // Settings
         Route::prefix('settings')->group(function () {

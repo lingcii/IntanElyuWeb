@@ -167,7 +167,14 @@ class NotificationController extends Controller
         $userId = $request->session()->get('user_id');
         $lastId = (int) $request->query('last_id', 0);
 
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            session_write_close();
+        }
+
         return response()->stream(function () use ($userId, $lastId) {
+            if (session_status() === PHP_SESSION_ACTIVE) {
+                session_write_close();
+            }
             $startTime = time();
             $currentLastId = $lastId;
 

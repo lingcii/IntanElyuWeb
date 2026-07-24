@@ -276,10 +276,10 @@ class DashboardController extends Controller
      */
     public function approveSpot(Request $request): JsonResponse
     {
-        // Only LUPTO and PICTO roles may approve spots
+        // Only LUPTO role may approve spots
         $role = $request->session()->get('user_role');
-        if (!in_array($role, ['lupto', 'picto'])) {
-            return response()->json(['error' => 'Unauthorized. Only LUPTO and PICTO can approve spots.'], 403);
+        if ($role !== 'lupto') {
+            return response()->json(['error' => 'Unauthorized. Only LUPTO can approve spots.'], 403);
         }
 
         $request->validate(['id' => 'required|integer']);
@@ -353,6 +353,12 @@ class DashboardController extends Controller
      */
     public function rejectSpot(Request $request): JsonResponse
     {
+        // Only LUPTO role may reject spots
+        $role = $request->session()->get('user_role');
+        if ($role !== 'lupto') {
+            return response()->json(['error' => 'Unauthorized. Only LUPTO can reject spots.'], 403);
+        }
+
         $request->validate([
             'id' => 'required|integer',
             'rejection_reason' => 'nullable|string|max:1000',
@@ -415,10 +421,10 @@ class DashboardController extends Controller
      */
     public function batchApproveSpots(Request $request): JsonResponse
     {
-        // Only LUPTO and PICTO roles may batch approve spots
+        // Only LUPTO role may batch approve spots
         $role = $request->session()->get('user_role');
-        if (!in_array($role, ['lupto', 'picto'])) {
-            return response()->json(['error' => 'Unauthorized. Only LUPTO and PICTO can approve spots.'], 403);
+        if ($role !== 'lupto') {
+            return response()->json(['error' => 'Unauthorized. Only LUPTO can approve spots.'], 403);
         }
 
         $request->validate(['ids' => 'required|array', 'ids.*' => 'integer']);

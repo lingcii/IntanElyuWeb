@@ -47,7 +47,7 @@ class ArchiveManagementController extends Controller
             ->leftJoin('users as creator',  'creator.id',  '=', 'fg.created_by')
             ->selectRaw("
                 fg.id, fg.title, fg.vehicle_type, fg.region, fg.effective_date,
-                fg.plate_number, fg.status, fg.created_at, fg.updated_at as archived_at,
+                fg.status, fg.created_at, fg.updated_at as archived_at,
                 COALESCE(creator.name, 'Deleted User')  as created_by_name,
                 '' as archived_by_name,
                 (SELECT COUNT(*) FROM fare_matrices fm WHERE fm.fare_guide_id = fg.id) as matrix_count,

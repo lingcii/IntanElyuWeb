@@ -11,17 +11,19 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('user_sessions', function (Blueprint $table) {
-            if (!Schema::hasColumn('user_sessions', 'platform')) {
-                $table->string('platform')->nullable()->after('user_agent');
-            }
-            if (!Schema::hasColumn('user_sessions', 'last_activity')) {
-                $table->timestamp('last_activity')->nullable()->after('created_at');
-            }
-            if (!Schema::hasColumn('user_sessions', 'is_active')) {
-                $table->boolean('is_active')->default(true)->after('expires_at');
-            }
-        });
+        if (Schema::hasTable('user_sessions')) {
+            Schema::table('user_sessions', function (Blueprint $table) {
+                if (!Schema::hasColumn('user_sessions', 'platform')) {
+                    $table->string('platform')->nullable()->after('user_agent');
+                }
+                if (!Schema::hasColumn('user_sessions', 'last_activity')) {
+                    $table->timestamp('last_activity')->nullable()->after('created_at');
+                }
+                if (!Schema::hasColumn('user_sessions', 'is_active')) {
+                    $table->boolean('is_active')->default(true)->after('expires_at');
+                }
+            });
+        }
     }
 
     /**
@@ -29,8 +31,10 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('user_sessions', function (Blueprint $table) {
-            $table->dropColumn(['platform', 'last_activity', 'is_active']);
-        });
+        if (Schema::hasTable('user_sessions')) {
+            Schema::table('user_sessions', function (Blueprint $table) {
+                $table->dropColumn(['platform', 'last_activity', 'is_active']);
+            });
+        }
     }
 };

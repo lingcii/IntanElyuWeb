@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id();
             
             $table->unsignedBigInteger('itinerary_id'); // Match itineraries.id
-            $table->integer('tourist_spot_id'); // Match tourist_spots.id
+            $table->unsignedBigInteger('tourist_spot_id'); // Match tourist_spots.id
             
             $table->foreign('itinerary_id')->references('id')->on('itineraries')->onDelete('cascade');
             $table->foreign('tourist_spot_id')->references('id')->on('tourist_spots')->onDelete('cascade');

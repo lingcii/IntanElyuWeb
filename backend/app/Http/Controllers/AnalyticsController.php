@@ -673,16 +673,16 @@ class AnalyticsController extends Controller
             $rankingsQuery = Municipality::join('analytics as a', 'a.municipality_id', '=', 'municipalities.id')
                 ->where('a.year', $year);
             if ($isMuni) $rankingsQuery->where('municipalities.id', $muniId);
-            $rankings = $rankingsQuery->selectRaw('municipalities.name, SUM(a.visits) as total_visits, AVG(a.avg_spend) as avg_spend')
+            $rankings = $rankingsQuery->selectRaw('municipalities.name, SUM(a.visits) as total_visits')
                 ->groupBy('municipalities.id', 'municipalities.name')
                 ->orderByDesc('total_visits')->get();
 
             $costQuery = Municipality::join('analytics as a', 'a.municipality_id', '=', 'municipalities.id')
                 ->where('a.year', $year);
             if ($isMuni) $costQuery->where('municipalities.id', $muniId);
-            $costBreakdown = $costQuery->selectRaw('municipalities.name, AVG(a.avg_spend) as avg_spend, SUM(a.visits) as total_visits, (AVG(a.avg_spend)*SUM(a.visits)) as estimated_revenue')
+            $costBreakdown = $costQuery->selectRaw('municipalities.name, SUM(a.visits) as total_visits')
                 ->groupBy('municipalities.id', 'municipalities.name')
-                ->orderByDesc('estimated_revenue')->limit(10)->get();
+                ->orderByDesc('total_visits')->limit(10)->get();
 
             $muniVisitsQuery = Municipality::join('analytics as a', 'a.municipality_id', '=', 'municipalities.id')
                 ->where('a.year', $year)->where('a.month', now()->month);

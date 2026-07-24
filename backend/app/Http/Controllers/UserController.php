@@ -179,13 +179,15 @@ class UserController extends Controller
             'password'        => 'required|string|min:6',
         ]);
 
-        $status = $request->get('status', 'active');
-        $isDefaultPassword = false;
+        $sessionRole = $request->session()->get('user_role');
+        $isLupto = ($sessionRole === 'lupto' || $request->is('api/lupto/*'));
 
-        if ($request->role === 'lupto' || in_array($request->role, User::$MUNICIPAL_ROLES)) {
-            $status = 'pending';
-            $isDefaultPassword = true;
+        if ($isLupto && !in_array($request->role, User::$MUNICIPAL_ROLES)) {
+            return response()->json(['error' => 'Forbidden: LUPTO accounts can only create Municipal users.'], 403);
         }
+
+        $status = $request->get('status', 'active');
+        $isDefaultPassword = true;
 
         $user = User::create([
             'name'                => $request->name,

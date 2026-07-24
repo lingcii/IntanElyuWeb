@@ -170,6 +170,11 @@ class FareDataController extends Controller
     /** POST /api/{role}/fare-data/upload */
     public function upload(Request $request): JsonResponse
     {
+        $role = $request->session()->get('user_role');
+        if ($role === 'lupto') {
+            return response()->json(['success' => false, 'error' => 'LUPTO users have view-only access to transportation fare.'], 403);
+        }
+
         $request->validate([
             'csv_file'       => 'required|file|max:20480',
             'title'          => 'nullable|string|max:255',
@@ -178,8 +183,11 @@ class FareDataController extends Controller
             'effective_date' => 'nullable|date',
         ]);
 
-        $role   = $request->session()->get('user_role');
-        $prefix = ($role === 'picto') ? 'fare_pitco_' : 'fare_mto_';
+        if (in_array($role, User::$MUNICIPAL_ROLES) && $request->filled('vehicle_type') && $request->vehicle_type !== 'Tricycle') {
+            return response()->json(['success' => false, 'error' => 'Municipal users can only upload Tricycle fare data.'], 422);
+        }
+
+        $prefix = ($role === 'picto' || $role === 'pitco') ? 'fare_pitco_' : 'fare_mto_';
 
         $file              = $request->file('csv_file');
         $extension         = strtolower($file->getClientOriginalExtension());
@@ -257,11 +265,14 @@ class FareDataController extends Controller
     public function store(Request $request): JsonResponse
     {
         $role = $request->session()->get('user_role');
+        if ($role === 'lupto') {
+            return response()->json(['success' => false, 'error' => 'LUPTO users have view-only access to transportation fare.'], 403);
+        }
         $userId = (int) $request->session()->get('user_id');
 
         $request->validate([
             'title'          => 'required|string|max:255',
-            'vehicle_type'   => 'required|string|in:PUB_Aircon,PUB_Ordinary,PUJ_Aircon,PUJ_Ordinary,Tricycle,Van',
+            'vehicle_type'   => 'required|string|in:PUB_Aircon,PUB_Ordinary,PUJ_Aircon,PUJ_Ordinary,Tricycle,Van,MPUJ,TPUJ,TAXI,UVE',
             'region'         => 'required|string|max:255',
             'effective_date' => 'required|date',
             'status'         => 'nullable|string|in:active,draft,archived',
@@ -345,17 +356,21 @@ class FareDataController extends Controller
         }
     }
 
-    /** PUT /api/pitco/fare-data/{id} */
     public function update(Request $request, int $id): JsonResponse
     {
         $role = $request->session()->get('user_role');
-        if ($role !== 'picto' && $role !== 'pitco') {
-            return response()->json(['error' => 'Forbidden: Only PICTO users can edit fare matrices.'], 403);
+        if ($role === 'lupto') {
+            return response()->json(['error' => 'Forbidden: LUPTO users have view-only access to transportation fare.'], 403);
+        }
+        if (in_array($role, User::$MUNICIPAL_ROLES)) {
+            if ($request->vehicle_type !== 'Tricycle') {
+                return response()->json(['error' => 'Forbidden: Municipal users can only edit Tricycle fare matrices.'], 403);
+            }
         }
 
         $request->validate([
             'title'          => 'required|string|max:255',
-            'vehicle_type'   => 'required|string|in:PUB_Aircon,PUB_Ordinary,PUJ_Aircon,PUJ_Ordinary,Tricycle,Van',
+            'vehicle_type'   => 'required|string|in:PUB_Aircon,PUB_Ordinary,PUJ_Aircon,PUJ_Ordinary,Tricycle,Van,MPUJ,TPUJ,TAXI,UVE',
             'region'         => 'required|string|max:255',
             'effective_date' => 'required|date',
             'status'         => 'nullable|string|in:active,draft,archived',
@@ -436,6 +451,11 @@ class FareDataController extends Controller
     /** POST /api/{role}/fare-data/sync  – activate / archive / draft */
     public function sync(Request $request): JsonResponse
     {
+        $role = $request->session()->get('user_role');
+        if ($role === 'lupto') {
+            return response()->json(['error' => 'Forbidden: LUPTO users have view-only access to transportation fare.'], 403);
+        }
+
         $request->validate([
             'guide_id' => 'required|integer',
             'status'   => 'required|in:active,archived,draft',
@@ -497,9 +517,14 @@ class FareDataController extends Controller
         return response()->json(['success' => true, 'fare_guide_id' => $guideId, 'status' => $status]);
     }
 
-    /** DELETE /api/pitco/fare-data/{id}  – PITCO only */
+    /** DELETE /api/{role}/fare-data/{id} */
     public function destroy(Request $request, int $id): JsonResponse
     {
+        $role = $request->session()->get('user_role');
+        if ($role === 'lupto') {
+            return response()->json(['error' => 'Forbidden: LUPTO users have view-only access to transportation fare.'], 403);
+        }
+
         $guide = FareGuide::find($id);
         $guideTitle = $guide ? $guide->title : "Fare guide #{$id}";
 

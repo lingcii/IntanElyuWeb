@@ -24,7 +24,7 @@ return new class extends Migration
             $table->time('opening_time')->nullable();
             $table->time('closing_time')->nullable();
             $table->boolean('is_maintenance')->default(false);
-            $table->string('status')->default('EXIST');
+            $table->string('status')->default('approved');
             $table->string('classification_status')->nullable();
             $table->integer('visits')->default(0);
             $table->decimal('rating', 3, 2)->default(0);

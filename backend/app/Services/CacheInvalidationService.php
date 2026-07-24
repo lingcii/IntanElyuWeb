@@ -16,7 +16,7 @@ class CacheInvalidationService
         // Clear province-wide dashboard caches for primary roles.
         // NOTE: DashboardController stores cache under the ':v2' versioned key.
         // We clear BOTH old (no suffix) and new (:v2) keys for safety.
-        foreach (['lupto', 'picto'] as $role) {
+        foreach (['lupto', 'picto', 'pitco'] as $role) {
             Cache::forget("dashboard:data:{$role}:0");      // legacy key (no :v2)
             Cache::forget("dashboard:data:{$role}:0:v2");  // current key
         }
@@ -132,7 +132,7 @@ class CacheInvalidationService
     public static function invalidateTouristSpots(?int $muniId = null): void
     {
         // Clear province-wide list caches
-        foreach (['lupto', 'picto'] as $role) {
+        foreach (['lupto', 'picto', 'pitco'] as $role) {
             Cache::forget("tourist-spots:list:{$role}:0");
         }
 

@@ -187,6 +187,64 @@ class RbacWorkflowTest extends TestCase
         }
         $this->assertTrue($found, 'Approved spot should be visible to PICTO');
 
+        // 8.5 PICTO Create/Update restriction (PICTO can view only)
+        $response = $this->actingAs($picto)
+            ->withSession([
+                'user_id' => $picto->id,
+                'user_role' => $picto->role,
+                'user_municipality_id' => $picto->municipality_id,
+            ])
+            ->postJson('/api/tourist-spots', [
+                'name' => 'PICTO Forbidden Spot',
+                'barangay' => 'Test Barangay',
+                'category' => 'Beach',
+                'classification_status' => 'EXISTING',
+                'entrance_fee' => 0.00,
+                'description' => 'PICTO cannot create',
+                'municipality_id' => $municipal->municipality_id,
+            ]);
+        $response->assertStatus(403);
+
+        $response = $this->actingAs($picto)
+            ->withSession([
+                'user_id' => $picto->id,
+                'user_role' => $picto->role,
+            ])
+            ->putJson("/api/tourist-spots/{$spot->id}", [
+                'name' => 'PICTO Edit Attempt',
+                'category' => 'Beach',
+                'classification_status' => 'EXISTING',
+                'description' => 'PICTO cannot edit',
+            ]);
+        $response->assertStatus(403);
+
+        // 8.6 LUPTO Create spot (Auto-approved - no need approval)
+        $luptoSpotName = "LUPTO Auto Approved Spot " . rand(1000, 9999);
+        $response = $this->actingAs($lupto)
+            ->withSession([
+                'user_id' => $lupto->id,
+                'user_role' => $lupto->role,
+            ])
+            ->postJson('/api/tourist-spots', [
+                'name' => $luptoSpotName,
+                'barangay' => 'LUPTO Barangay',
+                'category' => 'Culture',
+                'classification_status' => 'EXISTING',
+                'entrance_fee' => 0.00,
+                'description' => 'Spot created by LUPTO auto-approved.',
+                'latitude' => 16.62,
+                'longitude' => 120.32,
+                'municipality_id' => $municipal->municipality_id,
+                'points' => 50,
+                'images' => [
+                    ['photo_url' => '/images/placeholder.jpg']
+                ]
+            ]);
+        $response->assertStatus(201);
+        $luptoSpot = TouristSpot::where('name', $luptoSpotName)->first();
+        $this->assertNotNull($luptoSpot);
+        $this->assertEquals('approved', $luptoSpot->status, 'LUPTO created spot should be auto-approved');
+
         // 9. LUPTO Create restriction (Should block emerging/potential)
         $response = $this->actingAs($lupto)
             ->withSession([

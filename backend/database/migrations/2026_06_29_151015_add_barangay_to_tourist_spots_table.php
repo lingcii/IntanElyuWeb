@@ -12,9 +12,12 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('tourist_spots', function (Blueprint $table) {
-            $table->string('barangay', 255)->nullable()->after('municipality_id');
-            $table->timestamp('updated_at')->nullable()->after('created_at');
-            $table->string('category', 255)->change();
+            if (!Schema::hasColumn('tourist_spots', 'barangay')) {
+                $table->string('barangay', 255)->nullable()->after('municipality_id');
+            }
+            if (!Schema::hasColumn('tourist_spots', 'updated_at')) {
+                $table->timestamp('updated_at')->nullable()->after('created_at');
+            }
         });
     }
 

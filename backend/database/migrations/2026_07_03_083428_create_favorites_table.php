@@ -13,8 +13,8 @@ return new class extends Migration
     {
         Schema::create('favorites', function (Blueprint $table) {
             $table->id();
-            $table->integer('user_id');
-            $table->integer('tourist_spot_id');
+            $table->unsignedBigInteger('user_id');
+            $table->unsignedBigInteger('tourist_spot_id');
             
             $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
             $table->foreign('tourist_spot_id')->references('id')->on('tourist_spots')->onDelete('cascade');

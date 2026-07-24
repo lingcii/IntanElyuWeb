@@ -1,0 +1,46 @@
+
+        .nc-page { padding: 20px; }
+        .nc-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .nc-header h2 { margin: 0; font-size: 20px; display: flex; align-items: center; gap: 10px; }
+        .nc-unread-count { font-size: 13px; color: #3B82F6; background: #EFF6FF; padding: 4px 12px; border-radius: 20px; font-weight: 600; }
+        .nc-actions { display: flex; gap: 8px; }
+        .nc-actions button { padding: 8px 16px; border-radius: 8px; border: 1.5px solid #E2E8F0; background: #fff; cursor: pointer; font-size: 12.5px; font-weight: 600; color: #475569; transition: all 0.15s; }
+        .nc-actions button:hover { background: #F8FAFC; }
+        .nc-actions .btn-read-all { color: #2563EB; border-color: #BFDBFE; }
+        .nc-actions .btn-read-all:hover { background: #EFF6FF; }
+        .nc-actions .btn-clear { color: #DC2626; border-color: #FECACA; }
+        .nc-actions .btn-clear:hover { background: #FEF2F2; }
+        .nc-filters { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
+        .nc-filters select, .nc-filters input { padding: 8px 12px; border: 1.5px solid #E2E8F0; border-radius: 8px; font-size: 12.5px; color: #374151; background: #fff; font-family: inherit; }
+        .nc-filters select { min-width: 140px; }
+        .nc-filters input { min-width: 200px; }
+        .nc-filters input:focus, .nc-filters select:focus { outline: none; border-color: #3B82F6; box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
+        .nc-list { display: flex; flex-direction: column; gap: 6px; }
+        .nc-card { display: flex; align-items: flex-start; gap: 14px; padding: 14px 16px; background: #fff; border: 1px solid #E5E7EB; border-radius: 10px; cursor: pointer; transition: all 0.18s; }
+        .nc-card:hover { border-color: #D1D5DB; box-shadow: 0 2px 8px rgba(0,0,0,0.06); transform: translateX(3px); }
+        .nc-card.unread { background: #F0F7FF; border-color: #BFDBFE; }
+        .nc-card .nc-dot { width: 8px; height: 8px; border-radius: 50%; background: #3B82F6; flex-shrink: 0; margin-top: 6px; display: none; }
+        .nc-card.unread .nc-dot { display: block; }
+        .nc-card .nc-icon { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 14px; flex-shrink: 0; }
+        .nc-icon.blue { background: #3B82F6; } .nc-icon.green { background: #10B981; } .nc-icon.red { background: #EF4444; }
+        .nc-icon.orange { background: #F59E0B; } .nc-icon.purple { background: #8B5CF6; } .nc-icon.gray { background: #6B7280; } .nc-icon.yellow { background: #EAB308; }
+        .nc-card .nc-body { flex: 1; min-width: 0; }
+        .nc-card .nc-type { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 2px; color: #64748B; }
+        .nc-card .nc-title { font-size: 13.5px; font-weight: 600; color: #1E293B; margin-bottom: 3px; }
+        .nc-card .nc-msg { font-size: 12px; color: #64748B; line-height: 1.4; }
+        .nc-card .nc-meta { display: flex; flex-wrap: wrap; gap: 10px; font-size: 11px; color: #94A3B8; margin-top: 6px; }
+        .nc-card .nc-meta span { display: inline-flex; align-items: center; gap: 3px; }
+        .nc-card .nc-actions-cell { display: flex; gap: 4px; flex-shrink: 0; opacity: 0; transition: opacity 0.15s; }
+        .nc-card:hover .nc-actions-cell { opacity: 1; }
+        .nc-card .nc-actions-cell button { background: none; border: none; cursor: pointer; color: #94A3B8; font-size: 13px; padding: 4px 6px; border-radius: 4px; transition: all 0.15s; }
+        .nc-card .nc-actions-cell button:hover { color: #DC2626; background: #FEF2F2; }
+        .nc-empty { text-align: center; padding: 40px; color: #94A3B8; }
+        .nc-empty i { font-size: 36px; margin-bottom: 8px; opacity: 0.3; }
+        .nc-pagination { display: flex; justify-content: center; gap: 6px; margin-top: 20px; }
+        .nc-pagination button { padding: 8px 14px; border: 1.5px solid #E2E8F0; border-radius: 8px; background: #fff; cursor: pointer; font-size: 12.5px; font-weight: 600; color: #374151; transition: all 0.15s; }
+        .nc-pagination button:hover { background: #F8FAFC; border-color: #D1D5DB; }
+        .nc-pagination button.active { background: #3B82F6; color: #fff; border-color: #3B82F6; }
+        .nc-pagination button:disabled { opacity: 0.4; cursor: default; }
+        .nc-time { font-size: 11px; color: #94A3B8; flex-shrink: 0; margin-top: 2px; white-space: nowrap; }
+        .toast { position: fixed; bottom: 20px; right: 20px; background: #1E293B; color: #fff; padding: 12px 20px; border-radius: 10px; font-size: 13px; z-index: 9999; opacity: 0; transform: translateY(10px); transition: all 0.3s ease; pointer-events: none; }
+        .toast.show { opacity: 1; transform: translateY(0); }

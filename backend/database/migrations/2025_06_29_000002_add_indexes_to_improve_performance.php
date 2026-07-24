@@ -9,36 +9,52 @@ return new class extends Migration
     public function up(): void
     {
         // Indexes for tourist_spots table
-        Schema::table('tourist_spots', function (Blueprint $table) {
-            $table->index(['status', 'municipality_id']);
-            $table->index(['category']);
-            $table->index(['classification_status']);
-            $table->index(['visits']);
-            $table->index(['rating']);
-            $table->index(['created_at']);
-        });
+        try {
+            Schema::table('tourist_spots', function (Blueprint $table) {
+                $table->index(['status', 'municipality_id']);
+                $table->index(['category']);
+                $table->index(['classification_status']);
+                $table->index(['visits']);
+                $table->index(['rating']);
+                $table->index(['created_at']);
+            });
+        } catch (\Throwable $e) {}
 
         // Indexes for analytics table
-        Schema::table('analytics', function (Blueprint $table) {
-            $table->index(['year', 'month']);
-            $table->index(['municipality_id', 'year', 'month']);
-        });
+        try {
+            if (Schema::hasColumn('analytics', 'date')) {
+                Schema::table('analytics', function (Blueprint $table) {
+                    $table->index(['date']);
+                });
+            } elseif (Schema::hasColumn('analytics', 'year')) {
+                Schema::table('analytics', function (Blueprint $table) {
+                    $table->index(['year', 'month']);
+                    $table->index(['municipality_id', 'year', 'month']);
+                });
+            }
+        } catch (\Throwable $e) {}
 
         // Indexes for users table
-        Schema::table('users', function (Blueprint $table) {
-            $table->index(['role', 'status']);
-            $table->index(['status']);
-        });
+        try {
+            Schema::table('users', function (Blueprint $table) {
+                $table->index(['role', 'status']);
+                $table->index(['status']);
+            });
+        } catch (\Throwable $e) {}
 
         // Indexes for alerts table
-        Schema::table('alerts', function (Blueprint $table) {
-            $table->index(['is_read', 'created_at']);
-        });
+        try {
+            Schema::table('alerts', function (Blueprint $table) {
+                $table->index(['is_read', 'created_at']);
+            });
+        } catch (\Throwable $e) {}
 
         // Indexes for tourist_spot_images
-        Schema::table('tourist_spot_images', function (Blueprint $table) {
-            $table->index(['spot_id', 'is_primary']);
-        });
+        try {
+            Schema::table('tourist_spot_images', function (Blueprint $table) {
+                $table->index(['spot_id', 'is_primary']);
+            });
+        } catch (\Throwable $e) {}
     }
 
     public function down(): void
@@ -52,10 +68,16 @@ return new class extends Migration
             $table->dropIndex(['created_at']);
         });
 
-        Schema::table('analytics', function (Blueprint $table) {
-            $table->dropIndex(['year', 'month']);
-            $table->dropIndex(['municipality_id', 'year', 'month']);
-        });
+        if (Schema::hasColumn('analytics', 'date')) {
+            Schema::table('analytics', function (Blueprint $table) {
+                $table->dropIndex(['date']);
+            });
+        } elseif (Schema::hasColumn('analytics', 'year')) {
+            Schema::table('analytics', function (Blueprint $table) {
+                $table->dropIndex(['year', 'month']);
+                $table->dropIndex(['municipality_id', 'year', 'month']);
+            });
+        }
 
         Schema::table('users', function (Blueprint $table) {
             $table->dropIndex(['role', 'status']);
