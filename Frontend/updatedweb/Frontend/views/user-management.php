@@ -159,7 +159,13 @@ ob_start();
 <div class="um-modal-overlay" id="userFormModal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="formModalTitle">
     <div class="um-modal">
         <div class="um-modal-header">
-            <h3 id="formModalTitle"><i class="fas fa-user-edit"></i> <span id="formModalTitleText">Add Municipal User</span></h3>
+            <div class="um-modal-header-content">
+                <div class="um-modal-icon-badge"><i class="fas fa-user-plus"></i></div>
+                <div>
+                    <h3 id="formModalTitle"><span id="formModalTitleText">Add Municipal User</span></h3>
+                    <p class="um-modal-subtitle">Configure account details and access permissions for the new user</p>
+                </div>
+            </div>
             <button class="um-modal-close" onclick="closeFormModal()" aria-label="Close"><i class="fas fa-times"></i></button>
         </div>
         <div class="um-modal-body">
@@ -168,28 +174,40 @@ ob_start();
                 <div class="um-form-grid">
                     <!-- Full Name -->
                     <div class="um-form-group full">
-                        <label class="um-form-label" for="formName">Full Name <span class="required">*</span></label>
-                        <input type="text" id="formName" class="um-form-control" placeholder="e.g. Juan dela Cruz" maxlength="100" required>
+                        <label class="um-form-label" for="formName"><i class="fas fa-id-card" style="color:#073B6B;"></i> FULL NAME <span class="required">*</span></label>
+                        <div class="um-field-wrap">
+                            <i class="fas fa-user um-field-icon"></i>
+                            <input type="text" id="formName" class="um-form-control with-icon" placeholder="e.g. Juan dela Cruz" maxlength="100" required>
+                        </div>
                     </div>
                     <!-- Email -->
                     <div class="um-form-group">
-                        <label class="um-form-label" for="formEmail">Email Address <span class="required">*</span></label>
-                        <input type="email" id="formEmail" class="um-form-control" placeholder="user@example.com" maxlength="100" required>
+                        <label class="um-form-label" for="formEmail"><i class="fas fa-envelope" style="color:#073B6B;"></i> EMAIL ADDRESS <span class="required">*</span></label>
+                        <div class="um-field-wrap">
+                            <i class="fas fa-envelope um-field-icon"></i>
+                            <input type="email" id="formEmail" class="um-form-control with-icon" placeholder="user@example.com" maxlength="100" required>
+                        </div>
                     </div>
                     <!-- Role Selection -->
                     <div class="um-form-group">
-                        <label class="um-form-label" for="formRole">Role <span class="required">*</span></label>
-                        <select id="formRole" class="um-form-control" onchange="onRoleChange()" required>
-                            <option value="municipal">Municipal Tourism Office (MTO)</option>
-                            <option value="lupto">La Union Provincial Tourism Office (LUPTO)</option>
-                        </select>
+                        <label class="um-form-label" for="formRole"><i class="fas fa-shield-halved" style="color:#073B6B;"></i> ROLE <span class="required">*</span></label>
+                        <div class="um-field-wrap">
+                            <i class="fas fa-shield-halved um-field-icon"></i>
+                            <select id="formRole" class="um-form-control with-icon" onchange="onRoleChange()" required>
+                                <option value="municipal">Municipal Tourism Office (MTO)</option>
+                                <option value="lupto">La Union Provincial Tourism Office (LUPTO)</option>
+                            </select>
+                        </div>
                     </div>
                     <!-- Municipality Selection -->
-                    <div class="um-form-group" id="muniGroup" style="display:none;">
-                        <label class="um-form-label" for="formMunicipality">Municipality</label>
-                        <select id="formMunicipality" class="um-form-control">
-                            <option value="">— Select Municipality —</option>
-                        </select>
+                    <div class="um-form-group full" id="muniGroup" style="display:none;">
+                        <label class="um-form-label" for="formMunicipality"><i class="fas fa-location-dot" style="color:#073B6B;"></i> MUNICIPALITY <span class="required">*</span></label>
+                        <div class="um-field-wrap">
+                            <i class="fas fa-location-dot um-field-icon"></i>
+                            <select id="formMunicipality" class="um-form-control with-icon">
+                                <option value="">— Select Municipality —</option>
+                            </select>
+                        </div>
                     </div>
                     <!-- Hidden Status & Default Password -->
                     <input type="hidden" id="formStatus" value="active">
@@ -200,9 +218,9 @@ ob_start();
             </form>
         </div>
         <div class="um-modal-footer">
-            <button class="btn-gov btn-gov-secondary" onclick="closeFormModal()">Cancel</button>
-            <button class="btn-gov" id="formSubmitBtn" onclick="submitUserForm()">
-                <i class="fas fa-save"></i> <span id="formSubmitText">Save User</span>
+            <button type="button" class="btn-gov btn-gov-secondary um-btn-cancel" onclick="closeFormModal()">Cancel</button>
+            <button type="button" class="btn-gov btn-gov-primary um-btn-submit" id="formSubmitBtn" onclick="submitUserForm()">
+                <i class="fas fa-user-plus"></i> <span id="formSubmitText">Create User</span>
             </button>
         </div>
     </div>

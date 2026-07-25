@@ -77,37 +77,60 @@ function openAddFareGuideModal() {
     
     const role = (window.userRole || '').toLowerCase();
     const path = (window.location.pathname || '').toUpperCase();
+    const regionWrap = document.getElementById('fgRegionWrap');
+    const regionInput = document.getElementById('fgRegion');
 
-    // Municipal: lock to Tricycle only
+    // Municipal: lock to Tricycle and assigned municipality
     if (role === 'municipal' || path.includes('/MUNICIPAL/')) {
         const vt = document.getElementById('fgVehicleType');
         if (vt) { vt.value = 'Tricycle'; vt.disabled = true; }
-    }
 
-    // PICTO: auto-fill Region to "All Municipalities, La Union" and lock it
-    const regionWrap = document.getElementById('fgRegionWrap');
-    const regionInput = document.getElementById('fgRegion');
-    if (role === 'picto' || path.includes('/PICTO/')) {
         if (regionInput) {
-            regionInput.value = 'All Municipalities, La Union';
-            regionInput.readOnly = true;
-            regionInput.style.background = '#f1f5f9';
-            regionInput.style.color = '#64748b';
+            const muniName = window.userMunicipalityName || regionInput.value || 'Municipal';
+            regionInput.value = muniName;
+            if (regionInput.tagName === 'INPUT') {
+                regionInput.readOnly = true;
+                regionInput.style.background = '#f1f5f9';
+                regionInput.style.color = '#475569';
+            } else if (regionInput.tagName === 'SELECT') {
+                regionInput.disabled = true;
+            }
         }
         if (regionWrap) {
-            const hint = regionWrap.querySelector('.fd-region-hint');
+            let hint = regionWrap.querySelector('.fd-region-hint');
             if (!hint) {
-                const p = document.createElement('p');
-                p.className = 'fd-region-hint';
-                p.style.cssText = 'margin:4px 0 0;font-size:11px;color:#64748b;';
-                p.textContent = 'PICTO fare guides apply to all municipalities.';
-                regionWrap.appendChild(p);
+                hint = document.createElement('p');
+                hint.className = 'fd-region-hint';
+                hint.style.cssText = 'margin:4px 0 0;font-size:11px;color:#64748b;';
+                regionWrap.appendChild(hint);
+            }
+            const name = window.userMunicipalityName || (regionInput ? regionInput.value : 'Municipal');
+            hint.innerHTML = `<i class="fas fa-lock" style="font-size:10px;"></i> Restricted to your assigned municipality (${name}).`;
+        }
+    } else if (role === 'picto' || path.includes('/PICTO/')) {
+        if (regionInput) {
+            regionInput.value = 'All Municipalities, La Union';
+            if (regionInput.tagName === 'INPUT') {
+                regionInput.readOnly = true;
+                regionInput.style.background = '#f1f5f9';
+                regionInput.style.color = '#64748b';
+            }
+        }
+        if (regionWrap) {
+            let hint = regionWrap.querySelector('.fd-region-hint');
+            if (!hint) {
+                hint = document.createElement('p');
+                hint.className = 'fd-region-hint';
+                hint.style.cssText = 'margin:4px 0 0;font-size:11px;color:#64748b;';
+                hint.textContent = 'PICTO fare guides apply to all municipalities.';
+                regionWrap.appendChild(hint);
             }
         }
     } else {
-        // Reset for non-PICTO
+        // Reset for general non-restricted roles
         if (regionInput) {
             regionInput.readOnly = false;
+            regionInput.disabled = false;
             regionInput.style.background = '';
             regionInput.style.color = '';
         }

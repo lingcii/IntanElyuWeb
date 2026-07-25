@@ -124,6 +124,7 @@ ob_start();
 
 <!-- Load feedback API script dynamically and initialize feedback module -->
 <script>
+window.userRole = '<?= htmlspecialchars($userRole ?? 'lupto') ?>';
 (function () {
     if (!window.__luptoFeedbackScriptInjected) {
         window.__luptoFeedbackScriptInjected = true;

@@ -84,7 +84,7 @@ ob_start();
                 </div>
                 <?php if ($userRole !== 'picto'): ?>
                 <button data-action="open-create-form" class="btn btn-primary" style="margin-left: auto;">
-                    <i class="fas fa-plus"></i> Add Spot
+                    <i class="fas fa-plus"></i> Add Tourist Site
                 </button>
                 <?php endif; ?>
             </div>
@@ -256,8 +256,8 @@ ob_start();
             <div class="sfm-header-left">
                 <div class="sfm-header-icon"><i class="fas fa-map-marked-alt"></i></div>
                 <div>
-                    <h2 id="formModalTitle">Add New Spot</h2>
-                    <p class="sfm-header-sub">Fill in the details below to register a tourist spot</p>
+                    <h2 id="formModalTitle">Add New Tourist Site</h2>
+                    <p class="sfm-header-sub">Fill in the details below to register a tourist site</p>
                 </div>
             </div>
             <button type="button" class="sfm-close-btn" data-action="close-form-modal" aria-label="Close Modal">

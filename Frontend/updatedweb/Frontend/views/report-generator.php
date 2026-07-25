@@ -125,19 +125,23 @@ ob_start();
                         <input type="date" id="rg-end-date" class="rg-input">
                     </div>
 
-                    <!-- Export Format & Download Action -->
-                    <div class="rg-form-group">
-                        <label for="rg-export-format"><i class="fas fa-file-export"></i> Export Format</label>
-                        <div style="display:flex; gap:8px;">
-                            <select id="rg-export-format" class="rg-select">
-                                <option value="pdf">PDF (.pdf)</option>
-                                <option value="excel">Excel (.xlsx)</option>
-                                <option value="csv">CSV (.csv)</option>
-                                <option value="print">Print Report</option>
-                            </select>
-                            <button type="button" id="rg-btn-download-now" class="rg-btn rg-btn-primary" style="white-space:nowrap; padding:9px 16px;">
-                                <i class="fas fa-download"></i> Download
+                    <!-- Download Dropdown Action -->
+                    <div class="rg-form-group" style="align-self: flex-end;">
+                        <div class="rg-dropdown" id="rg-download-dropdown-wrap">
+                            <button type="button" id="rg-btn-download-now" class="rg-btn rg-btn-primary rg-dropdown-toggle" style="white-space:nowrap; padding:9px 16px;" onclick="if(window.toggleReportDownloadDropdown) window.toggleReportDownloadDropdown(event);">
+                                <i class="fas fa-download"></i> Download <i class="fas fa-chevron-down" style="margin-left:4px; font-size:0.75rem;"></i>
                             </button>
+                            <div class="rg-dropdown-menu" id="rg-download-dropdown-menu">
+                                <button type="button" class="rg-dropdown-item" data-format="pdf" onclick="if(window.selectReportDownloadFormat) window.selectReportDownloadFormat('pdf', event);">
+                                    <i class="fas fa-file-pdf" style="color:#EF4444; width:16px;"></i> PDF (.pdf)
+                                </button>
+                                <button type="button" class="rg-dropdown-item" data-format="csv" onclick="if(window.selectReportDownloadFormat) window.selectReportDownloadFormat('csv', event);">
+                                    <i class="fas fa-file-csv" style="color:#10B981; width:16px;"></i> CSV (.csv)
+                                </button>
+                                <button type="button" class="rg-dropdown-item" data-format="excel" onclick="if(window.selectReportDownloadFormat) window.selectReportDownloadFormat('excel', event);">
+                                    <i class="fas fa-file-excel" style="color:#16A34A; width:16px;"></i> Excel (.xlsx)
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

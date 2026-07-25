@@ -1665,7 +1665,7 @@ h4 {
     align-items: center;
     justify-content: space-between;
     padding: 22px 28px 20px;
-    background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 60%, #3b82f6 100%);
+    background: linear-gradient(135deg, #073B6B 0%, #0B5394 100%);
     color: #fff;
     gap: 16px;
 }
@@ -1696,7 +1696,7 @@ h4 {
 .sfm-header-sub {
     margin: 3px 0 0;
     font-size: 12px;
-    color: rgba(255,255,255,.75);
+    color: #93C5FD;
 }
 .sfm-close-btn {
     background: rgba(255,255,255,.15);

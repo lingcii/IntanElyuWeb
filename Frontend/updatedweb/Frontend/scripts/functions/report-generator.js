@@ -77,7 +77,6 @@
             this.elCategory = document.getElementById('rg-category');
             this.elClassification = document.getElementById('rg-classification');
             this.elStatus = document.getElementById('rg-status');
-            this.elExportFormat = document.getElementById('rg-export-format');
 
             this.btnGenerate = document.getElementById('rg-btn-generate');
             this.btnPreview = document.getElementById('rg-btn-preview');
@@ -87,6 +86,8 @@
             this.btnExportCsv = document.getElementById('rg-btn-csv');
             this.btnPrint = document.getElementById('rg-btn-print');
             this.btnDownloadNow = document.getElementById('rg-btn-download-now');
+            this.downloadDropdownWrap = document.getElementById('rg-download-dropdown-wrap');
+            this.downloadDropdownMenu = document.getElementById('rg-download-dropdown-menu');
 
             this.modalConfirm = document.getElementById('rg-confirm-modal');
             this.modalMsg = document.getElementById('rg-confirm-msg');
@@ -116,15 +117,30 @@
                 }
             });
 
-            // Confirmation modal only pops up when user explicitly clicks the "Download" button!
-            if (this.btnDownloadNow) {
-                this.btnDownloadNow.addEventListener('click', () => {
-                    const format = this.elExportFormat ? this.elExportFormat.value : 'pdf';
-                    if (format === 'print') {
-                        this.handlePrint();
-                    } else {
+            // Toggle Download Dropdown Menu
+            if (this.btnDownloadNow && this.downloadDropdownMenu) {
+                this.btnDownloadNow.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.downloadDropdownMenu.classList.toggle('show');
+                });
+            }
+
+            // Close Download Dropdown Menu when clicking outside
+            document.addEventListener('click', (e) => {
+                if (this.downloadDropdownMenu && !e.target.closest('#rg-download-dropdown-wrap')) {
+                    this.downloadDropdownMenu.classList.remove('show');
+                }
+            });
+
+            // Dropdown format option click handler -> triggers confirm modal
+            if (this.downloadDropdownMenu) {
+                this.downloadDropdownMenu.querySelectorAll('.rg-dropdown-item').forEach(item => {
+                    item.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        const format = item.dataset.format || 'pdf';
+                        this.downloadDropdownMenu.classList.remove('show');
                         this.handleExport(format);
-                    }
+                    });
                 });
             }
 
@@ -241,8 +257,6 @@
                 params.append('municipality', this.elMunicipality.value);
             }
 
-            if (this.elExportFormat) params.append('format', this.elExportFormat.value);
-
             return params;
         }
 
@@ -273,12 +287,6 @@
                 if (this.reportCache) this.reportCache.set(cacheKey, json);
                 this.reportData = json;
                 this.renderReportPreview(json);
-
-                const format = this.elExportFormat ? this.elExportFormat.value : 'PDF';
-                if (format === 'print') {
-                    setTimeout(() => window.print(), 300);
-                }
-                this.addRecentReportLog(json.report_title, json.report_type, format.toUpperCase());
             } catch (err) {
                 console.error('Error generating report:', err);
                 this.renderErrorState(err.message);
@@ -666,7 +674,7 @@
         }
 
         openConfirmModal(format) {
-            let label = 'PDF';
+            let label = 'PDF (.pdf)';
             if (format === 'excel') label = 'Excel (.xlsx)';
             if (format === 'csv') label = 'CSV (.csv)';
 
@@ -727,14 +735,14 @@
 
                 // Format consistent filename
                 const dateStr = new Date().toISOString().slice(0, 10);
-                const ext = 'csv';
+                const ext = format === 'excel' ? 'xlsx' : (format === 'csv' ? 'csv' : 'pdf');
                 let fileName = `Tourist_Spots_Report_${dateStr}.${ext}`;
 
                 const disposition = res.headers.get('Content-Disposition');
                 if (disposition && disposition.includes('filename=')) {
                     const match = disposition.match(/filename="?([^";]+)"?/);
                     if (match && match[1]) {
-                        fileName = match[1].replace(/\.xlsx$/, '.csv').replace(/\.xls$/, '.csv');
+                        fileName = match[1];
                     }
                 }
 
@@ -894,6 +902,34 @@
     window.softRefreshReportGenerator = async function () {
         if (window.__reportGeneratorInstance) {
             await window.__reportGeneratorInstance.handleGenerateReport(true);
+        }
+    };
+
+    window.toggleReportDownloadDropdown = function (e) {
+        if (e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        const menu = document.getElementById('rg-download-dropdown-menu');
+        if (menu) {
+            menu.classList.toggle('show');
+        }
+    };
+
+    window.selectReportDownloadFormat = function (format, e) {
+        if (e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        const menu = document.getElementById('rg-download-dropdown-menu');
+        if (menu) {
+            menu.classList.remove('show');
+        }
+        if (window.__reportGeneratorInstance) {
+            window.__reportGeneratorInstance.handleExport(format);
+        } else {
+            const inst = window.initReportGeneratorModule(false);
+            if (inst) inst.handleExport(format);
         }
     };
 
