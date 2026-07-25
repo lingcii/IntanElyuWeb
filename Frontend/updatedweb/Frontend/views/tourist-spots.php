@@ -282,7 +282,7 @@ ob_start();
                         </div>
                     </div>
 
-                    <div class="sfm-field">
+                    <div class="sfm-field" id="municipalityFieldGroup">
                         <label class="sfm-label" for="spotMunicipality">
                             Municipality <span class="sfm-required">*</span>
                         </label>
@@ -592,7 +592,9 @@ ob_start();
 <script>
     window.touristSpotsData = [];
     window.municipalitiesData = [];
-    window.userRole = '<?= htmlspecialchars($_SESSION["user_role"] ?? "lupto") ?>';
+    window.userRole = '<?= htmlspecialchars($userRole ?? "lupto") ?>';
+    window.userMunicipalityId = <?= json_encode($_SESSION['user_municipality_id'] ?? null) ?>;
+    window.userMunicipalityName = <?= json_encode($_SESSION['user_municipality_name'] ?? null) ?>;
     window.currentUserName = '<?= htmlspecialchars($_SESSION["user_name"] ?? "") ?>';
 </script>
 <script src="../scripts/la-union-boundaries.js?v=<?= time() ?>"></script>

@@ -162,24 +162,28 @@
             const kpis = data.kpis;
 
             const elSpots = container.querySelector('[data-kpi="total-tourist-spots"] .lupto-kpi-value');
+            const elApproved = container.querySelector('[data-kpi="total-approved-spots"] .lupto-kpi-value');
             const elFare = container.querySelector('[data-kpi="total-fare-matrix"] .lupto-kpi-value');
             const elUsers = container.querySelector('[data-kpi="total-tourist-users"] .lupto-kpi-value');
             const elPoints = container.querySelector('[data-kpi="total-points-earned"] .lupto-kpi-value');
             const elVisits = container.querySelector('[data-kpi="total-visits"] .lupto-kpi-value');
 
             if (elSpots) window.animateKpiValue(elSpots, kpis.total_tourist_spots ?? kpis.totalTouristSpots ?? 0);
+            if (elApproved) window.animateKpiValue(elApproved, kpis.total_approved_spots ?? 0);
             if (elFare) window.animateKpiValue(elFare, kpis.total_fare_matrix ?? 0);
             if (elUsers) window.animateKpiValue(elUsers, kpis.total_tourist_users ?? 0);
             if (elPoints) window.animateKpiValue(elPoints, kpis.total_points_earned ?? 0);
             if (elVisits) window.animateKpiValue(elVisits, kpis.total_visits ?? 0);
         } else {
             const elSpots = container.querySelector('[data-kpi="total-tourist-spots"] .lupto-kpi-value');
+            const elApproved = container.querySelector('[data-kpi="total-approved-spots"] .lupto-kpi-value');
             const elFare = container.querySelector('[data-kpi="total-fare-matrix"] .lupto-kpi-value');
             const elUsers = container.querySelector('[data-kpi="total-tourist-users"] .lupto-kpi-value');
             const elPoints = container.querySelector('[data-kpi="total-points-earned"] .lupto-kpi-value');
             const elVisits = container.querySelector('[data-kpi="total-visits"] .lupto-kpi-value');
 
             if (elSpots) window.animateKpiValue(elSpots, 0);
+            if (elApproved) window.animateKpiValue(elApproved, 0);
             if (elFare) window.animateKpiValue(elFare, 0);
             if (elUsers) window.animateKpiValue(elUsers, 0);
             if (elPoints) window.animateKpiValue(elPoints, 0);

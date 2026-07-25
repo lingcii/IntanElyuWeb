@@ -1,4 +1,4 @@
-﻿
+
 // map-view-api.js initializer — works both on fresh page load AND SPA injection
 // (DOMContentLoaded may have already fired when this script is injected by the SPA router)
 function initMapView() {
@@ -307,17 +307,18 @@ function _runMapView() {
     }
 
     window.refreshLuptoMap = function() {
+        if (typeof map === 'undefined' || !map) return;
         clearInterval(statusInterval);
         rebuildTouristSpotsData();
 
-        allMarkers.forEach(m => map.removeLayer(m));
+        allMarkers.forEach(m => { try { map.removeLayer(m); } catch (e) {} });
         allMarkers = [];
-        spotMarkers.forEach(m => map.removeLayer(m));
+        spotMarkers.forEach(m => { try { map.removeLayer(m); } catch (e) {} });
         spotMarkers = [];
         activeSpotMarker = null;
 
         if (currentRouteLayer) {
-            map.removeLayer(currentRouteLayer);
+            try { map.removeLayer(currentRouteLayer); } catch (e) {}
             currentRouteLayer = null;
         }
 

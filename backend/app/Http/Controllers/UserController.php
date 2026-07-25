@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Enums\ActivityAction;
+use App\Mail\WelcomeUserMail;
 use App\Models\Alert;
 use App\Models\Municipality;
 use App\Models\Notification;
@@ -11,10 +12,12 @@ use App\Services\ActivityLogService;
 use App\Services\NotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Validation\Rule;
 
 class UserController extends Controller
 {
@@ -167,7 +170,7 @@ class UserController extends Controller
     //  POST / PUT
     // ──────────────────────────────────────────────────────────────────────────
 
-    /** POST /api/{role}/users  – create user (PITCO) */
+    /** POST /api/{role}/users  – create user (PITCO/LUPTO) */
     public function store(Request $request): JsonResponse
     {
         $request->validate([
@@ -186,13 +189,16 @@ class UserController extends Controller
             return response()->json(['error' => 'Forbidden: LUPTO accounts can only create Municipal users.'], 403);
         }
 
-        $status = $request->get('status', 'active');
+        $status            = $request->get('status', 'active');
         $isDefaultPassword = true;
+
+        // Capture plain-text password BEFORE hashing so it can be included in the welcome email.
+        $plainPassword = $request->password;
 
         $user = User::create([
             'name'                => $request->name,
             'email'               => $request->email,
-            'password'            => Hash::make($request->password),
+            'password'            => Hash::make($plainPassword),
             'role'                => $request->role,
             'status'              => $status,
             'municipality_id'     => $request->municipality_id,
@@ -229,7 +235,34 @@ class UserController extends Controller
         Cache::forget('users:stats');
         Cache::forget('activity_stats');
 
-        return response()->json(['success' => true, 'user' => $user, 'message' => 'User created successfully.'], 201);
+        // ── Send welcome email ────────────────────────────────────────────────
+        $emailSent  = false;
+        $emailError = null;
+        try {
+            $loginUrl = env('APP_FRONTEND_URL', config('app.url', 'http://localhost:8080'));
+            Mail::to($user->email)
+                ->queue(new WelcomeUserMail($user, $plainPassword, $loginUrl));
+            $emailSent = true;
+        } catch (\Throwable $e) {
+            // Keep the account — only log and surface the failure
+            $emailError = 'Welcome email could not be queued: ' . $e->getMessage();
+            Log::error('[WelcomeUserMail] Failed to queue email for user #' . $user->id, [
+                'email'     => $user->email,
+                'exception' => $e->getMessage(),
+            ]);
+        }
+
+        $message = $emailSent
+            ? 'User created successfully. A welcome email has been sent to ' . $user->email . '.'
+            : 'User created successfully. However, the welcome email could not be sent — please inform the user manually.';
+
+        return response()->json([
+            'success'     => true,
+            'user'        => $user,
+            'message'     => $message,
+            'email_sent'  => $emailSent,
+            'email_error' => $emailError,
+        ], 201);
     }
 
     /** PUT /api/{role}/users/{id}  – update user */

@@ -1,12 +1,11 @@
 <?php
 
-
 //   Shared Dashboard template — all roles.
 //   Role-specific KPI cards, map label, and JS script are determined by $userRole.
  
 require_once __DIR__ . '/../session-bridge.php';
 
-// Allow all three role families — guard normalises $userRole for us
+// Allow all three role families
 $allowedRoles  = ['lupto', 'picto', 'municipal'];
 $loginRedirect = '../login.php';
 require_once __DIR__ . '/_role_guard.php';

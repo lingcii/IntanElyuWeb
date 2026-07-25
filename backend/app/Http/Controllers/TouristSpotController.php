@@ -212,9 +212,16 @@ class TouristSpotController extends Controller
             $draft = TouristSpot::where('municipality_id', $muniId)->where('status', 'draft')->latest('id')->first();
         }
 
+        if (in_array($role, User::$MUNICIPAL_ROLES) && $muniId) {
+            $submittedMuniId = $request->input('municipality_id');
+            if ($submittedMuniId && (int)$submittedMuniId !== $muniId) {
+                return response()->json(['error' => 'Municipal users are restricted to drafts within their assigned municipality.'], 403);
+            }
+        }
+
         $data = [
             'name'                  => $request->input('name') ?: 'Untitled Draft',
-            'municipality_id'       => $request->input('municipality_id') ? (int) $request->input('municipality_id') : ($muniId ?: 1),
+            'municipality_id'       => in_array($role, User::$MUNICIPAL_ROLES) ? ($muniId ?: 1) : ($request->input('municipality_id') ? (int) $request->input('municipality_id') : ($muniId ?: 1)),
             'barangay'              => $request->input('barangay') ?: null,
             'category'              => $request->input('category') ?: 'Other',
             'entrance_fee'          => (float) ($request->input('entrance_fee') ?? 0),
@@ -338,8 +345,14 @@ class TouristSpotController extends Controller
         $role           = $request->session()->get('user_role');
         $sessionMuniId  = (int) $request->session()->get('user_municipality_id', 0);
 
-        // Municipal users always use their own municipality
+        // Municipal users always use their own municipality and cannot submit for another municipality
         if (in_array($role, User::$MUNICIPAL_ROLES)) {
+            $submittedMuniId = $request->input('municipality_id');
+            if ($submittedMuniId && (int)$submittedMuniId !== $sessionMuniId) {
+                return response()->json([
+                    'error' => 'Municipal users are restricted to submitting tourist spots within their assigned municipality.'
+                ], 403);
+            }
             $data['municipality_id'] = $sessionMuniId;
         }
 
@@ -537,6 +550,16 @@ class TouristSpotController extends Controller
 
         $role           = $request->session()->get('user_role');
         $municipalityId = (int) $request->session()->get('user_municipality_id', 0);
+
+        if (in_array($role, User::$MUNICIPAL_ROLES)) {
+            $submittedMuniId = $request->input('municipality_id');
+            if ($submittedMuniId && (int)$submittedMuniId !== $municipalityId) {
+                return response()->json([
+                    'error' => 'Municipal users are restricted to editing tourist spots within their assigned municipality.'
+                ], 403);
+            }
+            $data['municipality_id'] = $municipalityId;
+        }
 
         $query = TouristSpot::where('id', $id);
         if (in_array($role, User::$MUNICIPAL_ROLES) && $municipalityId) {

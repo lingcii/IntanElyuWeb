@@ -12,6 +12,28 @@ if (window.API_CONFIG && typeof window.API_CONFIG.getCsrfToken !== 'function') {
     };
 }
 
+// Safely patch Leaflet L.DomUtil.getPosition to prevent 'Cannot read properties of undefined (reading _leaflet_pos)'
+function patchLeafletDomUtil() {
+    if (typeof window.L !== 'undefined' && window.L.DomUtil && typeof window.L.DomUtil.getPosition === 'function') {
+        if (!window.L.DomUtil._patchedPosition) {
+            const origGetPosition = window.L.DomUtil.getPosition;
+            window.L.DomUtil.getPosition = function (el) {
+                if (!el) return new window.L.Point(0, 0);
+                try {
+                    return origGetPosition.call(window.L.DomUtil, el);
+                } catch (err) {
+                    return new window.L.Point(0, 0);
+                }
+            };
+            window.L.DomUtil._patchedPosition = true;
+        }
+    }
+}
+patchLeafletDomUtil();
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', patchLeafletDomUtil);
+}
+
 const API_BASE = `${window.API_CONFIG?.BASE_URL || ('http://' + (window.location.hostname || '127.0.0.1') + ':8000')}/api/tourist-spots`;
 
 // ── In-Memory Spots Cache ────────────────────────────────────────────────────
@@ -1549,64 +1571,94 @@ window.removeImage = function (index) {
 // ════════════════════════════════════════════════════════════════════════════════
 
 // Municipality coordinates (approximate for La Union)
+// Municipality coordinates (accurate for La Union database IDs)
 const municipalityCoordinates = {
-    1: { lat: 16.3147, lng: 119.9788 }, // Bacnotan
-    2: { lat: 16.6167, lng: 120.3167 }, // San Fernando City
-    3: { lat: 16.5500, lng: 120.3333 }, // Bauang
-    4: { lat: 16.4833, lng: 120.4167 }, // Naguilian
-    5: { lat: 16.3833, lng: 120.2833 }, // Caba
-    6: { lat: 16.2833, lng: 120.4833 }, // Tubao
-    7: { lat: 16.4167, lng: 120.1000 }, // Balaoan
-    8: { lat: 16.3500, lng: 120.5000 }, // Aringay
-    9: { lat: 16.4500, lng: 120.5000 }, // Santo Tomas
-    10: { lat: 16.3000, lng: 120.5500 }, // Rosario
-    11: { lat: 16.2000, lng: 120.4500 }, // Pugo
-    12: { lat: 16.5833, lng: 120.6000 }, // Tuba
-    13: { lat: 16.6500, lng: 120.5500 }, // Sablan
-    14: { lat: 16.5833, lng: 120.3833 }, // Bagulin
-    15: { lat: 16.6500, lng: 120.2500 }, // Sudipen
-    16: { lat: 16.6833, lng: 120.3500 }, // San Gabriel
-    17: { lat: 16.7167, lng: 120.4167 }, // San Juan
-    18: { lat: 16.2000, lng: 120.5000 }, // Agoo
-    19: { lat: 16.2500, lng: 120.5833 }, // Santa Cruz
-    20: { lat: 16.2300, lng: 120.4200 }  // Burgos
+    1: { lat: 16.6150, lng: 120.3170 }, // San Fernando
+    2: { lat: 16.6664, lng: 120.3367 }, // San Juan
+    3: { lat: 16.5200, lng: 120.3300 }, // Bauang
+    4: { lat: 16.3300, lng: 120.3600 }, // Agoo
+    5: { lat: 16.8500, lng: 120.3800 }, // Luna
+    6: { lat: 16.6800, lng: 120.4200 }, // San Gabriel
+    7: { lat: 16.8200, lng: 120.4000 }, // Balaoan
+    8: { lat: 16.3900, lng: 120.3700 }, // Aringay
+    9: { lat: 16.2300, lng: 120.4800 }, // Rosario
+    10: { lat: 16.7200, lng: 120.3500 }, // Bacnotan
+    11: { lat: 16.5300, lng: 120.4300 }, // Naguilian
+    12: { lat: 16.3500, lng: 120.4200 }, // Tubao
+    13: { lat: 16.3000, lng: 120.4800 }, // Pugo
+    14: { lat: 16.4400, lng: 120.3400 }, // Caba
+    15: { lat: 16.2800, lng: 120.3800 }, // Santo Tomas
+    16: { lat: 16.9000, lng: 120.4200 }, // Bangar
+    17: { lat: 16.7500, lng: 120.4500 }, // Burgos
+    18: { lat: 16.6000, lng: 120.5000 }, // Bagulin
+    19: { lat: 16.4800, lng: 120.5200 }, // Santol
+    20: { lat: 16.5800, lng: 120.4800 }  // Sudipen
 };
 
-// Helper to generate barangay entries with default municipality coordinates
-function createBarangayList(names, muniId) {
-    const coords = municipalityCoordinates[muniId];
-    return names.map(name => ({ name, lat: coords.lat, lng: coords.lng }));
+const idToMunicipalityNameMap = {
+    1: 'San Fernando', 2: 'San Juan', 3: 'Bauang', 4: 'Agoo', 5: 'Luna',
+    6: 'San Gabriel', 7: 'Balaoan', 8: 'Aringay', 9: 'Rosario', 10: 'Bacnotan',
+    11: 'Naguilian', 12: 'Tubao', 13: 'Pugo', 14: 'Caba', 15: 'Santo Tomas',
+    16: 'Bangar', 17: 'Burgos', 18: 'Bagulin', 19: 'Santol', 20: 'Sudipen'
+};
+
+const barangaysByMunicipalityName = {
+    'San Fernando': ['Abut', 'Apaleng', 'Bacsil', 'Baraoas', 'Bato', 'Biday', 'Bangbangolan', 'Bangcusay', 'Barangay I (Poblacion)', 'Barangay II (Poblacion)', 'Barangay III (Poblacion)', 'Barangay IV (Poblacion)', 'Birunget', 'Bungro', 'Cabarsican', 'Cadaclan', 'Calabugao', 'Camansi', 'Canaoay', 'Carlatan', 'Cabaroan (Negro)', 'Cadapli', 'Dallangayan Este', 'Dallangayan Oeste', 'Dalumpinas Este', 'Dalumpinas Oeste', 'Ilocanos Norte', 'Ilocanos Sur', 'Langcuas', 'Lingsat', 'Madayegdeg', 'Mameltac', 'Masicong', 'Narra Este', 'Narra Oeste', 'Namtutan', 'Pagdaldagan', 'Pagdaraoan', 'Pao Norte', 'Pao Sur', 'Pacpaco', 'Pian', 'Poro', 'Puspus', 'San Agustin', 'San Francisco', 'Sagayad', 'Santiago Norte', 'Santiago Sur', 'San Vicente', 'Saoay', 'Siboan-Otong', 'Tanquigan', 'Tanqui', 'Sevilla'],
+    'San Juan': ['Allangigan', 'Aludaid', 'Bacsayan', 'Balballosa', 'Bambanay', 'Bugbugcao', 'Caarusipan', 'Cabaroan', 'Cabugnayan', 'Cacapian', 'Caculangan', 'Casilagan', 'Catdongan', 'Dangdangla', 'Dasay', 'Dinanum', 'Duplas', 'Guinguinabang', 'Ili Norte (Poblacion)', 'Ili Sur (Poblacion)', 'Legleg', 'Lubing', 'Nadsaag', 'Nagsabaran', 'Naguirangan', 'Naguituban', 'Nagyubuyuban', 'Oaquing', 'Pacpacac', 'Pagdildilan', 'Panicsican', 'Quidem', 'Santa Rosa', 'Saracat', 'Santo Rosario', 'Taboc', 'Talogtog', 'Urbiztondo'],
+    'Bauang': ['Acao', 'Bagbag', 'Ballay', 'Baccuit Norte', 'Baccuit Sur', 'Boy-utan', 'Bucayab', 'Cabalayangan', 'Cabisilan', 'Casilagan', 'Central East (Poblacion)', 'Central West (Poblacion)', 'Dili', 'Disso-or', 'Guerrero', 'Jimenez', 'Jimenez West', 'Lower San Agustin', 'Nagrebcan', 'Pagdalagan Sur', 'Paliguasan', 'Palingulang', 'Parian Este', 'Parian Oeste', 'Paringao', 'Payocpoc Norte Este', 'Payocpoc Norte Oeste', 'Payocpoc Sur', 'Pilar', 'Pottot', 'Pudoc', 'Pugo', 'Quinavite', 'Santa Monica', 'Santiago', 'Taberna', 'Upper San Agustin', 'Urayong'],
+    'Agoo': ['Ambitacay', 'Balawarte', 'Capas', 'Consolacion (Poblacion)', 'San Agustin East', 'San Agustin Norte', 'San Agustin Sur', 'San Antonino', 'San Antonio', 'San Francisco', 'San Isidro', 'San Java Norte', 'San Juan', 'San Jose Norte', 'San Jose Sur', 'San Julian Central', 'San Julian East', 'San Julian Norte', 'San Julian West', 'San Manuel Norte', 'San Manuel Sur', 'San Marcos', 'San Miguel', 'San Nicolas Central (Poblacion)', 'San Nicolas East', 'San Nicolas Norte (Poblacion)', 'San Nicolas Sur (Poblacion)', 'San Nicolas West', 'San Pedro', 'San Roque East', 'San Roque West', 'San Vicente Norte', 'San Vicente Sur', 'Santa Ana', 'Santa Barbara (Poblacion)', 'Santa Fe', 'Santa Maria', 'Santa Monica', 'Santa Rita (Nalinac)', 'Santa Rita East', 'Santa Rita Norte', 'Santa Rita Sur', 'Santa Rita West', 'Nazareno', 'Macalva Central', 'Macalva Norte', 'Macalva Sur', 'Purok'],
+    'Luna': ['Alcala (Poblacion)', 'Ayaoan', 'Barangobong', 'Barrientos', 'Bungro', 'Buselbusel', 'Cabalitocan', 'Cantoria No. 1', 'Cantoria No. 2', 'Cantoria No. 3', 'Cantoria No. 4', 'Carisquis', 'Darigayos', 'Magallanes (Poblacion)', 'Magsiping', 'Mamay', 'Nalvo Norte', 'Nalvo Sur', 'Nagrebcan', 'Napaset', 'Oaqui No. 1', 'Oaqui No. 2', 'Oaqui No. 3', 'Oaqui No. 4', 'Pila', 'Pitpitac', 'Rimos No. 1', 'Rimos No. 2', 'Rimos No. 3', 'Rimos No. 4', 'Rimos No. 5', 'Rissing', 'Salcedo (Poblacion)', 'Santo Domingo Norte', 'Santo Domingo Sur', 'Sucoc Norte', 'Sucoc Sur', 'Suyo', 'Tallaoen', 'Victoria (Poblacion)'],
+    'San Gabriel': ['Amontoc', 'Apayao', 'Bayabas', 'Balbalayang', 'Bucao', 'Bumbuneg', 'Daking', 'Lacong', 'Lipay Este', 'Lipay Norte', 'Lipay Proper', 'Lipay Sur', 'Lon-oy', 'Poblacion', 'Polipol'],
+    'Balaoan': ['Almeida', 'Antonino', 'Apatut', 'Ar-arampang', 'Baracbac Este', 'Baracbac Oeste', 'Bet-ang', 'Bulbulala', 'Bungol', 'Butubut Este', 'Butubut Norte', 'Butubut Oeste', 'Butubut Sur', 'Cabuaan Oeste (Poblacion)', 'Calliat', 'Camiling', 'Calumbaya', 'Calungbuyan', 'Dr. Camilo Osias Poblacion (Cabuaan Este)', 'Guinaburan', 'Nagsabaran Norte', 'Nagsabaran Sur', 'Nalasin', 'Napaset', 'Pagbennecan', 'Pagleddegan', 'Paraoir', 'Patpata', 'Sablut', 'San Pablo', 'Sinapangan Norte', 'Sinapangan Sur', 'Tallipugo'],
+    'Aringay': ['Alaska', 'Basca', 'Dulao', 'Gallano', 'Macabato', 'Manga', 'Pangao-aoan East', 'Pangao-aoan West', 'Poblacion', 'Samara', 'San Antonio', 'San Benito Norte', 'San Benito Sur', 'San Eugenio', 'San Juan East', 'San Juan West', 'San Simon East', 'San Simon West', 'Santa Cecilia', 'Santa Lucia', 'Santo Rosario East', 'Santo Rosario West', 'Santa Rita East', 'Santa Rita West'],
+    'Rosario': ['Alipang', 'Amlang', 'Ambangonan', 'Bacani', 'Bangar', 'Bani', 'Benteng-Sapilang', 'Camp One', 'Carunuan East', 'Carunuan West', 'Casilagan', 'Cataguingtingan', 'Concepcion', 'Damortis', 'Gumot-Nagcolaran', 'Inabaan Norte', 'Inabaan Sur', 'Marcos', 'Nagtagaan', 'Nancamotian', 'Parasapas', 'Poblacion East', 'Poblacion West', 'San Jose', 'Subusub', 'Tabtabungao', 'Tay-ac', 'Tanglag', 'Udiao', 'Vila'],
+    'Bacnotan': ['Agtipal', 'Arosip', 'Bacqui', 'Bacsil', 'Bagutot', 'Ballogo', 'Baroro', 'Bitalag', 'Burayoc', 'Bussaoit', 'Cabaroan', 'Cabarsican', 'Cabugao', 'Calautit', 'Carcarmay', 'Casiaman', 'Santa Cruz', 'Galongen', 'Guinabang', 'Legleg', 'Lisqueb', 'Mabanengbeng 1st', 'Mabanengbeng 2nd', 'Maragayap', 'Nagatiran', 'Nangalisan', 'Narra', 'Nagsaraboan', 'Nagsimbaanan', 'Oya-oy', 'Paagan', 'Pagan', 'Pandan', 'Pang-Pang', 'Poblacion', 'Quirino', 'Raois', 'Sagapan', 'Salincob', 'San Martin', 'Santa Rita', 'Sapilang', 'Sayoan', 'Sipulo', 'Ubbog', 'Zaragosa'],
+    'Naguilian': ['Al-alinao Norte', 'Al-alinao Sur', 'Aguioas', 'Ambaracao Norte', 'Ambaracao Sur', 'Angin', 'Baraoas Norte', 'Baraoas Sur', 'Bariquir', 'Bato', 'Balecbec', 'Bancagan', 'Bimmotobot', 'Dal-lipaoen', 'Daramuangan', 'Guesset', 'Gusing Norte', 'Gusing Sur', 'Imelda', 'Lioac Norte', 'Lioac Sur', 'Magungunay', 'Mamat-ing Norte', 'Mamat-ing Sur', 'Natividad (Poblacion)', 'Ortiz (Poblacion)', 'Ribsuan', 'San Antonio', 'San Isidro', 'Sili', 'Suguidan Norte', 'Suguidan Sur', 'Teddingan'],
+    'Tubao': ['Amallapay', 'Anduyan', 'Caoigue', 'Francia Sur', 'Francia West', 'Garcia', 'Gonzales', 'Halog East', 'Halog West', 'Leones East', 'Leones West', 'Linapew', 'Lloren', 'Magsaysay', 'Pideg', 'Poblacion', 'Rizal', 'Santa Teresa'],
+    'Pugo': ['Ambalite', 'Ambangonan', 'Cares', 'Cuenca', 'Duplas', 'Maoasoas Norte', 'Maoasoas Sur', 'Palina', 'Poblacion East', 'Poblacion West', 'Saytan', 'San Luis', 'Tavora East', 'Tavora Proper'],
+    'Caba': ['Bautista', 'Gana', 'Juan Cartas', 'Las-ud', 'Liquicia', 'Poblacion Norte', 'Poblacion Sur', 'San Carlos', 'San Cornelio', 'San Fermin', 'San Gregorio', 'San Jose', 'Santiago Norte', 'Santiago Sur', 'Sobredillo', 'Urayong', 'Wenceslao'],
+    'Santo Tomas': ['Ambitacay', 'Bail', 'Balaoc', 'Balsaan', 'Baybay', 'Cabaruan', 'Casilagan', 'Casantaan', 'Cupang', 'Damortis', 'Fernando', 'Linong', 'Lomboy', 'Malabago', 'Namboongan', 'Namonitan', 'Narvacan', 'Patac', 'Poblacion', 'Pongpong', 'Raois', 'Tococ', 'Tubod', 'Ubagan'],
+    'Bangar': ['Agdeppa', 'Alzate', 'Bangaoilan East', 'Bangaoilan West', 'Barraca', 'Central East No. 1 (Poblacion)', 'Central East No. 2 (Poblacion)', 'Central West No. 2 (Poblacion)', 'Consuegra', 'General Prim East', 'General Prim West', 'General Terrero', 'Luzong Norte', 'Luzong Sur', 'Maria Cristina East', 'Maria Cristina West', 'Mindoro', 'Nagsabaran', 'Nagsidorisan', 'Quintarong', 'Reyna Regente', 'Rissing', 'San Blas', 'San Cristobal', 'Sinapangan Norte', 'Sinapangan Sur', 'Ubbog'],
+    'Burgos': ['Agpay', 'Bilis', 'Caoayan', 'Dalacdac', 'Delles', 'Imelda', 'Libtong', 'Linuan', 'Lower Tumapoc', 'New Poblacion', 'Old Poblacion', 'Upper Tumapoc'],
+    'Bagulin': ['Alibangsay', 'Baay', 'Cambaly', 'Cardiz', 'Dagup', 'Libbo', 'Suyo (Poblacion)', 'Tagudtud', 'Tio-angan', 'Wallayan'],
+    'Santol': ['Corrooy', 'Lettac Norte', 'Lettac Sur', 'Mangaan', 'Paagan', 'Poblacion', 'Puguil', 'Ramot', 'Sasaba', 'Sapdaan', 'Tubaday'],
+    'Sudipen': ['Bigbiga', 'Bulalaan', 'Castro', 'Duplas', 'Ipet', 'Ilocano', 'Maliclico', 'Namaltugan', 'Old Central', 'Poblacion', 'Porporiket', 'San Francisco Norte', 'San Francisco Sur', 'San Jose', 'Sengngat', 'Turod', 'Up-uplas']
+};
+
+function getBarangaysForMuniIdOrName(muniIdOrName) {
+    let name = null;
+    if (muniIdOrName !== null && muniIdOrName !== undefined && muniIdOrName !== '') {
+        if (!isNaN(muniIdOrName)) {
+            const idInt = parseInt(muniIdOrName);
+            const muniObj = window.municipalitiesData?.find(m => m.id == idInt);
+            name = muniObj ? muniObj.name : idToMunicipalityNameMap[idInt];
+        } else if (typeof muniIdOrName === 'string') {
+            name = muniIdOrName;
+        }
+    }
+    if (!name && typeof getSelectedMuniName === 'function') {
+        name = getSelectedMuniName();
+    }
+    if (!name && window.userMunicipalityName) {
+        name = window.userMunicipalityName;
+    }
+    if (!name) return [];
+
+    let normName = name;
+    if (normName === 'San Fernando City') normName = 'San Fernando';
+
+    const names = barangaysByMunicipalityName[normName] || [];
+    const idLookup = Object.keys(idToMunicipalityNameMap).find(key => idToMunicipalityNameMap[key] === normName) || 1;
+    const coords = municipalityCoordinates[idLookup] || { lat: 16.6150, lng: 120.3170 };
+
+    return names.map(bName => ({ name: bName, lat: coords.lat, lng: coords.lng }));
 }
-
-// Barangays with coordinates (using municipality coordinates as default)
-const barangaysByMunicipality = {
-    1: createBarangayList(['Allangigan', 'Aludaid', 'Bacsayan', 'Balballosa', 'Bambanay', 'Bugbugcao', 'Caarusipan', 'Cabaroan', 'Cabugnayan', 'Cacapian', 'Caculangan', 'Casilagan', 'Catdongan', 'Dangdangla', 'Dasay', 'Dinanum', 'Duplas', 'Guinguinabang', 'Ili Norte (Poblacion)', 'Ili Sur (Poblacion)', 'Legleg', 'Lubing', 'Nadsaag', 'Nagsabaran', 'Naguirangan', 'Naguituban', 'Nagyubuyuban', 'Oaquing', 'Pacpacac', 'Pagdildilan', 'Panicsican', 'Quidem', 'Santa Rosa', 'Saracat', 'Santo Rosario', 'Taboc', 'Talogtog', 'Urbiztondo'], 1),
-    2: createBarangayList(['Abut', 'Apaleng', 'Bacsil', 'Baraoas', 'Bato', 'Biday', 'Bangbangolan', 'Bangcusay', 'Barangay I (Poblacion)', 'Barangay II (Poblacion)', 'Barangay III (Poblacion)', 'Barangay IV (Poblacion)', 'Birunget', 'Bungro', 'Cabarsican', 'Cadaclan', 'Calabugao', 'Camansi', 'Canaoay', 'Carlatan', 'Cabaroan (Negro)', 'Cadapli', 'Dallangayan Este', 'Dallangayan Oeste', 'Dalumpinas Este', 'Dalumpinas Oeste', 'Ilocanos Norte', 'Ilocanos Sur', 'Langcuas', 'Lingsat', 'Madayegdeg', 'Mameltac', 'Masicong', 'Narra Este', 'Narra Oeste', 'Namtutan', 'Pagdaldagan', 'Pagdaraoan', 'Pao Norte', 'Pao Sur', 'Pacpaco', 'Pian', 'Poro', 'Puspus', 'San Agustin', 'San Francisco', 'Sagayad', 'Santiago Norte', 'Santiago Sur', 'San Vicente', 'Saoay', 'Siboan-Otong', 'Tanquigan', 'Tanqui', 'Sevilla'], 2),
-    3: createBarangayList(['Acao', 'Bagbag', 'Ballay', 'Baccuit Norte', 'Baccuit Sur', 'Boy-utan', 'Bucayab', 'Cabalayangan', 'Cabisilan', 'Casilagan', 'Central East (Poblacion)', 'Central West (Poblacion)', 'Dili', 'Disso-or', 'Guerrero', 'Jimenez', 'Jimenez West', 'Lower San Agustin', 'Nagrebcan', 'Pagdalagan Sur', 'Paliguasan', 'Palingulang', 'Parian Este', 'Parian Oeste', 'Paringao', 'Payocpoc Norte Este', 'Payocpoc Norte Oeste', 'Payocpoc Sur', 'Pilar', 'Pottot', 'Pudoc', 'Pugo', 'Quinavite', 'Santa Monica', 'Santiago', 'Taberna', 'Upper San Agustin', 'Urayong'], 3),
-    4: createBarangayList(['Ambitacay', 'Balawarte', 'Capas', 'Consolacion (Poblacion)', 'San Agustin East', 'San Agustin Norte', 'San Agustin Sur', 'San Antonino', 'San Antonio', 'San Francisco', 'San Isidro', 'San Java Norte', 'San Juan', 'San Jose Norte', 'San Jose Sur', 'San Julian Central', 'San Julian East', 'San Julian Norte', 'San Julian West', 'San Manuel Norte', 'San Manuel Sur', 'San Marcos', 'San Miguel', 'San Nicolas Central (Poblacion)', 'San Nicolas East', 'San Nicolas Norte (Poblacion)', 'San Nicolas Sur (Poblacion)', 'San Nicolas West', 'San Pedro', 'San Roque East', 'San Roque West', 'San Vicente Norte', 'San Vicente Sur', 'Santa Ana', 'Santa Barbara (Poblacion)', 'Santa Fe', 'Santa Maria', 'Santa Monica', 'Santa Rita (Nalinac)', 'Santa Rita East', 'Santa Rita Norte', 'Santa Rita Sur', 'Santa Rita West', 'Nazareno', 'Macalva Central', 'Macalva Norte', 'Macalva Sur', 'Purok'], 4),
-    5: createBarangayList(['Alcala (Poblacion)', 'Ayaoan', 'Barangobong', 'Barrientos', 'Bungro', 'Buselbusel', 'Cabalitocan', 'Cantoria No. 1', 'Cantoria No. 2', 'Cantoria No. 3', 'Cantoria No. 4', 'Carisquis', 'Darigayos', 'Magallanes (Poblacion)', 'Magsiping', 'Mamay', 'Nalvo Norte', 'Nalvo Sur', 'Nagrebcan', 'Napaset', 'Oaqui No. 1', 'Oaqui No. 2', 'Oaqui No. 3', 'Oaqui No. 4', 'Pila', 'Pitpitac', 'Rimos No. 1', 'Rimos No. 2', 'Rimos No. 3', 'Rimos No. 4', 'Rimos No. 5', 'Rissing', 'Salcedo (Poblacion)', 'Santo Domingo Norte', 'Santo Domingo Sur', 'Sucoc Norte', 'Sucoc Sur', 'Suyo', 'Tallaoen', 'Victoria (Poblacion)'], 5),
-    6: createBarangayList(['Amontoc', 'Apayao', 'Bayabas', 'Balbalayang', 'Bucao', 'Bumbuneg', 'Daking', 'Lacong', 'Lipay Este', 'Lipay Norte', 'Lipay Proper', 'Lipay Sur', 'Lon-oy', 'Poblacion', 'Polipol'], 6),
-    7: createBarangayList(['Almeida', 'Antonino', 'Apatut', 'Ar-arampang', 'Baracbac Este', 'Baracbac Oeste', 'Bet-ang', 'Bulbulala', 'Bungol', 'Butubut Este', 'Butubut Norte', 'Butubut Oeste', 'Butubut Sur', 'Cabuaan Oeste (Poblacion)', 'Calliat', 'Camiling', 'Calumbaya', 'Calungbuyan', 'Dr. Camilo Osias Poblacion (Cabuaan Este)', 'Guinaburan', 'Nagsabaran Norte', 'Nagsabaran Sur', 'Nalasin', 'Napaset', 'Pagbennecan', 'Pagleddegan', 'Paraoir', 'Patpata', 'Sablut', 'San Pablo', 'Sinapangan Norte', 'Sinapangan Sur', 'Tallipugo'], 7),
-    8: createBarangayList(['Alaska', 'Basca', 'Dulao', 'Gallano', 'Macabato', 'Manga', 'Pangao-aoan East', 'Pangao-aoan West', 'Poblacion', 'Samara', 'San Antonio', 'San Benito Norte', 'San Benito Sur', 'San Eugenio', 'San Juan East', 'San Juan West', 'San Simon East', 'San Simon West', 'Santa Cecilia', 'Santa Lucia', 'Santo Rosario East', 'Santo Rosario West', 'Santa Rita East', 'Santa Rita West'], 8),
-    9: createBarangayList(['Alipang', 'Amlang', 'Ambangonan', 'Bacani', 'Bangar', 'Bani', 'Benteng-Sapilang', 'Camp One', 'Carunuan East', 'Carunuan West', 'Casilagan', 'Cataguingtingan', 'Concepcion', 'Damortis', 'Gumot-Nagcolaran', 'Inabaan Norte', 'Inabaan Sur', 'Marcos', 'Nagtagaan', 'Nancamotian', 'Parasapas', 'Poblacion East', 'Poblacion West', 'San Jose', 'Subusub', 'Tabtabungao', 'Tay-ac', 'Tanglag', 'Udiao', 'Vila'], 9),
-    10: createBarangayList(['Agtipal', 'Arosip', 'Bacqui', 'Bacsil', 'Bagutot', 'Ballogo', 'Baroro', 'Bitalag', 'Burayoc', 'Bussaoit', 'Cabaroan', 'Cabarsican', 'Cabugao', 'Calautit', 'Carcarmay', 'Casiaman', 'Santa Cruz', 'Galongen', 'Guinabang', 'Legleg', 'Lisqueb', 'Mabanengbeng 1st', 'Mabanengbeng 2nd', 'Maragayap', 'Nagatiran', 'Nangalisan', 'Narra', 'Nagsaraboan', 'Nagsimbaanan', 'Oya-oy', 'Paagan', 'Pagan', 'Pandan', 'Pang-Pang', 'Poblacion', 'Quirino', 'Raois', 'Sagapan', 'Salincob', 'San Martin', 'Santa Rita', 'Sapilang', 'Sayoan', 'Sipulo', 'Ubbog', 'Zaragosa'], 10),
-    11: createBarangayList(['Al-alinao Norte', 'Al-alinao Sur', 'Aguioas', 'Ambaracao Norte', 'Ambaracao Sur', 'Angin', 'Baraoas Norte', 'Baraoas Sur', 'Bariquir', 'Bato', 'Balecbec', 'Bancagan', 'Bimmotobot', 'Dal-lipaoen', 'Daramuangan', 'Guesset', 'Gusing Norte', 'Gusing Sur', 'Imelda', 'Lioac Norte', 'Lioac Sur', 'Magungunay', 'Mamat-ing Norte', 'Mamat-ing Sur', 'Natividad (Poblacion)', 'Ortiz (Poblacion)', 'Ribsuan', 'San Antonio', 'San Isidro', 'Sili', 'Suguidan Norte', 'Suguidan Sur', 'Teddingan'], 11),
-    12: createBarangayList(['Amallapay', 'Anduyan', 'Caoigue', 'Francia Sur', 'Francia West', 'Garcia', 'Gonzales', 'Halog East', 'Halog West', 'Leones East', 'Leones West', 'Linapew', 'Lloren', 'Magsaysay', 'Pideg', 'Poblacion', 'Rizal', 'Santa Teresa'], 12),
-    13: createBarangayList(['Ambalite', 'Ambangonan', 'Cares', 'Cuenca', 'Duplas', 'Maoasoas Norte', 'Maoasoas Sur', 'Palina', 'Poblacion East', 'Poblacion West', 'Saytan', 'San Luis', 'Tavora East', 'Tavora Proper'], 13),
-    14: createBarangayList(['Bautista', 'Gana', 'Juan Cartas', 'Las-ud', 'Liquicia', 'Poblacion Norte', 'Poblacion Sur', 'San Carlos', 'San Cornelio', 'San Fermin', 'San Gregorio', 'San Jose', 'Santiago Norte', 'Santiago Sur', 'Sobredillo', 'Urayong', 'Wenceslao'], 14),
-    15: createBarangayList(['Ambitacay', 'Bail', 'Balaoc', 'Balsaan', 'Baybay', 'Cabaruan', 'Casilagan', 'Casantaan', 'Cupang', 'Damortis', 'Fernando', 'Linong', 'Lomboy', 'Malabago', 'Namboongan', 'Namonitan', 'Narvacan', 'Patac', 'Poblacion', 'Pongpong', 'Raois', 'Tococ', 'Tubod', 'Ubagan'], 15),
-    16: createBarangayList(['Agdeppa', 'Alzate', 'Bangaoilan East', 'Bangaoilan West', 'Barraca', 'Central East No. 1 (Poblacion)', 'Central East No. 2 (Poblacion)', 'Central West No. 1 (Poblacion)', 'Central West No. 2 (Poblacion)', 'Central West No. 3 (Poblacion)', 'Consuegra', 'General Prim East', 'General Prim West', 'General Terrero', 'Luzong Norte', 'Luzong Sur', 'Maria Cristina East', 'Maria Cristina West', 'Mindoro', 'Nagsabaran', 'Nagsidorisan', 'Quintarong', 'Reyna Regente', 'Rissing', 'San Blas', 'San Cristobal', 'Sinapangan Norte', 'Sinapangan Sur', 'Ubbog'], 16),
-    17: createBarangayList(['Agpay', 'Bilis', 'Caoayan', 'Dalacdac', 'Delles', 'Imelda', 'Libtong', 'Linuan', 'Lower Tumapoc', 'New Poblacion', 'Old Poblacion', 'Upper Tumapoc'], 17),
-    18: createBarangayList(['Alibangsay', 'Baay', 'Cambaly', 'Cardiz', 'Dagup', 'Libbo', 'Suyo (Poblacion)', 'Tagudtud', 'Tio-angan', 'Wallayan'], 18),
-    19: createBarangayList(['Corrooy', 'Lettac Norte', 'Lettac Sur', 'Mangaan', 'Paagan', 'Poblacion', 'Puguil', 'Ramot', 'Sasaba', 'Sapdaan', 'Tubaday'], 19),
-    20: createBarangayList(['Bigbiga', 'Bulalaan', 'Castro', 'Duplas', 'Ipet', 'Ilocano', 'Maliclico', 'Namaltugan', 'Old Central', 'Poblacion', 'Porporiket', 'San Francisco Norte', 'San Francisco Sur', 'San Jose', 'Sengngat', 'Turod', 'Up-uplas'], 20)
-};
 
 window.onMunicipalityChange = function (muniId) {
     const select = document.getElementById('spotBarangay');
     if (!select) return;
     select.innerHTML = '<option value="">— Select Barangay —</option>';
-    const barangays = barangaysByMunicipality[parseInt(muniId)] || [];
+    const barangays = getBarangaysForMuniIdOrName(muniId);
     barangays.forEach(b => {
         const opt = document.createElement('option');
         opt.value = b.name;
@@ -1714,11 +1766,12 @@ window.onBarangayChange = async function (barangayName) {
             modalMarker.setLatLng([found.lat, found.lng]);
             modalMap.setView([found.lat, found.lng], 16);
         } else {
+            let tryCount1 = 0;
             const tryPlaceMarker = () => {
                 if (typeof placeOrMoveDraggableMarker === 'function' && modalMap) {
                     placeOrMoveDraggableMarker(found.lat, found.lng);
                     modalMap.setView([found.lat, found.lng], 16);
-                } else {
+                } else if (++tryCount1 < 20) {
                     setTimeout(tryPlaceMarker, 100);
                 }
             };
@@ -1736,11 +1789,12 @@ window.onBarangayChange = async function (barangayName) {
                 modalMarker.setLatLng([lat, lng]);
                 modalMap.setView([lat, lng], 14);
             } else {
+                let tryCount2 = 0;
                 const tryPlaceMarker = () => {
                     if (typeof placeOrMoveDraggableMarker === 'function' && modalMap) {
                         placeOrMoveDraggableMarker(lat, lng);
                         modalMap.setView([lat, lng], 14);
-                    } else {
+                    } else if (++tryCount2 < 20) {
                         setTimeout(tryPlaceMarker, 100);
                     }
                 };
@@ -1916,9 +1970,14 @@ function formatFeesShort(spot) {
 // FORM OPERATIONS - CREATE/EDIT/SAVE
 // ════════════════════════════════════════════════════════════════════════════════
 
+function isMunicipalUser() {
+    const role = (window.userRole || document.body?.dataset?.role || document.querySelector('meta[name="user-role"]')?.content || '').toLowerCase();
+    return role === 'municipal' || role.endsWith('_mto');
+}
+
 function buildCurrentFormDraftPayload() {
     const spotName = document.getElementById('spotName')?.value || '';
-    const spotCategory = document.getElementById('spotCategory')?.value || '';
+    const spotCategory = getSelectedCategoriesString();
     const spotClassification = document.getElementById('spotClassification')?.value || 'EXISTING';
     const spotFee = parseFloat(document.getElementById('spotFee')?.value) || 0;
     const environmentalFee = parseFloat(document.getElementById('environmentalFee')?.value) || 0;
@@ -1927,7 +1986,10 @@ function buildCurrentFormDraftPayload() {
     const lng = parseFloat(document.getElementById('spotLongitude')?.value) || null;
     const barangay = document.getElementById('spotBarangay')?.value || null;
     const description = document.getElementById('spotDescription')?.value || '';
-    const municipalityId = parseInt(document.getElementById('spotMunicipality')?.value) || null;
+    let municipalityId = parseInt(document.getElementById('spotMunicipality')?.value) || null;
+    if (isMunicipalUser() && window.userMunicipalityId) {
+        municipalityId = parseInt(window.userMunicipalityId);
+    }
     const openingTime = document.getElementById('spotOpeningTime')?.value || null;
     const closingTime = document.getElementById('spotClosingTime')?.value || null;
     const isMaintenance = document.getElementById('spotIsMaintenance')?.checked ? 1 : 0;
@@ -2000,9 +2062,11 @@ function restoreDraftData(draft) {
         document.getElementById('descCharCount').textContent = draft.description.length;
     }
 
-    if (draft.municipality_id) {
-        document.getElementById('spotMunicipality').value = draft.municipality_id;
-        onMunicipalityChange(draft.municipality_id);
+    const activeMuniId = isMunicipalUser() && window.userMunicipalityId ? window.userMunicipalityId : draft.municipality_id;
+    if (activeMuniId) {
+        const muniSelect = document.getElementById('spotMunicipality');
+        if (muniSelect) muniSelect.value = activeMuniId;
+        onMunicipalityChange(activeMuniId);
         if (draft.barangay) {
             setTimeout(() => {
                 const bSel = document.getElementById('spotBarangay');
@@ -2060,8 +2124,27 @@ function initBlankCreateForm() {
     document.getElementById('spotLongitude').value = '';
     document.getElementById('spotDescription').value = '';
     document.getElementById('descCharCount').textContent = '0';
-    document.getElementById('spotMunicipality').value = '';
-    document.getElementById('spotBarangay').innerHTML = '<option value="">— Select Barangay —</option>';
+
+    const muniGroup = document.getElementById('municipalityFieldGroup');
+    const muniSelect = document.getElementById('spotMunicipality');
+
+    if (isMunicipalUser()) {
+        if (muniGroup) muniGroup.style.display = 'none';
+        if (muniSelect) {
+            muniSelect.removeAttribute('required');
+            const assignedMuniId = window.userMunicipalityId || 1;
+            muniSelect.value = assignedMuniId;
+            onMunicipalityChange(assignedMuniId);
+        }
+    } else {
+        if (muniGroup) muniGroup.style.display = 'block';
+        if (muniSelect) {
+            muniSelect.setAttribute('required', 'required');
+            muniSelect.value = '';
+        }
+        document.getElementById('spotBarangay').innerHTML = '<option value="">— Select Barangay —</option>';
+    }
+
     document.getElementById('spotOpeningTime').value = '08:00';
     document.getElementById('spotClosingTime').value = '17:00';
     document.getElementById('spotIsMaintenance').checked = false;
@@ -2177,8 +2260,22 @@ window.editSpot = async function (spotId) {
         document.getElementById('spotDescription').value = spot.description || '';
         document.getElementById('descCharCount').textContent = (spot.description || '').length;
 
-        document.getElementById('spotMunicipality').value = spot.municipality_id;
-        onMunicipalityChange(spot.municipality_id);
+        const muniGroup = document.getElementById('municipalityFieldGroup');
+        const muniSelect = document.getElementById('spotMunicipality');
+        if (isMunicipalUser()) {
+            if (muniGroup) muniGroup.style.display = 'none';
+            if (muniSelect) {
+                muniSelect.removeAttribute('required');
+                if (window.userMunicipalityId) muniSelect.value = window.userMunicipalityId;
+            }
+        } else {
+            if (muniGroup) muniGroup.style.display = 'block';
+            if (muniSelect) {
+                muniSelect.setAttribute('required', 'required');
+                muniSelect.value = spot.municipality_id;
+            }
+        }
+        onMunicipalityChange(muniSelect?.value || spot.municipality_id);
         if (spot.barangay) {
             setTimeout(() => {
                 document.getElementById('spotBarangay').value = spot.barangay;
@@ -2206,11 +2303,18 @@ window.editSpot = async function (spotId) {
 // ── Initialize Modal Map
 function initModalMap() {
     if (!document.getElementById('modalMap')) return;
+    patchLeafletDomUtil();
 
     if (modalMap) {
-        modalMap.remove();
+        if (modalMarker) {
+            try { modalMarker.dragging?.disable(); } catch (e) {}
+            try { modalMarker.off(); } catch (e) {}
+            try { modalMap.removeLayer(modalMarker); } catch (e) {}
+            modalMarker = null;
+        }
+        try { modalMap.off(); } catch (e) {}
+        try { modalMap.remove(); } catch (e) {}
         modalMap = null;
-        modalMarker = null;
     }
 
     modalMap = L.map('modalMap', { minZoom: 10, maxZoom: 18 });
@@ -2382,10 +2486,18 @@ function forceCloseFormModal() {
     if (spotIdEl) spotIdEl.value = '';
     const spotNameEl = document.getElementById('spotName');
     if (spotNameEl) spotNameEl.value = '';
-    if (modalMap) {
-        modalMap.remove();
-        modalMap = null;
+    if (modalMarker) {
+        try { modalMarker.dragging?.disable(); } catch (e) {}
+        try { modalMarker.off(); } catch (e) {}
+        if (modalMap) {
+            try { modalMap.removeLayer(modalMarker); } catch (e) {}
+        }
         modalMarker = null;
+    }
+    if (modalMap) {
+        try { modalMap.off(); } catch (e) {}
+        try { modalMap.remove(); } catch (e) {}
+        modalMap = null;
     }
 }
 
@@ -2509,7 +2621,9 @@ window.submitSpotForm = async function (e) {
         longitude: parseFloat(document.getElementById('spotLongitude').value) || null,
         barangay: document.getElementById('spotBarangay').value || null,
         description: document.getElementById('spotDescription').value,
-        municipality_id: parseInt(document.getElementById('spotMunicipality').value),
+        municipality_id: (isMunicipalUser() && window.userMunicipalityId)
+            ? parseInt(window.userMunicipalityId)
+            : parseInt(document.getElementById('spotMunicipality').value),
         images: cleanImages,
         opening_time: document.getElementById('spotOpeningTime').value || null,
         closing_time: document.getElementById('spotClosingTime').value || null,

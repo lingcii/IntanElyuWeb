@@ -256,7 +256,7 @@
                         resolve(runNext());
                         return;
                     }
-                    
+
                     const existing = document.querySelector(`script[src="${src}"]`);
                     if (existing) {
                         if (existing.getAttribute('data-loaded') === 'true') {
@@ -688,12 +688,20 @@
         requestAnimationFrame(update);
     };
 
+    function getRoleFromContext() {
+        const rawRole = (window.userRole || document.body?.dataset?.role || document.querySelector('meta[name="user-role"]')?.content || '').toLowerCase();
+        const path = window.location.pathname;
+        if (rawRole === 'picto' || rawRole === 'pitco' || path.includes('/PICTO/')) return 'picto';
+        if (rawRole === 'lupto' || path.includes('/LUPTO/')) return 'lupto';
+        if (rawRole === 'municipal' || rawRole.endsWith('_mto') || path.includes('/MUNICIPAL/')) return 'municipal';
+        return rawRole || 'municipal';
+    }
+
     // ── Global Real-Time Refresh Notifier ───────────────────────────────────────
     window.notifyTouristSpotChanged = function () {
         void 0;
 
-        const path = window.location.pathname;
-        const currentRole = path.includes('/PICTO/') ? 'picto' : path.includes('/LUPTO/') ? 'lupto' : 'municipal';
+        const currentRole = getRoleFromContext();
         const STORAGE_PREFIX = `spa_state_${currentRole}_`;
         Object.keys(sessionStorage).forEach(key => {
             if (key.startsWith(STORAGE_PREFIX + 'html_')) {
@@ -702,7 +710,11 @@
         });
 
         const baseUrl = window.API_CONFIG?.BASE_URL || (`http://${window.location.hostname || '127.0.0.1'}:8000`);
-        const spotsUrl = currentRole === 'municipal' ? `${baseUrl}/api/municipal/tourist-spots` : `${baseUrl}/api/tourist-spots`;
+        const spotsUrl = currentRole === 'municipal'
+            ? `${baseUrl}/api/municipal/tourist-spots`
+            : currentRole === 'picto'
+                ? `${baseUrl}/api/pitco/tourist-spots`
+                : `${baseUrl}/api/lupto/tourist-spots`;
 
         if (window.API_CONFIG && typeof window.API_CONFIG.get === 'function') {
             return Promise.all([
@@ -766,11 +778,10 @@
     window.refreshActiveTab = refreshActiveTab;
     window.switchTab = switchTab;
 
-    window.notifyFareDataChanged = function() {
+    window.notifyFareDataChanged = function () {
         void 0;
 
-        const path = window.location.pathname;
-        const currentRole = path.includes('/PICTO/') ? 'picto' : path.includes('/LUPTO/') ? 'lupto' : 'municipal';
+        const currentRole = getRoleFromContext();
         const STORAGE_PREFIX = `spa_state_${currentRole}_`;
         Object.keys(sessionStorage).forEach(key => {
             if (key.startsWith(STORAGE_PREFIX + 'html_')) {
@@ -791,11 +802,10 @@
         }
     };
 
-    window.notifyUserChanged = function() {
+    window.notifyUserChanged = function () {
         void 0;
 
-        const path = window.location.pathname;
-        const currentRole = path.includes('/PICTO/') ? 'picto' : path.includes('/LUPTO/') ? 'lupto' : 'municipal';
+        const currentRole = getRoleFromContext();
         const STORAGE_PREFIX = `spa_state_${currentRole}_`;
         Object.keys(sessionStorage).forEach(key => {
             if (key.startsWith(STORAGE_PREFIX + 'html_')) {
