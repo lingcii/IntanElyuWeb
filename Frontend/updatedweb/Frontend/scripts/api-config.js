@@ -26,7 +26,7 @@ const LOCAL_BASE_URL =
     `${window.location.protocol}//${window.location.hostname}:8000`;
 
 const RAILWAY_BASE_URL =
-    'https://intanelyu-production.up.railway.app';
+    'https://intanelyuweb-production.up.railway.app';
 
 const baseUrl = USE_RAILWAY
     ? RAILWAY_BASE_URL
