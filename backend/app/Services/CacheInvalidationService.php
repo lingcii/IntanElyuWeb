@@ -61,21 +61,35 @@ class CacheInvalidationService
         }
 
         $keys = [
+            'analytics:summary-v9',
             'analytics:summary-v8',
+            'analytics:top-municipalities-v5',
             'analytics:top-municipalities',
+            'analytics:top-spots-v5',
             'analytics:top-spots',
+            'analytics:chart-data-v5',
+            'analytics:monthly-trend-v5',
             'analytics:monthly-trend',
+            'analytics:filter-options-v5',
             'analytics:filter-options',
+            'analytics:dashboard-v3',
             'analytics:full',
         ];
+
+        $years = [now()->year, now()->year - 1];
 
         foreach ($keys as $key) {
             foreach ($roles as $role) {
                 foreach ($muniIds as $id) {
                     Cache::forget("{$key}:{$role}:{$id}");
+                    foreach ($years as $yr) {
+                        Cache::forget("{$key}:{$yr}:{$id}:{$role}:{$id}");
+                        Cache::forget("{$key}:{$yr}:{$id}");
+                    }
                 }
             }
         }
+        Cache::flush();
     }
 
     /**

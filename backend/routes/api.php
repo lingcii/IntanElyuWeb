@@ -10,6 +10,7 @@ use App\Http\Controllers\MunicipalityController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\Picto\ArchiveManagementController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\ProofValidationController;
 use App\Http\Controllers\ReportGeneratorController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\TouristSpotController;
@@ -40,6 +41,7 @@ Route::prefix('auth')->group(function () {
 Route::get('/images/tourist-spots/{filename}', [TouristSpotController::class, 'serveImage']);
 Route::get('/serve-image',                      [TouristSpotController::class, 'serveImageProxy']);
 Route::get('/serve-image.php',                  [TouristSpotController::class, 'serveImageProxy']);
+Route::get('/images/proofs/{filename}',         [ProofValidationController::class, 'serveImage']);
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Authenticated routes
@@ -184,6 +186,13 @@ Route::middleware('auth.session')->group(function () {
             Route::get('/table',             [FeedbackManagementController::class, 'table']);
             Route::get('/spot-details/{id}', [FeedbackManagementController::class, 'spotDetails']);
         });
+
+        // Proof Images Validation (read-only for PICTO)
+        Route::prefix('proof-validation')->group(function () {
+            Route::get('/stats',  [ProofValidationController::class, 'stats']);
+            Route::get('/',       [ProofValidationController::class, 'index']);
+            Route::get('/{id}',   [ProofValidationController::class, 'show']);
+        });
     });
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -290,6 +299,13 @@ Route::middleware('auth.session')->group(function () {
             Route::get('/table',             [FeedbackManagementController::class, 'table']);
             Route::get('/spot-details/{id}', [FeedbackManagementController::class, 'spotDetails']);
         });
+
+        // Proof Images Validation (read-only for LUPTO)
+        Route::prefix('proof-validation')->group(function () {
+            Route::get('/stats',  [ProofValidationController::class, 'stats']);
+            Route::get('/',       [ProofValidationController::class, 'index']);
+            Route::get('/{id}',   [ProofValidationController::class, 'show']);
+        });
     });
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -385,6 +401,15 @@ Route::middleware('auth.session')->group(function () {
             Route::get('/gallery',           [FeedbackManagementController::class, 'gallery']);
             Route::get('/table',             [FeedbackManagementController::class, 'table']);
             Route::get('/spot-details/{id}', [FeedbackManagementController::class, 'spotDetails']);
+        });
+
+        // Proof Images Validation — MTO has full access (municipality-scoped)
+        Route::prefix('proof-validation')->group(function () {
+            Route::get('/stats',               [ProofValidationController::class, 'stats']);
+            Route::get('/',                    [ProofValidationController::class, 'index']);
+            Route::get('/{id}',                [ProofValidationController::class, 'show']);
+            Route::post('/{id}/approve',       [ProofValidationController::class, 'approve']);
+            Route::post('/{id}/reject',        [ProofValidationController::class, 'reject']);
         });
     });
 

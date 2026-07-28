@@ -284,6 +284,18 @@ window.closeFirstTimeSuccessModal = function() {
     }).catch(err => console.error(err));
 };
 
+window.closePasswordSuccessModal = function() {
+    const modal = document.getElementById('firstTimeSuccessModal');
+    if (modal) modal.style.display = 'none';
+    window.MUST_CHANGE_PASSWORD = false;
+    const syncUrl = new URL('../../sync-session.php', window.location.href).href;
+    fetch(syncUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clear_must_change_password: true })
+    }).catch(err => console.error(err));
+};
+
 window.focusSecuritySettings = function() {
     const modal = document.getElementById('globalFirstTimeLoginModal');
     if (modal) modal.style.display = 'none';
@@ -328,27 +340,32 @@ window.confirmUpdateSecuritySettings = async function() {
     if (updateBtn) {
         updateBtn.disabled = true;
         updateBtn.style.background = 'linear-gradient(135deg,#15803d 0%,#22c55e 100%)';
-        updateBtn.innerHTML = '<i class="fas fa-check"></i> Saving...';
+        updateBtn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Saving...';
     }
-    document.getElementById('currentPassword').value = '';
-    document.getElementById('newPassword').value = '';
-    document.getElementById('confirmPassword').value = '';
 
+    // Ensure error toast exists
     var toast = document.getElementById('luptoSaveToast');
     if (!toast) {
         toast = document.createElement('div');
         toast.id = 'luptoSaveToast';
-        toast.style.cssText = 'position:fixed;bottom:28px;right:28px;background:#15803d;color:#fff;padding:12px 22px;border-radius:10px;font-size:14px;font-weight:600;box-shadow:0 6px 20px rgba(0,0,0,.2);z-index:99999;display:flex;align-items:center;gap:10px;opacity:0;transition:opacity .3s';
-        toast.innerHTML = '<i class="fas fa-check-circle"></i> Password updated successfully!';
+        toast.style.cssText = 'position:fixed;bottom:28px;right:28px;padding:12px 22px;border-radius:10px;font-size:14px;font-weight:600;box-shadow:0 6px 20px rgba(0,0,0,.2);z-index:99999;display:flex;align-items:center;gap:10px;opacity:0;transition:opacity .3s;color:#fff;';
         document.body.appendChild(toast);
     }
-    toast.style.opacity = '1';
 
     try {
+        // Local helper — getRolePrefix() from the backup IIFE is not in scope here
+        function getLocalRolePrefix() {
+            const role = (window.userRole || document.body?.dataset?.role || document.querySelector('meta[name="user-role"]')?.content || '').toLowerCase();
+            const path = (window.location.pathname || '').toUpperCase();
+            if (role === 'picto' || role === 'pitco' || path.includes('PICTO')) return 'pitco';
+            if (role === 'municipal' || role.endsWith('_mto') || path.includes('MUNICIPAL')) return 'municipal';
+            return 'lupto';
+        }
+
         const controller = new AbortController();
         const timeoutId  = setTimeout(() => controller.abort(), 8000);
         const baseUrl = window.API_CONFIG?.BASE_URL || ('http://' + (window.location.hostname || '127.0.0.1') + ':8000');
-        const resp = await fetch(baseUrl + '/api/lupto/settings/password', {
+        const resp = await fetch(baseUrl + '/api/' + getLocalRolePrefix() + '/settings/password', {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
             credentials: 'include',
@@ -361,24 +378,38 @@ window.confirmUpdateSecuritySettings = async function() {
         });
         clearTimeout(timeoutId);
         const data = await resp.json();
+
         if (!resp.ok || data.error) {
+            // Show error toast
             toast.style.background = '#dc2626';
             toast.innerHTML = '<i class="fas fa-exclamation-circle"></i> ' + (data.error || data.message || 'Failed to update password.');
+            toast.style.opacity = '1';
+            setTimeout(() => { toast.style.opacity = '0'; }, 4000);
             if (updateBtn) { updateBtn.disabled = false; updateBtn.style.background = ''; updateBtn.innerHTML = originalText; }
-        } else if (data.first_time_reset || window.MUST_CHANGE_PASSWORD) {
-            const successModal = document.getElementById('firstTimeSuccessModal');
-            if (successModal) { successModal.style.display = 'flex'; }
-            else { window.location.href = '../../logout.php'; }
         } else {
+            // SUCCESS — always show the modal (whether first-time or regular change)
+            document.getElementById('currentPassword').value = '';
+            document.getElementById('newPassword').value = '';
+            document.getElementById('confirmPassword').value = '';
             if (updateBtn) { updateBtn.disabled = false; updateBtn.style.background = ''; updateBtn.innerHTML = originalText; }
+            const successModal = document.getElementById('firstTimeSuccessModal');
+            if (successModal) {
+                successModal.style.display = 'flex';
+            } else {
+                // Fallback if modal not found
+                toast.style.background = '#16a34a';
+                toast.innerHTML = '<i class="fas fa-check-circle"></i> Password updated successfully!';
+                toast.style.opacity = '1';
+                setTimeout(() => { toast.style.opacity = '0'; }, 4000);
+            }
         }
     } catch (err) {
         if (err.name !== 'AbortError') {
             toast.style.background = '#dc2626';
             toast.innerHTML = '<i class="fas fa-exclamation-circle"></i> ' + err.message;
+            toast.style.opacity = '1';
+            setTimeout(() => { toast.style.opacity = '0'; }, 4000);
         }
         if (updateBtn) { updateBtn.disabled = false; updateBtn.style.background = ''; updateBtn.innerHTML = originalText; }
-    } finally {
-        setTimeout(() => { toast.style.opacity = '0'; }, 3500);
     }
 };

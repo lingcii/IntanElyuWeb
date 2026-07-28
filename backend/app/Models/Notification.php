@@ -73,6 +73,8 @@ class Notification extends Model
             'municipality_assigned'  => 'fa-building',
             'municipality_updated'   => 'fa-city',
             'system_settings'        => 'fa-cog',
+            'proof_image_approved'   => 'fa-check-circle',
+            'proof_image_rejected'   => 'fa-times-circle',
         ];
     }
 
@@ -109,6 +111,8 @@ class Notification extends Model
             'municipality_assigned'  => 'purple',
             'municipality_updated'   => 'purple',
             'system_settings'        => 'purple',
+            'proof_image_approved'   => 'green',
+            'proof_image_rejected'   => 'red',
         ];
     }
 

@@ -101,23 +101,60 @@ const baseUrl = USE_RAILWAY
         PROFILE: `${baseUrl}/api/profile`,
 
         /**
-         * Converts relative proxy URLs (e.g. /api/serve-image.php?file=...) into
-         * absolute URLs relative to the frontend domain and path.
+         * Converts relative proxy URLs or missing scheme Railway URLs into absolute URLs.
          */
         normalizeImageUrl(url) {
             if (!url) return '';
-            if (/^https?:\/\//i.test(url)) {
-                return url;
+            let trimmed = String(url).trim();
+            if (/^https?:\/\//i.test(trimmed)) {
+                return trimmed;
             }
-            // Route all serve-image URLs through the Laravel backend (port 8000)
-            // Images are stored in backend/storage/app/public/tourist_spots/
-            if (url.startsWith('/api/serve-image.php')) {
-                return this.BASE_URL + url;
+            if (/^[a-z0-9\.\-]+\.up\.railway\.app/i.test(trimmed) || /^[a-z0-9\.\-]+\.railway\.app/i.test(trimmed)) {
+                return 'https://' + trimmed.replace(/^\/+/, '');
             }
-            if (url.startsWith('api/serve-image.php')) {
-                return this.BASE_URL + '/' + url;
+            if (trimmed.startsWith('/api/serve-image.php') || trimmed.startsWith('api/serve-image.php')) {
+                return this.BASE_URL + '/' + trimmed.replace(/^\/+/, '');
             }
-            return url;
+            if (trimmed.startsWith('storage/') || trimmed.startsWith('/storage/')) {
+                return 'https://intanelyumobile-production.up.railway.app/storage/' + trimmed.replace(/^\/?storage\//, '');
+            }
+            return trimmed;
+        },
+
+        /**
+         * Formats any image or avatar URL (Railway backend, local storage, relative path, or bare filename).
+         */
+        formatImageUrl(url, defaultSubdir = 'proofs') {
+            if (!url) return '';
+            let trimmed = String(url).trim();
+            if (!trimmed) return '';
+
+            if (/^https?:\/\//i.test(trimmed)) {
+                return trimmed;
+            }
+
+            if (/^[a-z0-9\.\-]+\.up\.railway\.app/i.test(trimmed) || /^[a-z0-9\.\-]+\.railway\.app/i.test(trimmed)) {
+                return 'https://' + trimmed.replace(/^\/+/, '');
+            }
+
+            const mobileBackendHost = 'https://intanelyumobile-production.up.railway.app';
+
+            if (trimmed.startsWith('/storage/') || trimmed.startsWith('storage/')) {
+                const clean = trimmed.replace(/^\/?storage\//, '');
+                return `${mobileBackendHost}/storage/${clean}`;
+            }
+
+            if (trimmed.startsWith('/avatars/') || trimmed.startsWith('avatars/')) {
+                const clean = trimmed.replace(/^\/?avatars\//, '');
+                return `${mobileBackendHost}/storage/avatars/${clean}`;
+            }
+
+            if (trimmed.startsWith('/proofs/') || trimmed.startsWith('proofs/')) {
+                const clean = trimmed.replace(/^\/?proofs\//, '');
+                return `${mobileBackendHost}/storage/proofs/${clean}`;
+            }
+
+            return `${mobileBackendHost}/storage/${defaultSubdir}/${trimmed.replace(/^\/+/, '')}`;
         },
 
         /**

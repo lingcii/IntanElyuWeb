@@ -33,6 +33,11 @@ if (str_starts_with($entryFileDir, $frontendRootPath)) {
         })();
     </script>
 
+    <!-- Google Fonts: Outfit + Inter (system design fonts) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap">
+
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
@@ -117,45 +122,45 @@ if (str_starts_with($entryFileDir, $frontendRootPath)) {
 <?php if (!empty($_SESSION['must_change_password'])): ?>
     <!-- First-Time Login Required Modal -->
     <div class="lupto-modal-overlay" id="globalFirstTimeLoginModal" style="display:none; z-index: 99999;">
-        <div class="lupto-modal-content" style="max-width: 420px; text-align: center;">
+        <div class="lupto-modal-content" style="max-width: 420px; text-align: center; font-family: 'Outfit', 'Inter', system-ui, sans-serif;">
             <div class="lupto-modal-header" style="background: #1e3a8a;">
-                <h3 class="lupto-modal-title" style="margin: 0; font-size: 16px; font-weight: 700; color: #fff;"><i class="fas fa-lock"></i> First-Time Login Required</h3>
+                <h3 class="lupto-modal-title" style="margin: 0; font-size: 16px; font-weight: 700; color: #fff; font-family: 'Outfit', 'Inter', system-ui, sans-serif; letter-spacing: 0.3px;"><i class="fas fa-lock"></i> First-Time Login Required</h3>
             </div>
             <div class="lupto-modal-body" style="padding: 24px; background: #fff;">
                 <i class="fas fa-key" style="font-size: 56px; color: #eab308; display: block; margin: 12px auto 20px;"></i>
-                <p style="font-size: 14px; font-weight: 700; color: #1e293b; margin: 0 0 8px;">
+                <p style="font-size: 15px; font-weight: 700; color: #1e293b; margin: 0 0 8px; font-family: 'Outfit', 'Inter', system-ui, sans-serif;">
                     First-Time Login Required
                 </p>
-                <p style="font-size: 13px; color: #64748b; line-height: 1.5; margin: 0;">
+                <p style="font-size: 13px; color: #64748b; line-height: 1.6; margin: 0; font-family: 'Inter', system-ui, sans-serif;">
                     You are currently using the default password assigned to your account.
                     For security reasons, you must change your password before accessing the system.
                 </p>
             </div>
             <div class="lupto-modal-footer" style="justify-content: center; gap: 12px; background: #f8fafc; padding: 16px; display: flex; border-top: 1px solid #e2e8f0;">
-                <button class="btn-gov btn-gov-secondary" style="min-width: 100px;" onclick="window.location.href='<?= $basePath ?>logout.php'">Cancel</button>
-                <button class="btn-gov" style="background: #1e3a8a; border-color: #1e3a8a; min-width: 150px; color: #fff;" onclick="goToSecuritySettings()">Change Password</button>
+                <button class="btn-gov btn-gov-secondary" style="min-width: 100px; font-family: 'Outfit', 'Inter', system-ui, sans-serif;" onclick="window.location.href='<?= $basePath ?>logout.php'">Cancel</button>
+                <button class="btn-gov" style="background: #1e3a8a; border-color: #1e3a8a; min-width: 150px; color: #fff; font-family: 'Outfit', 'Inter', system-ui, sans-serif;" onclick="goToSecuritySettings()">Change Password</button>
             </div>
         </div>
     </div>
 
     <!-- Access Denied Modal -->
     <div class="lupto-modal-overlay" id="globalAccessDeniedModal" style="display:none; z-index: 99999;">
-        <div class="lupto-modal-content" style="max-width: 420px; text-align: center;">
+        <div class="lupto-modal-content" style="max-width: 420px; text-align: center; font-family: 'Outfit', 'Inter', system-ui, sans-serif;">
             <div class="lupto-modal-header" style="background: #dc2626;">
-                <h3 class="lupto-modal-title" style="margin: 0; font-size: 16px; font-weight: 700; color: #fff;"><i class="fas fa-exclamation-triangle"></i> Access Denied</h3>
+                <h3 class="lupto-modal-title" style="margin: 0; font-size: 16px; font-weight: 700; color: #fff; font-family: 'Outfit', 'Inter', system-ui, sans-serif; letter-spacing: 0.3px;"><i class="fas fa-exclamation-triangle"></i> Access Denied</h3>
             </div>
             <div class="lupto-modal-body" style="padding: 24px; background: #fff;">
                 <i class="fas fa-ban" style="font-size: 56px; color: #dc2626; display: block; margin: 12px auto 20px;"></i>
-                <p style="font-size: 14px; font-weight: 700; color: #1e293b; margin: 0 0 8px;">
+                <p style="font-size: 15px; font-weight: 700; color: #1e293b; margin: 0 0 8px; font-family: 'Outfit', 'Inter', system-ui, sans-serif;">
                     Access Denied
                 </p>
-                <p style="font-size: 13px; color: #64748b; line-height: 1.5; margin: 0;">
+                <p style="font-size: 13px; color: #64748b; line-height: 1.6; margin: 0; font-family: 'Inter', system-ui, sans-serif;">
                     Please change your password first before accessing other modules.
                 </p>
             </div>
             <div class="lupto-modal-footer" style="justify-content: center; gap: 12px; background: #f8fafc; padding: 16px; display: flex; border-top: 1px solid #e2e8f0;">
-                <button class="btn-gov btn-gov-secondary" style="min-width: 100px;" onclick="window.location.href='<?= $basePath ?>logout.php'">Logout</button>
-                <button class="btn-gov" style="background: #dc2626; border-color: #dc2626; min-width: 180px; color: #fff;" onclick="goToSecuritySettings()">Go to Security Settings</button>
+                <button class="btn-gov btn-gov-secondary" style="min-width: 100px; font-family: 'Outfit', 'Inter', system-ui, sans-serif;" onclick="window.location.href='<?= $basePath ?>logout.php'">Logout</button>
+                <button class="btn-gov" style="background: #dc2626; border-color: #dc2626; min-width: 180px; color: #fff; font-family: 'Outfit', 'Inter', system-ui, sans-serif;" onclick="goToSecuritySettings()">Go to Security Settings</button>
             </div>
         </div>
     </div>

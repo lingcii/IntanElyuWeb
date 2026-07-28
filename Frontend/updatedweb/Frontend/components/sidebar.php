@@ -10,13 +10,14 @@ $currentDir = basename(dirname($_SERVER['PHP_SELF']));
 function mtoSections() {
     $sections = [
         'MAIN MENU' => [
-            ['href' => 'dashboard.php',       'icon' => 'fa-gauge-high',      'label' => 'Dashboard Overview'],
-            ['href' => 'tourist-spots.php',   'icon' => 'fa-location-dot',    'label' => 'Manage Tourist Sites'],
-            ['href' => 'feedback.php',        'icon' => 'fa-comments',        'label' => 'Feedback'],
-            ['href' => 'report-generator.php','icon' => 'fa-file-lines',      'label' => 'Report Generation'],
+            ['href' => 'dashboard.php',        'icon' => 'fa-gauge-high',      'label' => 'Dashboard Overview'],
+            ['href' => 'tourist-spots.php',    'icon' => 'fa-location-dot',    'label' => 'Manage Tourist Sites'],
+            ['href' => 'feedback.php',         'icon' => 'fa-comments',        'label' => 'Feedback'],
+            ['href' => 'proof-validation.php', 'icon' => 'fa-images',          'label' => 'Proof Validation'],
+            ['href' => 'report-generator.php', 'icon' => 'fa-file-lines',      'label' => 'Report Generation'],
         ],
         'SETTINGS & PRIVACY' => [
-            ['href' => 'settings.php',        'icon' => 'fa-cog',             'label' => 'System Settings'],
+            ['href' => 'settings.php',         'icon' => 'fa-cog',             'label' => 'System Settings'],
         ],
     ];
     $sections['MAIN MENU'][] = ['href' => 'fare-data.php', 'icon' => 'fa-money-bill-trend-up', 'label' => 'Fare Management'];
@@ -45,6 +46,7 @@ $sidebarConfig = [
             'ADMINISTRATION' => [
                 ['href' => 'user-management.php', 'icon' => 'fa-user',                   'label' => 'User Management'],
                 ['href' => 'feedback.php',        'icon' => 'fa-comments',               'label' => 'Feedback'],
+                ['href' => 'proof-validation.php','icon' => 'fa-images',                 'label' => 'Proof Validation'],
                 ['href' => 'report-generator.php','icon' => 'fa-file-lines',              'label' => 'Report Generation'],
                 ['href' => 'activity-logs.php',   'icon' => 'fa-history',                'label' => 'Activity Logs'],
             ],
@@ -70,6 +72,7 @@ $sidebarConfig = [
             'ADMINISTRATION' => [
                 ['href' => 'user-management.php',      'icon' => 'fa-user',                   'label' => 'User Management'],
                 ['href' => 'feedback.php',             'icon' => 'fa-comments',               'label' => 'Feedback'],
+                ['href' => 'proof-validation.php',     'icon' => 'fa-images',                 'label' => 'Proof Validation'],
                 ['href' => 'report-generator.php',     'icon' => 'fa-file-lines',              'label' => 'Report Generation'],
                 ['href' => 'activity-logs.php',        'icon' => 'fa-history',                'label' => 'Activity Logs'],
                 ['href' => 'archive-management.php',   'icon' => 'fa-box-archive',            'label' => 'Archive Management'],

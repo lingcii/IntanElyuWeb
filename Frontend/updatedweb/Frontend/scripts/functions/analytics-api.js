@@ -49,7 +49,8 @@
 
         if (!_forceNextFetches && _apiCache[url]) {
             const cached = _apiCache[url];
-            if (Date.now() - cached.timestamp < 1200000 && cached.data && cached.data.success) { // 20 minutes cache
+            const hasEmptyData = cached.data && cached.data.summary && cached.data.summary.total_visits === 0;
+            if (Date.now() - cached.timestamp < 60000 && cached.data && cached.data.success && !hasEmptyData) { // 1 minute cache
                 return cached.data;
             }
             delete _apiCache[url];
@@ -189,17 +190,32 @@
         const currentMonth = new Date().getMonth() + 1;
 
         const curVisits = Array(12).fill(0);
-        if (year === currentYear) {
-            for (let i = currentMonth; i < 12; i++) curVisits[i] = null;
-        }
         const prevVisits = Array(12).fill(0);
 
-        toArr(data.trend_current).forEach(r => {
-            const idx = r.month - 1;
-            if (year === currentYear && r.month > currentMonth) { curVisits[idx] = null; }
-            else { curVisits[idx] = parseInt(r.visits, 10); }
+        const currentTrend = toArr(data.trend_current || data.current);
+        const previousTrend = toArr(data.trend_previous || data.previous);
+
+        currentTrend.forEach(r => {
+            const idx = parseInt(r.month, 10) - 1;
+            if (idx >= 0 && idx < 12) {
+                curVisits[idx] = parseInt(r.visits || 0, 10);
+            }
         });
-        toArr(data.trend_previous).forEach(r => { prevVisits[r.month - 1] = parseInt(r.visits, 10); });
+
+        previousTrend.forEach(r => {
+            const idx = parseInt(r.month, 10) - 1;
+            if (idx >= 0 && idx < 12) {
+                prevVisits[idx] = parseInt(r.visits || 0, 10);
+            }
+        });
+
+        if (year === currentYear) {
+            for (let i = currentMonth; i < 12; i++) {
+                if (!currentTrend.some(r => parseInt(r.month, 10) === (i + 1))) {
+                    curVisits[i] = null;
+                }
+            }
+        }
 
         _trendCurVisits = curVisits;
         _trendPrevVisits = prevVisits;
@@ -207,7 +223,11 @@
         _trendCurrentYear = currentYear;
         _trendCurrentMonth = currentMonth;
 
-        const activeIdx = (year === currentYear) ? (currentMonth - 2 >= 0 ? currentMonth - 2 : 0) : 11;
+        let activeIdx = 11;
+        if (year === currentYear) {
+            const lastDataIdx = curVisits.reduce((last, v, idx) => (v !== null && v !== undefined ? idx : last), 0);
+            activeIdx = lastDataIdx;
+        }
         setText('kpiMonthlyVisited', fmtNum(curVisits[activeIdx] || 0));
         onMonthFilterChange();
 
@@ -490,18 +510,16 @@
 
         if (selectedMonth === 'all') {
             let total = 0;
-            _trendCurVisits.forEach(v => { if (v !== null) total += v; });
+            _trendCurVisits.forEach(v => { if (v !== null && v !== undefined) total += v; });
             display.textContent = fmtNum(total) + ' visitors';
         } else {
             const monthIdx = parseInt(selectedMonth, 10) - 1;
             const visits = _trendCurVisits[monthIdx];
             const monthName = months[monthIdx];
-            if (visits !== null && visits !== undefined && visits > 0) {
+            if (visits !== null && visits !== undefined) {
                 display.textContent = monthName + ' - ' + fmtNum(visits) + ' visitors';
-            } else if (_trendYear === _trendCurrentYear && monthIdx >= _trendCurrentMonth) {
-                display.textContent = monthName + ' - Not yet available';
             } else {
-                display.textContent = monthName + ' - 0 visitors';
+                display.textContent = monthName + ' - Not yet available';
             }
         }
     }
@@ -814,7 +832,7 @@
         const parent = canvas.parentNode;
         if (!parent) return false;
 
-        const hasData = values && values.length > 0 && values.some(v => v !== null && v > 0);
+        const hasData = values && values.length > 0 && values.some(v => v !== null && v !== undefined);
         let emptyEl = parent.querySelector('.chart-empty-state');
         if (!hasData) {
             if (!emptyEl) {

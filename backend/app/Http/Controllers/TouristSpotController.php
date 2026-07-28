@@ -369,7 +369,13 @@ class TouristSpotController extends Controller
         // Accept both the raw label ('EXISTING') and the mapped stored value ('EXIST')
         $classUpper = strtoupper($data['classification_status']);
         if ($role === 'lupto' && !in_array($classUpper, ['EXISTING', 'EXIST'])) {
-            return response()->json(['error' => 'LUPTO can only create spots with EXISTING classification.'], 422);
+            return response()->json(['error' => 'LUPTO can only create spots with Existing classification.'], 422);
+        }
+
+        // Municipal (MTO) users cannot create spots with EXISTING classification —
+        // new submissions must be Potential or Emerging and go through approval.
+        if (in_array($role, User::$MUNICIPAL_ROLES) && in_array($classUpper, ['EXISTING', 'EXIST'])) {
+            return response()->json(['error' => 'Municipal users can only create spots with Potential or Emerging classification.'], 422);
         }
 
         $mapped = TouristSpot::$STATUS_MAP[strtoupper($data['classification_status'])] ?? null;

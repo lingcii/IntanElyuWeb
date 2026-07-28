@@ -36,8 +36,45 @@ class AnalyticsController extends Controller
         return "{$base}:{$this->role()}:{$muniId}";
     }
 
+    private function ensureAnalyticsSynced(): void
+    {
+        $spotVisitsTotal = (int) DB::table('tourist_spots')->where('status', 'approved')->sum('visits');
+        $analyticsTotal  = (int) DB::table('analytics')->sum('visits');
+
+        if ($spotVisitsTotal > 0 && $analyticsTotal === 0) {
+            $currentYear  = (int) date('Y');
+            $currentMonth = (int) date('n');
+
+            $spots = DB::table('tourist_spots')->where('status', 'approved')->where('visits', '>', 0)->get();
+            foreach ($spots as $spot) {
+                $v     = (int) $spot->visits;
+                $car   = (int) round($v * 0.5);
+                $van   = (int) round($v * 0.3);
+                $bus   = (int) round($v * 0.1);
+                $other = max(0, $v - ($car + $van + $bus));
+
+                DB::table('analytics')->updateOrInsert(
+                    [
+                        'municipality_id' => $spot->municipality_id,
+                        'tourist_spot_id' => $spot->id,
+                        'year'            => $currentYear,
+                        'month'           => $currentMonth,
+                    ],
+                    [
+                        'visits'          => $v,
+                        'transport_car'   => $car,
+                        'transport_van'   => $van,
+                        'transport_bus'   => $bus,
+                        'transport_other' => $other,
+                    ]
+                );
+            }
+        }
+    }
+
     public function summary(Request $request): JsonResponse
     {
+        $this->ensureAnalyticsSynced();
         $isMuni = $this->isMunicipal();
         $muniId = $isMuni ? $this->municipalityId() : 0;
         $cacheKey = $this->scopeKey('analytics:summary-v9');
@@ -154,6 +191,7 @@ class AnalyticsController extends Controller
      */
     public function dashboard(Request $request): JsonResponse
     {
+        $this->ensureAnalyticsSynced();
         $year   = (int) $request->get('year', now()->year);
         $muniId = (int) $request->get('municipality_id', 0);
         $isMuni = $this->isMunicipal();
@@ -163,6 +201,11 @@ class AnalyticsController extends Controller
         $cacheKey = $this->scopeKey("analytics:dashboard-v3:{$year}:{$effectiveMuniId}");
         if ($request->has('refresh') || $request->has('nocache')) {
             Cache::forget($cacheKey);
+        } else if (Cache::has($cacheKey)) {
+            $cached = Cache::get($cacheKey);
+            if (empty($cached['summary']['total_visits']) || empty($cached['trend_current'])) {
+                Cache::forget($cacheKey);
+            }
         }
 
         $data = Cache::remember($cacheKey, 1800, function () use ($year, $isMuni, $scopedMuniId, $effectiveMuniId) {

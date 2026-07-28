@@ -244,20 +244,29 @@ ob_start();
 
     <!-- Password Changed Success Modal -->
     <div class="lupto-modal-overlay" id="firstTimeSuccessModal" style="display:none; z-index: 9999;">
-        <div class="lupto-modal-content" style="max-width: 420px; text-align: center;">
-            <div class="lupto-modal-header" style="background: #16a34a;">
-                <h3 class="lupto-modal-title"><i class="fas fa-check-circle"></i> Password Changed</h3>
+        <div class="lupto-modal-content" style="max-width: 440px; text-align: center;">
+            <div class="lupto-modal-header" style="background: linear-gradient(135deg, #16a34a 0%, #15803d 100%); padding: 20px 24px;">
+                <h3 class="lupto-modal-title" style="font-size: 16px; letter-spacing: 0.3px;">
+                    <i class="fas fa-check-circle"></i> Password Changed Successfully
+                </h3>
             </div>
-            <div class="lupto-modal-body" style="padding: 24px;">
-                <i class="fas fa-check-circle" style="font-size: 56px; color: #16a34a; display: block; margin: 12px auto 20px;"></i>
-                <p style="font-size: 14px; font-weight: 700; color: #1e293b; margin: 0 0 8px;">Password Changed Successfully</p>
-                <p style="font-size: 13px; color: #64748b; line-height: 1.5; margin: 0;">
-                    Your password has been updated successfully. Please log in again using your new password.
+            <div class="lupto-modal-body" style="padding: 32px 28px 24px;">
+                <div style="width: 72px; height: 72px; border-radius: 50%; background: linear-gradient(135deg, #dcfce7, #bbf7d0); display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; box-shadow: 0 4px 16px rgba(22,163,74,0.2);">
+                    <i class="fas fa-lock" style="font-size: 32px; color: #16a34a;"></i>
+                </div>
+                <p style="font-size: 15px; font-weight: 700; color: #1e293b; margin: 0 0 10px;">Your password has been updated!</p>
+                <p style="font-size: 13px; color: #64748b; line-height: 1.6; margin: 0;">
+                    For security, please log in again using your new password.
+                    <br>Would you like to go to the login page now?
                 </p>
             </div>
-            <div class="lupto-modal-footer" style="justify-content: center; gap: 12px; background: #f8fafc; padding: 16px; display: flex; border-top: 1px solid #e2e8f0;">
-                <button class="btn-gov btn-gov-secondary" style="min-width: 100px;" onclick="closeFirstTimeSuccessModal()">Close</button>
-                <button class="btn-gov" style="background: #16a34a; border-color: #16a34a; min-width: 140px; color: #fff;" onclick="window.location.href='../logout.php'">Log In Again</button>
+            <div class="lupto-modal-footer" style="justify-content: center; gap: 12px; background: #f8fafc; padding: 18px 24px; display: flex; border-top: 1px solid #e2e8f0;">
+                <button class="btn-gov btn-gov-secondary" style="min-width: 130px; display:flex; align-items:center; gap:6px; justify-content:center;" onclick="window.closePasswordSuccessModal()">
+                    <i class="fas fa-times"></i> No, Stay Here
+                </button>
+                <button class="btn-gov" style="background: linear-gradient(135deg, #16a34a, #15803d); border-color: #15803d; min-width: 140px; color: #fff; display:flex; align-items:center; gap:6px; justify-content:center;" onclick="window.location.href='../logout.php'">
+                    <i class="fas fa-sign-in-alt"></i> Yes, Login Now
+                </button>
             </div>
         </div>
     </div>

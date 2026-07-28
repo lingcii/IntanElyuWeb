@@ -1977,7 +1977,8 @@ function isMunicipalUser() {
 
 function buildCurrentFormDraftPayload() {
     const spotName = document.getElementById('spotName')?.value || '';
-    const spotCategory = getSelectedCategoriesString();
+    // Read from the hidden input kept in sync by syncCategoryHiddenInput() in tourist-spots-page.js
+    const spotCategory = document.getElementById('spotCategory')?.value || '';
     const spotClassification = document.getElementById('spotClassification')?.value || 'EXISTING';
     const spotFee = parseFloat(document.getElementById('spotFee')?.value) || 0;
     const environmentalFee = parseFloat(document.getElementById('environmentalFee')?.value) || 0;
@@ -2108,8 +2109,22 @@ function initBlankCreateForm() {
 
     const classificationSelect = document.getElementById('spotClassification');
     if (classificationSelect) {
-        classificationSelect.innerHTML = `<option value="">— Select Status —</option><option value="EXISTING">Existing</option>`;
-        classificationSelect.value = 'EXISTING';
+        // On CREATE: LUPTO → only Existing; MTO → only Potential & Emerging
+        if (isMunicipalUser()) {
+            classificationSelect.innerHTML = [
+                '<option value="">— Select Status —</option>',
+                '<option value="POTENTIAL">Potential</option>',
+                '<option value="EMERGING">Emerging</option>'
+            ].join('');
+            classificationSelect.value = 'POTENTIAL';
+        } else {
+            // LUPTO: only Existing allowed on create
+            classificationSelect.innerHTML = [
+                '<option value="">— Select Status —</option>',
+                '<option value="EXISTING">Existing</option>'
+            ].join('');
+            classificationSelect.value = 'EXISTING';
+        }
     }
 
     document.getElementById('spotFee').value = '0';
@@ -2241,15 +2256,13 @@ window.editSpot = async function (spotId) {
         // Convert DB status to form display status
         const formStatus = statusDisplayMap[spot.classification_status] || spot.classification_status;
         const classificationSelect = document.getElementById('spotClassification');
-        const isPictoEdit = window.userRole === 'picto';
-        classificationSelect.innerHTML = `
-            <option value="">— Select Status —</option>
-            <option value="EXISTING">Existing</option>
-            ${isPictoEdit ? `
-            <option value="EMERGING">Emerging</option>
-            <option value="POTENTIAL">Potential</option>
-            ` : ''}
-        `;
+        // On EDIT: all roles can reclassify to any of the 3 options
+        classificationSelect.innerHTML = [
+            '<option value="">— Select Status —</option>',
+            '<option value="EXISTING">Existing</option>',
+            '<option value="EMERGING">Emerging</option>',
+            '<option value="POTENTIAL">Potential</option>'
+        ].join('');
         classificationSelect.value = formStatus;
 
         document.getElementById('spotFee').value = spot.entrance_fee || 0;
@@ -2564,6 +2577,21 @@ window.submitSpotForm = async function (e) {
         showToast('Please select a classification status', 'danger');
         resetSaveBtn();
         return;
+    }
+
+    // Role-based classification restriction on CREATE only
+    const isCreating = !document.getElementById('spotId').value;
+    if (isCreating) {
+        if (isMunicipalUser() && classificationValue === 'EXISTING') {
+            showToast('Municipal users can only create spots with Potential or Emerging classification.', 'danger');
+            resetSaveBtn();
+            return;
+        }
+        if (!isMunicipalUser() && classificationValue !== 'EXISTING') {
+            showToast('LUPTO users can only create spots with Existing classification.', 'danger');
+            resetSaveBtn();
+            return;
+        }
     }
 
     const pointsInput = document.getElementById('spotPoints');
