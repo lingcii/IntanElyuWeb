@@ -651,28 +651,20 @@ async function confirmSaveUser() {
 
         closeFormModal();
         hideModal('umSaveConfirmModal');
-        showToast('success', isEdit ? 'User updated successfully.' : 'User created successfully.');
 
-        if (!isEdit && savedUser && body.email && body.password) {
-            const welcomeUrl = new URL('../../api/send_welcome_email.php', window.location.href).href;
-            fetch(welcomeUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'same-origin',
-                body: JSON.stringify({
-                    email: body.email,
-                    name: body.name,
-                    password: body.password
-                })
-            }).then(r => r.json()).then(d => {
-                if (d.success) {
-                    showToast('info', 'Welcome email sent to ' + body.email);
-                } else {
-                    showToast('warning', 'User created, but welcome email failed: ' + (d.error || d.message || 'Check Railway mail settings.'));
-                }
-            }).catch(() => {
-                showToast('warning', 'User created, but welcome email trigger failed.');
-            });
+        if (!isEdit) {
+            // Laravel backend already sends the welcome email via WelcomeUserMail.
+            // Show appropriate toast based on what the API reported.
+            if (data.email_sent) {
+                showToast('success', 'User created successfully. Welcome email sent to ' + body.email + '.');
+            } else if (data.email_error) {
+                showToast('warning', 'User created, but welcome email could not be sent. Please inform the user manually.');
+                console.warn('[UM] Welcome email error:', data.email_error);
+            } else {
+                showToast('success', 'User created successfully.');
+            }
+        } else {
+            showToast('success', 'User updated successfully.');
         }
 
         if (savedUser) {
