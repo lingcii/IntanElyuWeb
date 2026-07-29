@@ -21,7 +21,9 @@ if (isset($_SESSION['user_id'])) {
     <meta charset="UTF-8">
     <meta name="csrf-token" content="<?= $_SESSION['csrf_token'] ?>">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>INTAN ELYU - Tourist Spots Management System</title>
+    <title>INTAN ELYU</title>
+    <link rel="icon" type="image/png" href="images/LOGO.png">
+    <link rel="shortcut icon" type="image/png" href="images/LOGO.png">
     <!-- Google Fonts: Outfit -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

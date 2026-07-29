@@ -18,7 +18,9 @@ if (str_starts_with($entryFileDir, $frontendRootPath)) {
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?= isset($pageTitle) ? htmlspecialchars($pageTitle) : 'Dashboard' ?></title>
+    <title>INTAN ELYU</title>
+    <link rel="icon" type="image/png" href="<?= $basePath ?>images/LOGO.png">
+    <link rel="shortcut icon" type="image/png" href="<?= $basePath ?>images/LOGO.png">
 
     <!-- Silence non-essential console logs to protect sensitive data -->
     <script>
