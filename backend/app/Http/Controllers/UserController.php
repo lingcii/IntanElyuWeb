@@ -240,7 +240,12 @@ class UserController extends Controller
         $emailSent  = false;
         $emailError = null;
         try {
-            $loginUrl = env('APP_FRONTEND_URL', config('app.url', 'http://localhost:8080'));
+            // Hybrid URL: use Railway frontend URL when deployed, localhost when running locally
+            $appUrl = config('app.url', 'http://localhost');
+            $isRailway = str_contains($appUrl, 'railway.app');
+            $loginUrl = $isRailway
+                ? env('APP_FRONTEND_URL', 'https://intanelyuweb-frontend-production.up.railway.app')
+                : 'http://localhost:8080';
             Mail::to($user->email)
                 ->send(new WelcomeUserMail($user, $plainPassword, $loginUrl));
             $emailSent = true;

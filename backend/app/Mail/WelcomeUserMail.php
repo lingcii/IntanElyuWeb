@@ -25,9 +25,13 @@ class WelcomeUserMail extends Mailable
         public string $plainPassword,
         public string $loginUrl = '',
     ) {
-        // Default login URL if none provided
+        // Default login URL if none provided — hybrid: Railway when deployed, localhost otherwise
         if (empty($this->loginUrl)) {
-            $this->loginUrl = config('app.url', 'http://localhost:8080');
+            $appUrl = config('app.url', 'http://localhost');
+            $isRailway = str_contains($appUrl, 'railway.app');
+            $this->loginUrl = $isRailway
+                ? env('APP_FRONTEND_URL', 'https://intanelyuweb-frontend-production.up.railway.app')
+                : 'http://localhost:8080';
         }
     }
 
