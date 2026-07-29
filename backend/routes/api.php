@@ -29,19 +29,19 @@ use Illuminate\Support\Facades\Route;
 //  Auth (public)
 // ─────────────────────────────────────────────────────────────────────────────
 Route::prefix('auth')->group(function () {
-    Route::post('/login',    [LoginController::class,   'login']);
-    Route::post('/logout',   [LogoutController::class,  'logout']);
-    Route::post('/register', [RegisterController::class,'register']);
-    Route::get('/check',     [SessionController::class, 'check']);
+    Route::post('/login', [LoginController::class, 'login']);
+    Route::post('/logout', [LogoutController::class, 'logout']);
+    Route::post('/register', [RegisterController::class, 'register']);
+    Route::get('/check', [SessionController::class, 'check']);
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Public image serving (no auth required — served to <img> tags in HTML)
 // ─────────────────────────────────────────────────────────────────────────────
 Route::get('/images/tourist-spots/{filename}', [TouristSpotController::class, 'serveImage']);
-Route::get('/serve-image',                      [TouristSpotController::class, 'serveImageProxy']);
-Route::get('/serve-image.php',                  [TouristSpotController::class, 'serveImageProxy']);
-Route::get('/images/proofs/{filename}',         [ProofValidationController::class, 'serveImage']);
+Route::get('/serve-image', [TouristSpotController::class, 'serveImageProxy']);
+Route::get('/serve-image.php', [TouristSpotController::class, 'serveImageProxy']);
+Route::get('/images/proofs/{filename}', [ProofValidationController::class, 'serveImage']);
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Authenticated routes
@@ -50,28 +50,28 @@ Route::middleware('auth.session')->group(function () {
 
     // Profile (any authenticated role)
     Route::prefix('profile')->group(function () {
-        Route::get('/',          [ProfileController::class, 'show']);
-        Route::put('/',          [ProfileController::class, 'update']);
-        Route::put('/password',  [ProfileController::class, 'updatePassword']);
+        Route::get('/', [ProfileController::class, 'show']);
+        Route::put('/', [ProfileController::class, 'update']);
+        Route::put('/password', [ProfileController::class, 'updatePassword']);
     });
 
     // ─────────────────────────────────────────────────────────────────────────
     //  SHARED TOURIST SPOTS (all roles - PICTO: read-only; LUPTO/MUNICIPAL: full CRUD)
     // ─────────────────────────────────────────────────────────────────────────
     Route::prefix('tourist-spots')->group(function () {
-        Route::get('/draft',          [TouristSpotController::class, 'getDraft']);
-        Route::post('/draft',         [TouristSpotController::class, 'saveDraft']);
-        Route::delete('/draft/{id}',  [TouristSpotController::class, 'deleteDraft']);
-        Route::get('/',               [TouristSpotController::class, 'index']);
-        Route::get('/{id}',           [TouristSpotController::class, 'show']);
-        Route::post('/upload-image',  [TouristSpotController::class, 'uploadImage']);
-        Route::post('/',              [TouristSpotController::class, 'store']);
-        Route::put('/{id}',           [TouristSpotController::class, 'update']);
-        Route::delete('/{id}',        [TouristSpotController::class, 'destroy']);
+        Route::get('/draft', [TouristSpotController::class, 'getDraft']);
+        Route::post('/draft', [TouristSpotController::class, 'saveDraft']);
+        Route::delete('/draft/{id}', [TouristSpotController::class, 'deleteDraft']);
+        Route::get('/', [TouristSpotController::class, 'index']);
+        Route::get('/{id}', [TouristSpotController::class, 'show']);
+        Route::post('/upload-image', [TouristSpotController::class, 'uploadImage']);
+        Route::post('/', [TouristSpotController::class, 'store']);
+        Route::put('/{id}', [TouristSpotController::class, 'update']);
+        Route::delete('/{id}', [TouristSpotController::class, 'destroy']);
     });
 
     // Municipalities (shared read)
-    Route::get('/municipalities',      [MunicipalityController::class, 'index']);
+    Route::get('/municipalities', [MunicipalityController::class, 'index']);
     Route::get('/municipalities/{id}', [MunicipalityController::class, 'show']);
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -79,63 +79,63 @@ Route::middleware('auth.session')->group(function () {
     // ─────────────────────────────────────────────────────────────────────────
     Route::prefix('pitco')->middleware('role:picto')->group(function () {
         // Dashboard
-        Route::get('/dashboard',                    [DashboardController::class, 'index']);
-        Route::get('/map',                          [MapController::class, 'luptoMapData']);
+        Route::get('/dashboard', [DashboardController::class, 'index']);
+        Route::get('/map', [MapController::class, 'luptoMapData']);
 
         // Tourist Spots (read-only for PICTO)
-        Route::get('/tourist-spots',         [TouristSpotController::class, 'index']);
-        Route::get('/tourist-spots/{id}',    [TouristSpotController::class, 'show']);
+        Route::get('/tourist-spots', [TouristSpotController::class, 'index']);
+        Route::get('/tourist-spots/{id}', [TouristSpotController::class, 'show']);
 
         // Analytics
-            Route::prefix('analytics')->group(function () {
-                Route::get('/summary',              [AnalyticsController::class, 'summary']);
-                Route::get('/top-municipalities',   [AnalyticsController::class, 'topMunicipalities']);
-                Route::get('/top-spots',            [AnalyticsController::class, 'topSpots']);
-                Route::get('/chart-data',           [AnalyticsController::class, 'chartData']);
-                Route::get('/monthly-trend',        [AnalyticsController::class, 'monthlyTrend']);
-                Route::get('/filter-options',       [AnalyticsController::class, 'filterOptions']);
-                Route::get('/dashboard-data',       [AnalyticsController::class, 'dashboard']);
-                Route::get('/full',                 [AnalyticsController::class, 'full']);
-                Route::get('/export',               [AnalyticsController::class, 'export']);
-            });
+        Route::prefix('analytics')->group(function () {
+            Route::get('/summary', [AnalyticsController::class, 'summary']);
+            Route::get('/top-municipalities', [AnalyticsController::class, 'topMunicipalities']);
+            Route::get('/top-spots', [AnalyticsController::class, 'topSpots']);
+            Route::get('/chart-data', [AnalyticsController::class, 'chartData']);
+            Route::get('/monthly-trend', [AnalyticsController::class, 'monthlyTrend']);
+            Route::get('/filter-options', [AnalyticsController::class, 'filterOptions']);
+            Route::get('/dashboard-data', [AnalyticsController::class, 'dashboard']);
+            Route::get('/full', [AnalyticsController::class, 'full']);
+            Route::get('/export', [AnalyticsController::class, 'export']);
+        });
 
         // Fare Data (full access)
         Route::prefix('fare-data')->group(function () {
-            Route::get('/stats',              [FareDataController::class, 'stats']);
-            Route::get('/guides',             [FareDataController::class, 'guides']);
-            Route::get('/matrices',           [FareDataController::class, 'matrices']);
-            Route::get('/uploads',            [FareDataController::class, 'uploads']);
-            Route::get('/import-logs',        [FareDataController::class, 'importLogs']);
-            Route::get('/validation-errors',  [FareDataController::class, 'validationErrors']);
-            Route::post('/upload',            [FareDataController::class, 'upload']);
-            Route::post('/sync',              [FareDataController::class, 'sync']);
-            Route::post('/',                  [FareDataController::class, 'store']);
-            Route::put('/{id}',               [FareDataController::class, 'update']);
-            Route::delete('/{id}',            [FareDataController::class, 'destroy']);
+            Route::get('/stats', [FareDataController::class, 'stats']);
+            Route::get('/guides', [FareDataController::class, 'guides']);
+            Route::get('/matrices', [FareDataController::class, 'matrices']);
+            Route::get('/uploads', [FareDataController::class, 'uploads']);
+            Route::get('/import-logs', [FareDataController::class, 'importLogs']);
+            Route::get('/validation-errors', [FareDataController::class, 'validationErrors']);
+            Route::post('/upload', [FareDataController::class, 'upload']);
+            Route::post('/sync', [FareDataController::class, 'sync']);
+            Route::post('/', [FareDataController::class, 'store']);
+            Route::put('/{id}', [FareDataController::class, 'update']);
+            Route::delete('/{id}', [FareDataController::class, 'destroy']);
         });
 
         // User Management (full CRUD)
         Route::prefix('users')->group(function () {
-            Route::get('/',                  [UserController::class, 'index']);
-            Route::get('/municipalities',    [UserController::class, 'municipalities']);
-            Route::get('/audit-logs',        [UserController::class, 'auditLogs']);
-            Route::get('/{id}',              [UserController::class, 'show']);
-            Route::post('/',                 [UserController::class, 'store']);
-            Route::put('/{id}',              [UserController::class, 'update']);
-            Route::patch('/{id}/status',     [UserController::class, 'toggleStatus']);
-            Route::patch('/{id}/password',   [UserController::class, 'resetPassword']);
-            Route::delete('/{id}',           [UserController::class, 'destroy']);
-            Route::patch('/{id}/archive',    [UserController::class, 'archive']);
-            Route::patch('/{id}/restore',    [UserController::class, 'restore']);
+            Route::get('/', [UserController::class, 'index']);
+            Route::get('/municipalities', [UserController::class, 'municipalities']);
+            Route::get('/audit-logs', [UserController::class, 'auditLogs']);
+            Route::get('/{id}', [UserController::class, 'show']);
+            Route::post('/', [UserController::class, 'store']);
+            Route::put('/{id}', [UserController::class, 'update']);
+            Route::patch('/{id}/status', [UserController::class, 'toggleStatus']);
+            Route::patch('/{id}/password', [UserController::class, 'resetPassword']);
+            Route::delete('/{id}', [UserController::class, 'destroy']);
+            Route::patch('/{id}/archive', [UserController::class, 'archive']);
+            Route::patch('/{id}/restore', [UserController::class, 'restore']);
         });
 
         // Archive Management
         Route::prefix('archive')->group(function () {
-            Route::get('/stats',            [ArchiveManagementController::class, 'stats']);
-            Route::get('/fares',            [ArchiveManagementController::class, 'archivedFares']);
-            Route::get('/fares/{id}',       [ArchiveManagementController::class, 'archivedFareDetail']);
-            Route::post('/fares/{id}/restore',  [ArchiveManagementController::class, 'restore']);
-            Route::delete('/fares/{id}',    [ArchiveManagementController::class, 'permanentDelete']);
+            Route::get('/stats', [ArchiveManagementController::class, 'stats']);
+            Route::get('/fares', [ArchiveManagementController::class, 'archivedFares']);
+            Route::get('/fares/{id}', [ArchiveManagementController::class, 'archivedFareDetail']);
+            Route::post('/fares/{id}/restore', [ArchiveManagementController::class, 'restore']);
+            Route::delete('/fares/{id}', [ArchiveManagementController::class, 'permanentDelete']);
         });
 
         // Reports
@@ -160,38 +160,38 @@ Route::middleware('auth.session')->group(function () {
 
         // Settings
         Route::prefix('settings')->group(function () {
-            Route::get('/profile',          [SettingsController::class, 'profile']);
-            Route::put('/profile',          [SettingsController::class, 'updateProfile']);
-            Route::put('/password',         [SettingsController::class, 'updatePassword']);
+            Route::get('/profile', [SettingsController::class, 'profile']);
+            Route::put('/profile', [SettingsController::class, 'updateProfile']);
+            Route::put('/password', [SettingsController::class, 'updatePassword']);
             // Backup
-            Route::get('/backup/list',                [BackupController::class, 'list']);
-            Route::get('/backup/stats',               [BackupController::class, 'stats']);
-            Route::post('/backup/create',             [BackupController::class, 'create']);
-            Route::post('/backup/restore',            [BackupController::class, 'restoreFromFile']);
+            Route::get('/backup/list', [BackupController::class, 'list']);
+            Route::get('/backup/stats', [BackupController::class, 'stats']);
+            Route::post('/backup/create', [BackupController::class, 'create']);
+            Route::post('/backup/restore', [BackupController::class, 'restoreFromFile']);
             Route::get('/backup/download/{filename}', [BackupController::class, 'download']);
-            Route::delete('/backup/{filename}',       [BackupController::class, 'delete']);
+            Route::delete('/backup/{filename}', [BackupController::class, 'delete']);
         });
 
         // Leaderboard
         Route::prefix('leaderboard')->group(function () {
-            Route::get('/',       [LeaderboardController::class, 'index']);
-            Route::get('/top3',   [LeaderboardController::class, 'top3']);
-            Route::get('/kpis',   [LeaderboardController::class, 'kpis']);
+            Route::get('/', [LeaderboardController::class, 'index']);
+            Route::get('/top3', [LeaderboardController::class, 'top3']);
+            Route::get('/kpis', [LeaderboardController::class, 'kpis']);
         });
 
         // Feedback Module
         Route::prefix('feedback')->group(function () {
-            Route::get('/dashboard-stats',   [FeedbackManagementController::class, 'dashboardStats']);
-            Route::get('/gallery',           [FeedbackManagementController::class, 'gallery']);
-            Route::get('/table',             [FeedbackManagementController::class, 'table']);
+            Route::get('/dashboard-stats', [FeedbackManagementController::class, 'dashboardStats']);
+            Route::get('/gallery', [FeedbackManagementController::class, 'gallery']);
+            Route::get('/table', [FeedbackManagementController::class, 'table']);
             Route::get('/spot-details/{id}', [FeedbackManagementController::class, 'spotDetails']);
         });
 
         // Proof Images Validation (read-only for PICTO)
         Route::prefix('proof-validation')->group(function () {
-            Route::get('/stats',  [ProofValidationController::class, 'stats']);
-            Route::get('/',       [ProofValidationController::class, 'index']);
-            Route::get('/{id}',   [ProofValidationController::class, 'show']);
+            Route::get('/stats', [ProofValidationController::class, 'stats']);
+            Route::get('/', [ProofValidationController::class, 'index']);
+            Route::get('/{id}', [ProofValidationController::class, 'show']);
         });
     });
 
@@ -200,47 +200,47 @@ Route::middleware('auth.session')->group(function () {
     // ─────────────────────────────────────────────────────────────────────────
     Route::prefix('lupto')->middleware('role:lupto')->group(function () {
         // Dashboard
-        Route::get('/dashboard',                    [DashboardController::class, 'index']);
-        Route::get('/dashboard/poll',               [DashboardController::class, 'poll']);
-        Route::get('/dashboard/pending-spots',      [DashboardController::class, 'pendingSpots']);
-        Route::post('/dashboard/approve-spot',      [DashboardController::class, 'approveSpot']);
-        Route::post('/dashboard/reject-spot',       [DashboardController::class, 'rejectSpot']);
-        Route::post('/dashboard/batch-approve-spots',[DashboardController::class,'batchApproveSpots']);
+        Route::get('/dashboard', [DashboardController::class, 'index']);
+        Route::get('/dashboard/poll', [DashboardController::class, 'poll']);
+        Route::get('/dashboard/pending-spots', [DashboardController::class, 'pendingSpots']);
+        Route::post('/dashboard/approve-spot', [DashboardController::class, 'approveSpot']);
+        Route::post('/dashboard/reject-spot', [DashboardController::class, 'rejectSpot']);
+        Route::post('/dashboard/batch-approve-spots', [DashboardController::class, 'batchApproveSpots']);
 
         // Map - for LUPTO to see all municipalities
         Route::get('/map', [MapController::class, 'luptoMapData']);
 
         // Tourist Spots (alias to shared controller for map-view.php)
-        Route::get('/tourist-spots',     [TouristSpotController::class, 'index']);
-        Route::get('/tourist-spots/{id}',[TouristSpotController::class, 'show']);
+        Route::get('/tourist-spots', [TouristSpotController::class, 'index']);
+        Route::get('/tourist-spots/{id}', [TouristSpotController::class, 'show']);
 
         // Analytics (read-only)
         Route::prefix('analytics')->group(function () {
-            Route::get('/summary',              [AnalyticsController::class, 'summary']);
-            Route::get('/top-municipalities',   [AnalyticsController::class, 'topMunicipalities']);
-            Route::get('/top-spots',            [AnalyticsController::class, 'topSpots']);
-            Route::get('/chart-data',           [AnalyticsController::class, 'chartData']);
-            Route::get('/monthly-trend',        [AnalyticsController::class, 'monthlyTrend']);
-            Route::get('/filter-options',       [AnalyticsController::class, 'filterOptions']);
-            Route::get('/dashboard-data',       [AnalyticsController::class, 'dashboard']);
-            Route::get('/full',                 [AnalyticsController::class, 'full']);
-            Route::get('/export',               [AnalyticsController::class, 'export']);
+            Route::get('/summary', [AnalyticsController::class, 'summary']);
+            Route::get('/top-municipalities', [AnalyticsController::class, 'topMunicipalities']);
+            Route::get('/top-spots', [AnalyticsController::class, 'topSpots']);
+            Route::get('/chart-data', [AnalyticsController::class, 'chartData']);
+            Route::get('/monthly-trend', [AnalyticsController::class, 'monthlyTrend']);
+            Route::get('/filter-options', [AnalyticsController::class, 'filterOptions']);
+            Route::get('/dashboard-data', [AnalyticsController::class, 'dashboard']);
+            Route::get('/full', [AnalyticsController::class, 'full']);
+            Route::get('/export', [AnalyticsController::class, 'export']);
         });
 
         // Fare Data (view-only)
         Route::prefix('fare-data')->group(function () {
-            Route::get('/guides',             [FareDataController::class, 'guides']);
-            Route::get('/matrices',           [FareDataController::class, 'matrices']);
-            Route::get('/uploads',            [FareDataController::class, 'uploads']);
-            Route::get('/import-logs',        [FareDataController::class, 'importLogs']);
-            Route::get('/validation-errors',  [FareDataController::class, 'validationErrors']);
+            Route::get('/guides', [FareDataController::class, 'guides']);
+            Route::get('/matrices', [FareDataController::class, 'matrices']);
+            Route::get('/uploads', [FareDataController::class, 'uploads']);
+            Route::get('/import-logs', [FareDataController::class, 'importLogs']);
+            Route::get('/validation-errors', [FareDataController::class, 'validationErrors']);
         });
 
         // Leaderboard
         Route::prefix('leaderboard')->group(function () {
-            Route::get('/',       [LeaderboardController::class, 'index']);
-            Route::get('/top3',   [LeaderboardController::class, 'top3']);
-            Route::get('/kpis',   [LeaderboardController::class, 'kpis']);
+            Route::get('/', [LeaderboardController::class, 'index']);
+            Route::get('/top3', [LeaderboardController::class, 'top3']);
+            Route::get('/kpis', [LeaderboardController::class, 'kpis']);
         });
 
         // Activity Logs
@@ -265,46 +265,46 @@ Route::middleware('auth.session')->group(function () {
 
         // User Management (full CRUD — can only add municipal users)
         Route::prefix('users')->group(function () {
-            Route::get('/',                  [UserController::class, 'index']);
-            Route::get('/municipalities',    [UserController::class, 'municipalities']);
-            Route::get('/audit-logs',        [UserController::class, 'auditLogs']);
-            Route::get('/{id}',              [UserController::class, 'show']);
-            Route::post('/',                 [UserController::class, 'store']);
-            Route::put('/{id}',              [UserController::class, 'update']);
-            Route::patch('/{id}/status',     [UserController::class, 'toggleStatus']);
-            Route::patch('/{id}/password',   [UserController::class, 'resetPassword']);
-            Route::patch('/{id}/archive',    [UserController::class, 'archive']);
-            Route::patch('/{id}/restore',    [UserController::class, 'restore']);
-            Route::delete('/{id}',           [UserController::class, 'destroy']);
+            Route::get('/', [UserController::class, 'index']);
+            Route::get('/municipalities', [UserController::class, 'municipalities']);
+            Route::get('/audit-logs', [UserController::class, 'auditLogs']);
+            Route::get('/{id}', [UserController::class, 'show']);
+            Route::post('/', [UserController::class, 'store']);
+            Route::put('/{id}', [UserController::class, 'update']);
+            Route::patch('/{id}/status', [UserController::class, 'toggleStatus']);
+            Route::patch('/{id}/password', [UserController::class, 'resetPassword']);
+            Route::patch('/{id}/archive', [UserController::class, 'archive']);
+            Route::patch('/{id}/restore', [UserController::class, 'restore']);
+            Route::delete('/{id}', [UserController::class, 'destroy']);
         });
 
         // Settings
         Route::prefix('settings')->group(function () {
-            Route::get('/profile',  [SettingsController::class, 'profile']);
-            Route::put('/profile',  [SettingsController::class, 'updateProfile']);
+            Route::get('/profile', [SettingsController::class, 'profile']);
+            Route::put('/profile', [SettingsController::class, 'updateProfile']);
             Route::put('/password', [SettingsController::class, 'updatePassword']);
             // Backup
-            Route::get('/backup/list',                [BackupController::class, 'list']);
-            Route::get('/backup/stats',               [BackupController::class, 'stats']);
-            Route::post('/backup/create',             [BackupController::class, 'create']);
-            Route::post('/backup/restore',            [BackupController::class, 'restoreFromFile']);
+            Route::get('/backup/list', [BackupController::class, 'list']);
+            Route::get('/backup/stats', [BackupController::class, 'stats']);
+            Route::post('/backup/create', [BackupController::class, 'create']);
+            Route::post('/backup/restore', [BackupController::class, 'restoreFromFile']);
             Route::get('/backup/download/{filename}', [BackupController::class, 'download']);
-            Route::delete('/backup/{filename}',       [BackupController::class, 'delete']);
+            Route::delete('/backup/{filename}', [BackupController::class, 'delete']);
         });
 
         // Feedback Module
         Route::prefix('feedback')->group(function () {
-            Route::get('/dashboard-stats',   [FeedbackManagementController::class, 'dashboardStats']);
-            Route::get('/gallery',           [FeedbackManagementController::class, 'gallery']);
-            Route::get('/table',             [FeedbackManagementController::class, 'table']);
+            Route::get('/dashboard-stats', [FeedbackManagementController::class, 'dashboardStats']);
+            Route::get('/gallery', [FeedbackManagementController::class, 'gallery']);
+            Route::get('/table', [FeedbackManagementController::class, 'table']);
             Route::get('/spot-details/{id}', [FeedbackManagementController::class, 'spotDetails']);
         });
 
         // Proof Images Validation (read-only for LUPTO)
         Route::prefix('proof-validation')->group(function () {
-            Route::get('/stats',  [ProofValidationController::class, 'stats']);
-            Route::get('/',       [ProofValidationController::class, 'index']);
-            Route::get('/{id}',   [ProofValidationController::class, 'show']);
+            Route::get('/stats', [ProofValidationController::class, 'stats']);
+            Route::get('/', [ProofValidationController::class, 'index']);
+            Route::get('/{id}', [ProofValidationController::class, 'show']);
         });
     });
 
@@ -313,42 +313,42 @@ Route::middleware('auth.session')->group(function () {
     // ─────────────────────────────────────────────────────────────────────────
     Route::prefix('municipal')->middleware('role:municipal')->group(function () {
         // Dashboard
-        Route::get('/dashboard',      [DashboardController::class, 'index']);
+        Route::get('/dashboard', [DashboardController::class, 'index']);
         Route::get('/dashboard/poll', [DashboardController::class, 'poll']);
 
         // Analytics (scoped to own municipality)
         Route::prefix('analytics')->group(function () {
-            Route::get('/summary',              [AnalyticsController::class, 'summary']);
-            Route::get('/top-municipalities',   [AnalyticsController::class, 'topMunicipalities']);
-            Route::get('/top-spots',            [AnalyticsController::class, 'topSpots']);
-            Route::get('/chart-data',           [AnalyticsController::class, 'chartData']);
-            Route::get('/monthly-trend',        [AnalyticsController::class, 'monthlyTrend']);
-            Route::get('/filter-options',       [AnalyticsController::class, 'filterOptions']);
-            Route::get('/dashboard-data',       [AnalyticsController::class, 'dashboard']);
-            Route::get('/full',                 [AnalyticsController::class, 'full']);
-            Route::get('/export',               [AnalyticsController::class, 'export']);
+            Route::get('/summary', [AnalyticsController::class, 'summary']);
+            Route::get('/top-municipalities', [AnalyticsController::class, 'topMunicipalities']);
+            Route::get('/top-spots', [AnalyticsController::class, 'topSpots']);
+            Route::get('/chart-data', [AnalyticsController::class, 'chartData']);
+            Route::get('/monthly-trend', [AnalyticsController::class, 'monthlyTrend']);
+            Route::get('/filter-options', [AnalyticsController::class, 'filterOptions']);
+            Route::get('/dashboard-data', [AnalyticsController::class, 'dashboard']);
+            Route::get('/full', [AnalyticsController::class, 'full']);
+            Route::get('/export', [AnalyticsController::class, 'export']);
         });
 
         // Fare Data (upload + view)
         Route::prefix('fare-data')->group(function () {
-            Route::get('/guides',             [FareDataController::class, 'guides']);
-            Route::get('/matrices',           [FareDataController::class, 'matrices']);
-            Route::get('/uploads',            [FareDataController::class, 'uploads']);
-            Route::get('/import-logs',        [FareDataController::class, 'importLogs']);
-            Route::get('/validation-errors',  [FareDataController::class, 'validationErrors']);
-            Route::post('/upload',            [FareDataController::class, 'upload']);
-            Route::post('/sync',              [FareDataController::class, 'sync']);
-            Route::post('/',                  [FareDataController::class, 'store']);
+            Route::get('/guides', [FareDataController::class, 'guides']);
+            Route::get('/matrices', [FareDataController::class, 'matrices']);
+            Route::get('/uploads', [FareDataController::class, 'uploads']);
+            Route::get('/import-logs', [FareDataController::class, 'importLogs']);
+            Route::get('/validation-errors', [FareDataController::class, 'validationErrors']);
+            Route::post('/upload', [FareDataController::class, 'upload']);
+            Route::post('/sync', [FareDataController::class, 'sync']);
+            Route::post('/', [FareDataController::class, 'store']);
         });
 
         // Tourist Spots (CRUD scoped to own municipality)
         Route::prefix('tourist-spots')->group(function () {
-            Route::get('/',               [TouristSpotController::class, 'index']);
-            Route::get('/{id}',           [TouristSpotController::class, 'show']);
-            Route::post('/upload-image',  [TouristSpotController::class, 'uploadImage']);
-            Route::post('/',              [TouristSpotController::class, 'store']);
-            Route::put('/{id}',           [TouristSpotController::class, 'update']);
-            Route::delete('/{id}',        [TouristSpotController::class, 'destroy']);
+            Route::get('/', [TouristSpotController::class, 'index']);
+            Route::get('/{id}', [TouristSpotController::class, 'show']);
+            Route::post('/upload-image', [TouristSpotController::class, 'uploadImage']);
+            Route::post('/', [TouristSpotController::class, 'store']);
+            Route::put('/{id}', [TouristSpotController::class, 'update']);
+            Route::delete('/{id}', [TouristSpotController::class, 'destroy']);
         });
 
         // Map
@@ -356,9 +356,9 @@ Route::middleware('auth.session')->group(function () {
 
         // User Management (view + update)
         Route::prefix('users')->group(function () {
-            Route::get('/',               [UserController::class, 'index']);
-            Route::put('/{id}',           [UserController::class, 'update']);
-            Route::patch('/{id}/password',[UserController::class, 'resetPassword']);
+            Route::get('/', [UserController::class, 'index']);
+            Route::put('/{id}', [UserController::class, 'update']);
+            Route::patch('/{id}/password', [UserController::class, 'resetPassword']);
         });
 
         // Activity Logs
@@ -383,33 +383,33 @@ Route::middleware('auth.session')->group(function () {
 
         // Settings
         Route::prefix('settings')->group(function () {
-            Route::get('/profile',  [SettingsController::class, 'profile']);
-            Route::put('/profile',  [SettingsController::class, 'updateProfile']);
+            Route::get('/profile', [SettingsController::class, 'profile']);
+            Route::put('/profile', [SettingsController::class, 'updateProfile']);
             Route::put('/password', [SettingsController::class, 'updatePassword']);
             // Backup (municipal-scoped)
-            Route::get('/backup/list',                [BackupController::class, 'list']);
-            Route::get('/backup/stats',               [BackupController::class, 'stats']);
-            Route::post('/backup/create',             [BackupController::class, 'create']);
-            Route::post('/backup/restore',            [BackupController::class, 'restoreFromFile']);
+            Route::get('/backup/list', [BackupController::class, 'list']);
+            Route::get('/backup/stats', [BackupController::class, 'stats']);
+            Route::post('/backup/create', [BackupController::class, 'create']);
+            Route::post('/backup/restore', [BackupController::class, 'restoreFromFile']);
             Route::get('/backup/download/{filename}', [BackupController::class, 'download']);
-            Route::delete('/backup/{filename}',       [BackupController::class, 'delete']);
+            Route::delete('/backup/{filename}', [BackupController::class, 'delete']);
         });
 
         // Feedback Module
         Route::prefix('feedback')->group(function () {
-            Route::get('/dashboard-stats',   [FeedbackManagementController::class, 'dashboardStats']);
-            Route::get('/gallery',           [FeedbackManagementController::class, 'gallery']);
-            Route::get('/table',             [FeedbackManagementController::class, 'table']);
+            Route::get('/dashboard-stats', [FeedbackManagementController::class, 'dashboardStats']);
+            Route::get('/gallery', [FeedbackManagementController::class, 'gallery']);
+            Route::get('/table', [FeedbackManagementController::class, 'table']);
             Route::get('/spot-details/{id}', [FeedbackManagementController::class, 'spotDetails']);
         });
 
         // Proof Images Validation — MTO has full access (municipality-scoped)
         Route::prefix('proof-validation')->group(function () {
-            Route::get('/stats',               [ProofValidationController::class, 'stats']);
-            Route::get('/',                    [ProofValidationController::class, 'index']);
-            Route::get('/{id}',                [ProofValidationController::class, 'show']);
-            Route::post('/{id}/approve',       [ProofValidationController::class, 'approve']);
-            Route::post('/{id}/reject',        [ProofValidationController::class, 'reject']);
+            Route::get('/stats', [ProofValidationController::class, 'stats']);
+            Route::get('/', [ProofValidationController::class, 'index']);
+            Route::get('/{id}', [ProofValidationController::class, 'show']);
+            Route::post('/{id}/approve', [ProofValidationController::class, 'approve']);
+            Route::post('/{id}/reject', [ProofValidationController::class, 'reject']);
         });
     });
 
@@ -417,7 +417,7 @@ Route::middleware('auth.session')->group(function () {
     //  TOURIST (mobile / public tourist endpoints)
     // ─────────────────────────────────────────────────────────────────────────
     Route::prefix('tourist')->group(function () {
-        Route::get('/feedback',  [FeedbackController::class, 'index']);
+        Route::get('/feedback', [FeedbackController::class, 'index']);
         Route::post('/feedback', [FeedbackController::class, 'store']);
     });
 });

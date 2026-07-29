@@ -85,11 +85,26 @@
     }
 
     window.cardClick = function (el, id, url) {
-        el.classList.remove('unread');
-        var dot = el.querySelector('.nc-dot');
-        if (dot) dot.style.display = 'none';
+        if (el) {
+            el.classList.remove('unread');
+            var dot = el.querySelector('.nc-dot');
+            if (dot) dot.style.display = 'none';
+        }
         window.API_CONFIG.patch(API + '/' + id + '/read', {}).then(function () { loadPage(currentPage); }).catch(function () {});
-        if (url && url.endsWith('.php')) { window.location.href = url; }
+        if (url) {
+            var targetPage = url.split('?')[0];
+            var queryString = url.includes('?') ? url.split('?')[1] : '';
+            if (typeof window.switchTab === 'function') {
+                window.switchTab(targetPage);
+                setTimeout(function () {
+                    if (typeof window.handleNotifDeepLink === 'function') {
+                        window.handleNotifDeepLink(targetPage, queryString);
+                    }
+                }, 250);
+            } else {
+                window.location.href = url;
+            }
+        }
     };
 
     window.delNotif = function (id) {

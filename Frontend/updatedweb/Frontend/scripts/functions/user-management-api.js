@@ -1038,4 +1038,17 @@ window.confirmArchiveUser = confirmArchiveUser;
 window.confirmRestoreUser = confirmRestoreUser;
 window.confirmDeleteUser = confirmDeleteUser;
 
+window.highlightUserRow = function(userId) {
+    if (!userId) return;
+    const row = document.querySelector(`tr[data-id="${userId}"], tr[data-user-id="${userId}"]`);
+    if (row) {
+        row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        row.style.transition = 'background-color 0.5s ease';
+        row.style.backgroundColor = '#FEF3C7';
+        setTimeout(() => {
+            row.style.backgroundColor = '';
+        }, 3000);
+    }
+};
+
 })();

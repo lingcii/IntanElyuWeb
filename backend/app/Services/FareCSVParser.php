@@ -51,10 +51,10 @@ class FareCSVParser
         }
 
         $metadata = [
-            'title'          => $formMetadata['title'] ?? null,
-            'vehicle_type'   => $formMetadata['vehicle_type'] ?? null,
-            'region'         => $formMetadata['region'] ?? null,
-            'effective_date' => $formMetadata['effective_date'] ?? null,
+            'title'          => !empty($formMetadata['title']) ? trim($formMetadata['title']) : null,
+            'vehicle_type'   => !empty($formMetadata['vehicle_type']) ? trim($formMetadata['vehicle_type']) : null,
+            'region'         => !empty($formMetadata['region']) ? trim($formMetadata['region']) : null,
+            'effective_date' => !empty($formMetadata['effective_date']) ? trim($formMetadata['effective_date']) : null,
             'fares'          => []
         ];
 

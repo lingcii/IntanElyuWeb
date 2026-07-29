@@ -18,11 +18,16 @@ function patchLeafletDomUtil() {
         if (!window.L.DomUtil._patchedPosition) {
             const origGetPosition = window.L.DomUtil.getPosition;
             window.L.DomUtil.getPosition = function (el) {
-                if (!el) return new window.L.Point(0, 0);
+                if (!el || typeof el !== 'object') {
+                    return (window.L && window.L.Point) ? new window.L.Point(0, 0) : { x: 0, y: 0 };
+                }
+                if (!('_leaflet_pos' in el)) {
+                    try { el._leaflet_pos = (window.L && window.L.Point) ? new window.L.Point(0, 0) : { x: 0, y: 0 }; } catch (_) {}
+                }
                 try {
                     return origGetPosition.call(window.L.DomUtil, el);
                 } catch (err) {
-                    return new window.L.Point(0, 0);
+                    return (window.L && window.L.Point) ? new window.L.Point(0, 0) : { x: 0, y: 0 };
                 }
             };
             window.L.DomUtil._patchedPosition = true;
@@ -33,18 +38,18 @@ patchLeafletDomUtil();
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', patchLeafletDomUtil);
 }
+setInterval(patchLeafletDomUtil, 1000);
 
 const API_BASE = `${window.API_CONFIG?.BASE_URL || ('http://' + (window.location.hostname || '127.0.0.1') + ':8000')}/api/tourist-spots`;
 
 // ── In-Memory Spots Cache ────────────────────────────────────────────────────
 // Survives SPA re-navigation so returning to Tourist Spots is instant.
-const SPOTS_CACHE_TTL = 300000; // 5 minutes fresh TTL
+const SPOTS_CACHE_TTL = 0; // Real-time accuracy: always query live DB
 const cacheKey = '__LUPTO_TOURIST_SPOTS_CACHE__';
 window[cacheKey] = window[cacheKey] || { spots: null, munis: null, timestamp: 0 };
 
 function _isCacheFresh() {
-    const c = window[cacheKey];
-    return c.spots !== null && c.munis !== null && (Date.now() - c.timestamp) < SPOTS_CACHE_TTL;
+    return false;
 }
 
 /** Invalidate cache on write operations so next read is always fresh. */
@@ -827,10 +832,16 @@ export function setupMapLayerToggle() {
         tab.addEventListener('click', function () {
             document.querySelectorAll('.map-tab').forEach(t => t.classList.remove('active'));
             this.classList.add('active');
-            Object.values(mapLayers).forEach(l => {
-                if (map.hasLayer(l)) map.removeLayer(l);
-            });
-            mapLayers[this.dataset.view].addTo(map);
+            if (typeof map === 'undefined' || !map || typeof map.hasLayer !== 'function') return;
+            if (typeof mapLayers !== 'undefined' && mapLayers) {
+                Object.values(mapLayers).forEach(l => {
+                    if (l && map.hasLayer(l)) map.removeLayer(l);
+                });
+                const selectedLayer = mapLayers[this.dataset.view];
+                if (selectedLayer && typeof selectedLayer.addTo === 'function') {
+                    selectedLayer.addTo(map);
+                }
+            }
         });
     });
 }
@@ -1270,7 +1281,7 @@ window.openSpotModal = async function openSpotModal(spotId) {
                     <div>
                         <h2 class="spot-modal-title">${escapeHtml(spot.name)}</h2>
                         <div class="spot-modal-badges">
-                            <span class="spot-modal-badge muni-badge"><i class="fas fa-map-marker-alt"></i> ${escapeHtml(spot.municipality_name || 'La Union')}, La Union</span>
+                            <span class="spot-modal-badge muni-badge"><i class="fas fa-map-marker-alt"></i> ${escapeHtml((spot.barangay ? spot.barangay + ', ' : '') + (spot.municipality_name || (spot.municipality && spot.municipality.name) || 'La Union'))}, La Union</span>
                             ${classificationStyle ? `<span class="spot-modal-badge" style="background:${classificationStyle.bg};color:${classificationStyle.text};font-weight:700;">${classificationStyle.label}</span>` : ''}
                             ${(spot.status && spot.status !== 'approved') ? `<span class="spot-modal-badge" style="background:${spot.status === 'approved' ? '#10B981' : spot.status === 'pending' ? '#F59E0B' : '#DC2626'};color:#FFFFFF;font-weight:700;">${spot.status === 'approved' ? 'Approved' : spot.status === 'pending' ? 'Pending' : 'Rejected'}</span>` : ''}
                             ${spot.is_maintenance ? `<span class="spot-modal-badge" style="background:#F59E0B;color:#92400E;font-weight:700;"><i class="fas fa-exclamation-triangle"></i> Under Maintenance</span>` : ''}
@@ -1299,7 +1310,7 @@ window.openSpotModal = async function openSpotModal(spotId) {
                         </div>
                         <div class="spot-detail-card points-card">
                             <div class="detail-label points-label">⭐ Points</div>
-                            <div class="points-val">${spot.points !== undefined ? spot.points : 0} Points</div>
+                            <div class="points-val">${(spot.points && parseInt(spot.points) > 0) ? parseInt(spot.points) : ((spot.classification_status === 'EMERGE' || spot.classification_status === 'EMERGING') ? 100 : (spot.classification_status === 'POTENTIAL') ? 75 : 50)} Points</div>
                         </div>
                         <div class="spot-detail-card">
                             <div class="detail-label">Opening Time</div>
@@ -2117,6 +2128,7 @@ function initBlankCreateForm() {
                 '<option value="EMERGING">Emerging</option>'
             ].join('');
             classificationSelect.value = 'POTENTIAL';
+            document.getElementById('spotPoints').value = '75';
         } else {
             // LUPTO: only Existing allowed on create
             classificationSelect.innerHTML = [
@@ -2124,6 +2136,7 @@ function initBlankCreateForm() {
                 '<option value="EXISTING">Existing</option>'
             ].join('');
             classificationSelect.value = 'EXISTING';
+            document.getElementById('spotPoints').value = '50';
         }
     }
 
@@ -2249,7 +2262,12 @@ window.editSpot = async function (spotId) {
         document.getElementById('spotId').value = spot.id;
         document.getElementById('spotName').value = spot.name;
         document.getElementById('nameCharCount').textContent = spot.name.length;
-        document.getElementById('spotPoints').value = spot.points !== undefined ? spot.points : '0';
+        let formPts = (spot.points && parseInt(spot.points) > 0) ? parseInt(spot.points) : 0;
+        if (!formPts) {
+            const st = (spot.classification_status || '').toUpperCase();
+            formPts = (st === 'EMERGE' || st === 'EMERGING') ? 100 : (st === 'POTENTIAL') ? 75 : 50;
+        }
+        document.getElementById('spotPoints').value = formPts;
 
         setSelectedCategories(spot.category || '');
 
@@ -2841,8 +2859,14 @@ const sortSpotsPendingFirst = (arr) => {
     arr.sort((a, b) => {
         const statusA = a.status || '';
         const statusB = b.status || '';
+        const isMaintA = !!(a.is_maintenance || a.status === 'closed');
+        const isMaintB = !!(b.is_maintenance || b.status === 'closed');
+
         if (statusA === 'pending' && statusB !== 'pending') return -1;
         if (statusA !== 'pending' && statusB === 'pending') return 1;
+
+        if (isMaintA && !isMaintB) return -1;
+        if (!isMaintA && isMaintB) return 1;
 
         const timeA = new Date(a.created_at || 0).getTime();
         const timeB = new Date(b.created_at || 0).getTime();
@@ -3177,8 +3201,8 @@ function populateMuniDropdowns(municipalData) {
 
 function updateKpiCards(spotsData, municipalData) {
     const container = document.getElementById('spa-tab-tourist-spots.php') || document;
-    const total = spotsData.length;
-    const approved = spotsData.filter(s => (s.status || '') === 'approved').length;
+    const approved = spotsData.filter(s => (s.status || '') === 'approved' || (s.status || '') === 'EXIST' || (s.status || '') === 'EXISTING').length;
+    const total = approved;
     const pending = spotsData.filter(s => (s.status || '') === 'pending').length;
     const declined = spotsData.filter(s => (s.status || '') === 'rejected').length;
 
@@ -3212,7 +3236,7 @@ function updateKpiCards(spotsData, municipalData) {
     const trendPending = container.querySelector('#kpi-trend-pending');
     const trendDeclined = container.querySelector('#kpi-trend-declined');
     const trendCategory = container.querySelector('#kpi-trend-category');
-    if (trendTotal) trendTotal.innerHTML = '<i class="fas fa-layer-group"></i> All spots';
+    if (trendTotal) trendTotal.innerHTML = '<i class="fas fa-layer-group"></i> Approved spots';
     if (trendApproved) trendApproved.innerHTML = '<i class="fas fa-check"></i> ' + approved + ' approved';
     if (trendPending) trendPending.innerHTML = '<i class="fas fa-clock"></i> ' + pending + ' pending';
     if (trendDeclined) trendDeclined.innerHTML = '<i class="fas fa-times"></i> ' + declined + ' rejected';
@@ -3226,25 +3250,7 @@ function updateKpiCards(spotsData, municipalData) {
 
 function loadCachedKpis() {
     try {
-        const raw = sessionStorage.getItem('ts_kpis_lupto');
-        if (!raw) return;
-        const v = JSON.parse(raw);
-        const container = document.getElementById('spa-tab-tourist-spots.php') || document;
-
-        const elTotal = container.querySelector('[data-kpi="total-spots"] .lupto-kpi-value');
-        const elApproved = container.querySelector('[data-kpi="approved-spots"] .lupto-kpi-value');
-        const elPending = container.querySelector('[data-kpi="pending-spots"] .lupto-kpi-value');
-        const elDeclined = container.querySelector('[data-kpi="declined-spots"] .lupto-kpi-value');
-        const elCategory = container.querySelector('[data-kpi="most-visited-category"] .lupto-kpi-value');
-
-        if (elTotal) { elTotal.textContent = v.total; elTotal.style.color = '#1E293B'; }
-        if (elApproved) { elApproved.textContent = v.approved; elApproved.style.color = '#1E293B'; }
-        if (elPending) { elPending.textContent = v.pending || 0; elPending.style.color = '#1E293B'; }
-        if (elDeclined) { elDeclined.textContent = v.declined; elDeclined.style.color = '#1E293B'; }
-        if (elCategory) { elCategory.textContent = v.topCategory || '—'; elCategory.style.color = '#1E293B'; }
-
-        const spotCount = container.querySelector('#spotCount');
-        if (spotCount) spotCount.textContent = v.total;
+        sessionStorage.removeItem('ts_kpis_lupto');
     } catch (e) { }
 }
 
@@ -3278,6 +3284,11 @@ function renderCardsGrid(spotsData) {
         if (approvalStatus === 'pending') {
             html += `<span class="pending-badge" style="z-index: 2;"><i class="far fa-clock"></i> Pending</span>`;
         }
+        if (spot.is_maintenance) {
+            html += `<span class="maintenance-badge" style="z-index: 2;"><i class="fas fa-tools"></i> Under Maintenance</span>`;
+        } else if (approvalStatus === 'closed' || spot.status === 'closed') {
+            html += `<span class="closed-badge" style="z-index: 2;"><i class="fas fa-ban"></i> Closed</span>`;
+        }
         if (photoUrl) {
             html += `<img src="${escapeHtml(photoUrl)}" alt="${escapeHtml(spot.name || '')}" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block;" onerror="var p=this.parentElement;this.style.display='none';var ph=p.querySelector('.spot-image-placeholder');if(ph)ph.style.display='flex';">`;
             html += `<div class="spot-image-placeholder" style="display:none;"><i class="fas fa-image"></i><span>Image unavailable</span></div>`;
@@ -3294,17 +3305,27 @@ function renderCardsGrid(spotsData) {
         }
         html += `<div class="spot-body">`;
         html += `<h3>${spot.name || ''}</h3>`;
-        html += `<div class="muni"><i class="fas fa-map-marker-alt"></i> ${munName}, La Union</div>`;
+        const brgyLoc = spot.barangay ? `${spot.barangay}, ${munName}` : munName;
+        html += `<div class="muni"><i class="fas fa-map-marker-alt"></i> ${brgyLoc}, La Union</div>`;
         html += `<div class="tags">`;
         html += catTags;
         html += `<span class="tag" style="background:#F8FAFC;color:#4B5563;">${formatFeesShort(spot)}</span>`;
         if (status) {
             html += `<span class="tag" style="background:${statusBg};color:${statusColor};">${statusClass}</span>`;
         }
-        const pointsVal = spot.points !== undefined ? spot.points : 0;
+        let pointsVal = spot.points !== undefined && parseInt(spot.points) > 0 ? parseInt(spot.points) : 0;
+        if (!pointsVal) {
+            const st = (spot.classification_status || '').toUpperCase();
+            pointsVal = (st === 'EMERGE' || st === 'EMERGING') ? 100 : (st === 'POTENTIAL') ? 75 : 50;
+        }
         html += `<span class="tag" style="background:#FEF3C7;color:#D97706;font-weight:600;">🏆 ${pointsVal} Points</span>`;
         if (approvalStatus && approvalStatus !== 'approved') {
             html += `<span class="tag" style="background:${approvalBg};color:${approvalTextColor};">${approvalLabel}</span>`;
+        }
+        if (spot.is_maintenance) {
+            html += `<span class="tag" style="background:#FEF3C7;color:#D97706;font-weight:700;"><i class="fas fa-tools"></i> Under Maintenance</span>`;
+        } else if (approvalStatus === 'closed' || spot.status === 'closed') {
+            html += `<span class="tag" style="background:#FEE2E2;color:#DC2626;font-weight:700;"><i class="fas fa-ban"></i> Closed</span>`;
         }
         html += `</div>`;
         html += `<p>${desc}${(spot.description || '').length > 100 ? '...' : ''}</p>`;
@@ -3371,11 +3392,25 @@ function renderTableRows(spotsData) {
         html += `<tr data-spot-id="${spot.id}" data-municipality="${munName}" data-category="${spot.category || ''}" data-status="${statusClass}" data-name="${(spot.name || '').toLowerCase()}" style="cursor: pointer;">`;
         html += `<td style="font-family:'Courier New',monospace;color:#6B7280;">TS-${spotId}</td>`;
         html += `<td><strong>${spot.name || ''}</strong></td>`;
-        html += `<td>${munName}</td>`;
+        const tblLoc = spot.barangay ? `${spot.barangay}, ${munName}` : munName;
+        html += `<td>${tblLoc}</td>`;
         html += `<td>${catTags}</td>`;
         html += `<td>${status ? `<span class="tag" style="background:${statusBg};color:${statusColor};">${statusClass}</span>` : ''}</td>`;
-        html += `<td style="font-weight: 600; color: #D97706;">${spot.points !== undefined ? spot.points : 0} pts</td>`;
-        html += `<td>${(approvalStatus && approvalStatus !== 'approved') ? `<span class="tag" style="background:${approvalBg};color:${approvalTextColor};">${approvalLabel}</span>` : ''}</td>`;
+        let tablePts = spot.points !== undefined && parseInt(spot.points) > 0 ? parseInt(spot.points) : 0;
+        if (!tablePts) {
+            const st = (spot.classification_status || '').toUpperCase();
+            tablePts = (st === 'EMERGE' || st === 'EMERGING') ? 100 : (st === 'POTENTIAL') ? 75 : 50;
+        }
+        html += `<td style="font-weight: 600; color: #D97706;">${tablePts} pts</td>`;
+        let tableStatusBadge = '';
+        if (approvalStatus && approvalStatus !== 'approved') {
+            tableStatusBadge = `<span class="tag" style="background:${approvalBg};color:${approvalTextColor};">${approvalLabel}</span>`;
+        } else if (spot.is_maintenance) {
+            tableStatusBadge = `<span class="tag" style="background:#F59E0B;color:#FFFFFF;font-weight:700;"><i class="fas fa-tools"></i> Under Maintenance</span>`;
+        } else if (spot.status === 'closed') {
+            tableStatusBadge = `<span class="tag" style="background:#EF4444;color:#FFFFFF;font-weight:700;"><i class="fas fa-ban"></i> Closed</span>`;
+        }
+        html += `<td>${tableStatusBadge}</td>`;
         html += `<td>${feeDisplay}</td>`;
         html += `<td>${date}</td>`;
         html += `<td style="text-align:right;">`;
@@ -3666,7 +3701,20 @@ function initDeclineModal() {
     // Approve modal listeners
     document.getElementById('cancelApproveBtn')?.addEventListener('click', closeApproveModal);
     document.getElementById('confirmApproveBtn')?.addEventListener('click', confirmApprove);
-    document.getElementById('approveConfirmModal')?.addEventListener('click', e => { if (e.target.id === 'approveConfirmModal') closeApproveModal(); });
-}
+    }
 
 window.initDeclineModal = initDeclineModal;
+
+window.filterTouristSpotsByTab = function(tab) {
+    if (!window.touristSpotsData) return;
+    let filtered = window.touristSpotsData;
+    if (tab === 'pending') {
+        filtered = window.touristSpotsData.filter(s => (s.status || '').toLowerCase() === 'pending');
+    } else if (tab === 'approved') {
+        filtered = window.touristSpotsData.filter(s => (s.status || '').toLowerCase() === 'approved');
+    } else if (tab === 'rejected') {
+        filtered = window.touristSpotsData.filter(s => (s.status || '').toLowerCase() === 'rejected');
+    }
+    if (typeof renderCardsGrid === 'function') renderCardsGrid(filtered);
+    if (typeof renderTableRows === 'function') renderTableRows(filtered);
+};

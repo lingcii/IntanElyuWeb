@@ -101,7 +101,15 @@ const baseUrl = USE_RAILWAY
         PROFILE: `${baseUrl}/api/profile`,
 
         /**
-         * Converts relative proxy URLs or missing scheme Railway URLs into absolute URLs.
+         * Converts relative proxy URLs, missing-scheme Railway URLs, or
+         * Cloudflare R2 URLs into absolute displayable URLs.
+         *
+         * Storage sources handled:
+         *  - Cloudflare R2 full URL (https://...r2.cloudflarestorage.com/...) → returned as-is ✅
+         *  - External CDN / Unsplash https:// URLs → returned as-is ✅
+         *  - Railway URLs without scheme (intanelyuweb...railway.app/...) → https:// prepended
+         *  - Local proxy (/api/serve-image.php?file=...) → prefixed with BASE_URL
+         *  - Storage-relative paths (storage/...) → mobile backend fallback
          */
         normalizeImageUrl(url) {
             if (!url) return '';
@@ -155,6 +163,20 @@ const baseUrl = USE_RAILWAY
             }
 
             return `${mobileBackendHost}/storage/${defaultSubdir}/${trimmed.replace(/^\/+/, '')}`;
+        },
+
+        /**
+         * resolveImageUrl — explicit alias for displaying any image in the system.
+         * Works transparently with:
+         *   - Cloudflare R2 URLs  (https://...r2.cloudflarestorage.com/...)
+         *   - Railway CDN URLs    (https://...railway.app/...)
+         *   - Local proxy URLs    (/api/serve-image.php?file=...)
+         *   - Bare filenames      (spot_abc123.jpg)
+         *
+         * Usage: <img :src="API_CONFIG.resolveImageUrl(photo_url)">
+         */
+        resolveImageUrl(url, defaultSubdir = 'tourist_spots') {
+            return this.formatImageUrl(url, defaultSubdir);
         },
 
         /**

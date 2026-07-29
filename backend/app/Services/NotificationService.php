@@ -39,7 +39,15 @@ class NotificationService
     public static function notifyRoles(array $roles, string $type, string $title, string $message, array $data = []): void
     {
         try {
-            $users = User::whereIn('role', $roles)->where('status', 'active')->get();
+            $users = User::where(function ($q) use ($roles) {
+                $q->whereIn('role', $roles);
+                foreach ($roles as $r) {
+                    if ($r === 'municipal') {
+                        $q->orWhere('role', 'like', '%_mto');
+                    }
+                }
+            })->where('status', 'active')->get();
+
             foreach ($users as $user) {
                 self::notify($user->id, $type, $title, $message, $data);
             }
@@ -75,7 +83,7 @@ class NotificationService
      */
     public static function notifyLupto(string $type, string $title, string $message, array $data = []): void
     {
-        self::notifyRoles(['lupto'], $type, $title, $message, $data);
+        self::notifyRoles(['lupto', 'admin'], $type, $title, $message, $data);
     }
 
     /**
@@ -83,14 +91,14 @@ class NotificationService
      */
     public static function notifyPicto(string $type, string $title, string $message, array $data = []): void
     {
-        self::notifyRoles(['picto', 'pitco'], $type, $title, $message, $data);
+        self::notifyRoles(['picto', 'pitco', 'admin'], $type, $title, $message, $data);
     }
 
     /**
-     * Notify all provincial admins (PICTO + LUPTO).
+     * Notify all provincial admins (PICTO + LUPTO + Admin).
      */
     public static function notifyProvincial(string $type, string $title, string $message, array $data = []): void
     {
-        self::notifyRoles(['picto', 'pitco', 'lupto'], $type, $title, $message, $data);
+        self::notifyRoles(['picto', 'pitco', 'lupto', 'admin'], $type, $title, $message, $data);
     }
 }

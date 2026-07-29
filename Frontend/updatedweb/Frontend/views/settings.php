@@ -90,10 +90,6 @@ ob_start();
                         </button>
                     </div>
                 </div>
-                <div class="lupto-form-group">
-                    <label>Session Timeout (minutes)</label>
-                    <input type="number" class="filter-select" style="width:100%; height:40px; box-sizing:border-box;" value="30" placeholder="Session timeout in minutes">
-                </div>
                 <button class="btn-gov" onclick="window.showSaveConfirmModal()">
                     <i class="fas fa-save"></i> Save Changes
                 </button>

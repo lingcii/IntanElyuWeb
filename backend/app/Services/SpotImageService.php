@@ -44,11 +44,23 @@ class SpotImageService
 
     public function store(UploadedFile $file, string $municipalityName, string $spotName): string
     {
-        $extension = $file->getClientOriginalExtension();
+        $extension    = $file->getClientOriginalExtension();
         $relativePath = $this->generateRelativePath($municipalityName, $spotName, $extension);
 
-        $file->storeAs(dirname($relativePath), basename($relativePath), ['disk' => $this->disk]);
+        // Try Cloudflare R2 first
+        $r2 = new CloudflareR2Service();
+        if ($r2->isConfigured()) {
+            try {
+                $filename  = basename($relativePath);
+                $folder    = 'tourist_spots/' . strtoupper(trim($municipalityName));
+                return $r2->upload($file, $folder, $filename);
+            } catch (\Exception $e) {
+                \Log::warning('[R2] SpotImageService upload failed, falling back to local: ' . $e->getMessage());
+            }
+        }
 
+        // Fallback: local public disk
+        $file->storeAs(dirname($relativePath), basename($relativePath), ['disk' => $this->disk]);
         return $relativePath;
     }
 }

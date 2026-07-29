@@ -2205,6 +2205,58 @@ label.sfm-upload-area {
     font-size: 12px;
 }
 
+.maintenance-badge {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    background: #F59E0B;
+    color: #ffffff;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 6px 12px;
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.pending-badge + .maintenance-badge {
+    top: 44px;
+}
+
+.maintenance-badge i {
+    font-size: 12px;
+}
+
+.closed-badge {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    background: #EF4444;
+    color: #ffffff;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 6px 12px;
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.pending-badge + .closed-badge {
+    top: 44px;
+}
+
+.closed-badge i {
+    font-size: 12px;
+}
+
 .pending-card-body {
     padding: 24px;
     display: flex;

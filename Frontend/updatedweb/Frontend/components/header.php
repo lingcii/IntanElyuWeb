@@ -187,6 +187,7 @@ function timeAgo($datetime) {
                         <i class="fas fa-bell"></i> Notifications
                     </div>
                     <div class="notif-header-actions">
+                        <a href="notifications.php" class="view-all-notif-btn" title="View All Notifications"><i class="fas fa-list"></i> View All</a>
                         <button class="mark-all-read" onclick="window.markAllRead()" title="Mark all as read">Mark all read</button>
                         <button class="clear-all" onclick="window.clearAllNotifs()" title="Clear all">Clear</button>
                     </div>
@@ -345,9 +346,10 @@ function timeAgo($datetime) {
 
 <script>
 (function () {
-    var role = document.querySelector('meta[name="user-role"]') ? '' : '<?= htmlspecialchars($userRole ?? "") ?>';
-    var prefixMap = { picto: 'pitco', lupto: 'lupto' };
-    var prefix = prefixMap[role] || (role.endsWith && role.endsWith('_mto') || role === 'municipal' ? 'municipal' : null);
+    var metaEl = document.querySelector('meta[name="user-role"]');
+    var role = (metaEl ? metaEl.getAttribute('content') : '<?= htmlspecialchars($userRole ?? "") ?>').toLowerCase();
+    var prefixMap = { lupto: 'lupto', picto: 'pitco', pitco: 'pitco', municipal: 'municipal', admin: 'admin' };
+    var prefix = prefixMap[role] || (role.endsWith('_mto') || role === 'municipal' ? 'municipal' : 'lupto');
     if (!prefix) return;
     var baseUrl = window.API_CONFIG ? window.API_CONFIG.BASE_URL : 'http://localhost:8000';
     var API = baseUrl + '/api/' + prefix + '/notifications';
@@ -380,19 +382,21 @@ function timeAgo($datetime) {
         return new Date(dateStr).toLocaleDateString();
     }
     function esc(str) { return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+
     function updateBadge(count) {
-        unreadCount = count;
+        unreadCount = Math.max(0, count);
         if (!notifBadge) return;
-        notifBadge.textContent = count > 99 ? '99+' : count;
-        notifBadge.style.display = count > 0 ? '' : 'none';
-        if (count > badgePrev && badgePrev >= 0) {
+        notifBadge.textContent = unreadCount > 99 ? '99+' : unreadCount;
+        notifBadge.style.display = unreadCount > 0 ? 'inline-flex' : 'none';
+        if (unreadCount > badgePrev && badgePrev >= 0) {
             notifBadge.classList.remove('pulse'); void notifBadge.offsetWidth; notifBadge.classList.add('pulse');
             var btn = document.getElementById('notifBtn');
             if (btn) { btn.classList.remove('shake'); void btn.offsetWidth; btn.classList.add('shake'); }
         }
-        badgePrev = count;
-        if (notifCountEl) notifCountEl.textContent = count + ' new';
+        badgePrev = unreadCount;
+        if (notifCountEl) notifCountEl.textContent = unreadCount + ' new';
     }
+
     function renderNotifications(notifications) {
         var html = '';
         if (!notifications || !notifications.length) {
@@ -419,37 +423,82 @@ function timeAgo($datetime) {
                     '</div>';
             });
         }
-        html += '<div class="notif-footer"><a href="notifications.php"><i class="fas fa-list"></i> View All Notifications <i class="fas fa-arrow-right"></i></a></div>';
         notifItemsEl.innerHTML = html;
     }
+
     function fetchNotifications() {
+        if (!window.API_CONFIG) return;
         window.API_CONFIG.get(API + '/recent').then(function (data) {
             updateBadge(data.unread_count || 0);
             renderNotifications(data.notifications || []);
-        }).catch(function () {
-            notifItemsEl.innerHTML = '<div class="notif-empty"><i class="fas fa-bell-slash"></i><span>Unable to load</span></div>';
+        }).catch(function (err) {
+            console.warn('Failed to fetch notifications:', err);
+            notifItemsEl.innerHTML = '<div class="notif-empty"><i class="fas fa-exclamation-circle"></i><span>Unable to load notifications</span></div>';
         });
     }
+
     window.handleNotifClick = function (el, url, id) {
-        el.classList.remove('unread');
-        var dot = el.querySelector('.notif-dot');
-        if (dot) dot.style.display = 'none';
+        if (el) {
+            el.classList.remove('unread');
+            var dot = el.querySelector('.notif-dot');
+            if (dot) dot.style.display = 'none';
+        }
+        if (unreadCount > 0) {
+            updateBadge(unreadCount - 1);
+        }
+        var dropdown = document.getElementById('notifDropdown');
+        if (dropdown) dropdown.classList.remove('active');
+
         window.API_CONFIG.patch(API + '/' + id + '/read', {}).catch(function () {});
-        fetchNotifications();
+
         if (url) {
             var targetPage = url.split('?')[0];
+            var queryString = url.includes('?') ? url.split('?')[1] : '';
+
             if (typeof window.switchTab === 'function') {
                 window.switchTab(targetPage);
-            } else if (url.endsWith('.php') || url.includes('.php')) {
+                setTimeout(function () {
+                    if (typeof window.handleNotifDeepLink === 'function') {
+                        window.handleNotifDeepLink(targetPage, queryString);
+                    }
+                }, 250);
+            } else {
                 window.location.href = url;
             }
         }
     };
-    window.deleteNotif = function (id) {
-        window.API_CONFIG.delete(API + '/' + id).then(function () { fetchNotifications(); }).catch(function () {});
+
+    window.handleNotifDeepLink = function (targetPage, queryString) {
+        if (!queryString) return;
+        var params = new URLSearchParams(queryString);
+        var spotId = params.get('spot_id');
+        var tab = params.get('tab');
+        var userId = params.get('user_id');
+
+        if (targetPage.includes('tourist-spots.php')) {
+            if (tab && typeof window.filterTouristSpotsByTab === 'function') {
+                window.filterTouristSpotsByTab(tab);
+            }
+            if (spotId && typeof window.openSpotModal === 'function') {
+                window.openSpotModal(spotId);
+            }
+        } else if (targetPage.includes('user-management.php')) {
+            if (userId && typeof window.highlightUserRow === 'function') {
+                window.highlightUserRow(userId);
+            }
+        }
     };
+
+    window.deleteNotif = function (id) {
+        window.API_CONFIG.delete(API + '/' + id).then(function (res) {
+            if (res && res.unread_count !== undefined) {
+                updateBadge(res.unread_count);
+            }
+            fetchNotifications();
+        }).catch(function () {});
+    };
+
     window.markAllRead = function () {
-        unreadCount = 0;
         updateBadge(0);
         if (notifItemsEl) {
             var items = notifItemsEl.querySelectorAll('.notif-item.unread');
@@ -461,8 +510,10 @@ function timeAgo($datetime) {
         }
         window.API_CONFIG.patch(API + '/read-all', {}).then(function () {
             fetchNotifications();
+            showNotifToast('All notifications marked as read', 'success');
         }).catch(function () {});
     };
+
     window.clearAllNotifs = function () {
         var clearModal = document.getElementById('clearNotifsConfirmModal');
         if (clearModal) {
@@ -480,13 +531,16 @@ function timeAgo($datetime) {
             if (clearModal) clearModal.style.display = 'none';
             window.API_CONFIG.delete(API + '/clear-all').then(function () {
                 updateBadge(0);
-                fetchNotifications();
-                showNotifToast('All notifications have been deleted successfully.', 'success');
+                if (notifItemsEl) {
+                    notifItemsEl.innerHTML = '<div class="notif-empty"><i class="fas fa-bell-slash"></i><span>No notifications yet</span></div>';
+                }
+                showNotifToast('All notifications cleared successfully.', 'success');
             }).catch(function (err) {
                 console.error('Failed to clear notifications:', err);
             });
         }
     });
+
     function startSSE() {
         try {
             if (window._headerSSE) { try { window._headerSSE.close(); } catch(e){} }
@@ -496,40 +550,24 @@ function timeAgo($datetime) {
                 fetchNotifications();
                 try {
                     var notif = JSON.parse(e.data);
-                    void 0;
-                    
                     if (notif.module === 'Dashboard' || notif.type === 'spot_approved' || notif.type === 'spot_rejected' || notif.type === 'spot_pending') {
-                        if (typeof window.softRefreshDashboard === 'function') {
-                            window.softRefreshDashboard();
-                        }
-                        if (typeof window.softRefreshTouristSpots === 'function') {
-                            window.softRefreshTouristSpots();
-                        }
+                        if (typeof window.softRefreshDashboard === 'function') window.softRefreshDashboard();
+                        if (typeof window.softRefreshTouristSpots === 'function') window.softRefreshTouristSpots();
                     } else if (notif.module === 'Users' || notif.type === 'user_created' || notif.type === 'user_updated') {
-                        if (typeof window.softRefreshDashboard === 'function') {
-                            window.softRefreshDashboard();
-                        }
-                        if (typeof window.refreshTable === 'function') {
-                            window.refreshTable();
-                        }
-                    } else if (notif.module === 'FareData' || notif.type === 'fare_updated') {
-                        if (typeof window.softRefreshDashboard === 'function') {
-                            window.softRefreshDashboard();
-                        }
-                        if (typeof window.softRefreshFareData === 'function') {
-                            window.softRefreshFareData();
-                        }
+                        if (typeof window.softRefreshDashboard === 'function') window.softRefreshDashboard();
+                        if (typeof window.refreshTable === 'function') window.refreshTable();
                     }
                 } catch (err) {
-                    console.error('Error parsing notification data:', err);
+                    console.error('Error parsing SSE data:', err);
                 }
             });
             es.addEventListener('count', function (e) { try { var d = JSON.parse(e.data); updateBadge(d.unread_count || 0); } catch (er) {} });
             es.onerror = function () { es.close(); };
         } catch (err) {}
     }
+
     fetchNotifications();
     setTimeout(startSSE, 2000);
-    setInterval(fetchNotifications, 60000);
+    setInterval(fetchNotifications, 30000);
 })();
 </script>

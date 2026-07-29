@@ -72,11 +72,11 @@ class DashboardController extends Controller
         $municipalityId = (int) $request->session()->get('user_municipality_id', 0);
         $isMuni         = in_array($role, User::$MUNICIPAL_ROLES) && $municipalityId;
 
-        $cacheKey = "dashboard:data:{$role}:{$municipalityId}:v5";
+        $cacheKey = "dashboard:data:{$role}:{$municipalityId}:v6";
         $cacheTtl = $isMuni ? 120 : 120;
 
         $payload = Cache::remember($cacheKey, $cacheTtl, function () use ($isMuni, $municipalityId) {
-            // 1. Tourist Spots counts (exclude drafts)
+            // 1. Tourist Spots counts (exclude drafts; pending spots do NOT count toward total spots KPI)
             $spotCountsQuery = DB::table('tourist_spots')->where('status', '!=', 'draft');
             if ($isMuni) {
                 $spotCountsQuery->where('municipality_id', $municipalityId);
@@ -84,9 +84,9 @@ class DashboardController extends Controller
             $spotCounts = $spotCountsQuery
                 ->selectRaw("COUNT(*) as total, COALESCE(SUM(status='approved'), 0) as approved, COALESCE(SUM(status='pending'), 0) as pending")
                 ->first();
-            $totalSpots = (int) ($spotCounts->total ?? 0);
             $approvedSpots = (int) ($spotCounts->approved ?? 0);
             $pendingSpots = (int) ($spotCounts->pending ?? 0);
+            $totalSpots = $approvedSpots;
 
             // 2. Approved tourist spots list (scoped columns)
             $spotsQuery = TouristSpot::where('status', 'approved')
@@ -307,14 +307,32 @@ class DashboardController extends Controller
             );
 
             $muniName = Municipality::find($spot->municipality_id)?->name;
+            if ($spot->created_by) {
+                NotificationService::notify(
+                    $spot->created_by,
+                    'spot_approved',
+                    'Tourist Spot Approved',
+                    "Your submission \"{$spot->name}\" has been approved by LUPTO!",
+                    [
+                        'module'            => 'Tourist Spots',
+                        'action_url'        => "tourist-spots.php?tab=approved&spot_id={$spot->id}",
+                        'spot_id'           => $spot->id,
+                        'spot_name'         => $spot->name,
+                        'municipality_name' => $muniName,
+                        'actor_name'        => $request->session()->get('user_name'),
+                    ]
+                );
+            }
+
             NotificationService::notifyMunicipality(
                 $spot->municipality_id,
                 'spot_approved',
                 'Tourist Spot Approved',
-                "\"{$spot->name}\" has been approved",
+                "Tourist spot \"{$spot->name}\" has been approved by LUPTO!",
                 [
                     'module'            => 'Tourist Spots',
-                    'action_url'        => 'tourist-spots.php',
+                    'action_url'        => "tourist-spots.php?tab=approved&spot_id={$spot->id}",
+                    'spot_id'           => $spot->id,
                     'spot_name'         => $spot->name,
                     'municipality_name' => $muniName,
                     'actor_name'        => $request->session()->get('user_name'),
@@ -324,10 +342,11 @@ class DashboardController extends Controller
             NotificationService::notifyProvincial(
                 'spot_approved',
                 'Tourist Spot Approved',
-                "\"{$spot->name}\" has been approved",
+                "\"{$spot->name}\" has been approved by LUPTO.",
                 [
                     'module'            => 'Tourist Spots',
-                    'action_url'        => 'tourist-spots.php',
+                    'action_url'        => "tourist-spots.php?tab=approved&spot_id={$spot->id}",
+                    'spot_id'           => $spot->id,
                     'spot_name'         => $spot->name,
                     'municipality_name' => $muniName,
                     'actor_name'        => $request->session()->get('user_name'),
@@ -380,30 +399,54 @@ class DashboardController extends Controller
         );
 
         $muniName = Municipality::find($spot->municipality_id)?->name;
+        $rejectMsg = "\"{$spot->name}\" was rejected" . ($rejectionReason ? ". Reason: {$rejectionReason}" : '.');
+
+        if ($spot->created_by) {
+            NotificationService::notify(
+                $spot->created_by,
+                'spot_rejected',
+                'Tourist Spot Rejected',
+                $rejectMsg,
+                [
+                    'module'            => 'Tourist Spots',
+                    'action_url'        => "tourist-spots.php?tab=rejected&spot_id={$spot->id}",
+                    'spot_id'           => $spot->id,
+                    'spot_name'         => $spot->name,
+                    'municipality_name' => $muniName,
+                    'actor_name'        => $request->session()->get('user_name'),
+                    'rejection_reason'  => $rejectionReason,
+                ]
+            );
+        }
+
         NotificationService::notifyMunicipality(
             $spot->municipality_id,
             'spot_rejected',
             'Tourist Spot Rejected',
-            "\"{$spot->name}\" was rejected" . ($rejectionReason ? ": {$rejectionReason}" : ''),
+            $rejectMsg,
             [
                 'module'            => 'Tourist Spots',
-                'action_url'        => 'tourist-spots.php',
+                'action_url'        => "tourist-spots.php?tab=rejected&spot_id={$spot->id}",
+                'spot_id'           => $spot->id,
                 'spot_name'         => $spot->name,
                 'municipality_name' => $muniName,
                 'actor_name'        => $request->session()->get('user_name'),
+                'rejection_reason'  => $rejectionReason,
             ]
         );
 
         NotificationService::notifyProvincial(
             'spot_rejected',
             'Tourist Spot Rejected',
-            "\"{$spot->name}\" was rejected" . ($rejectionReason ? ": {$rejectionReason}" : ''),
+            $rejectMsg,
             [
                 'module'            => 'Tourist Spots',
-                'action_url'        => 'tourist-spots.php',
+                'action_url'        => "tourist-spots.php?tab=rejected&spot_id={$spot->id}",
+                'spot_id'           => $spot->id,
                 'spot_name'         => $spot->name,
                 'municipality_name' => $muniName,
                 'actor_name'        => $request->session()->get('user_name'),
+                'rejection_reason'  => $rejectionReason,
             ]
         );
 
@@ -450,6 +493,7 @@ class DashboardController extends Controller
                 ]);
 
             // Group by municipality and increment attraction_count once per municipality
+            /** @var \Illuminate\Support\Collection<int, int> $countByMunicipality */
             $countByMunicipality = $spots->groupBy('municipality_id')->map->count();
             foreach ($countByMunicipality as $municipalityId => $count) {
                 Municipality::where('id', $municipalityId)->increment('attraction_count', $count);

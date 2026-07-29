@@ -64,9 +64,11 @@ return new class extends Migration
         } catch (\Exception $e) {}
 
         // merch_reservations.status: only 'pending', 'claimed', 'cancelled'
-        try {
-            DB::statement("ALTER TABLE merch_reservations ADD CONSTRAINT merch_reservations_status_check CHECK (status IN ('pending', 'claimed', 'cancelled'))");
-        } catch (\Exception $e) {}
+        if (Schema::hasTable('merch_reservations')) {
+            try {
+                DB::statement("ALTER TABLE merch_reservations ADD CONSTRAINT merch_reservations_status_check CHECK (status IN ('pending', 'claimed', 'cancelled'))");
+            } catch (\Exception $e) {}
+        }
 
         // ===== 5. Indexes for faster queries on commonly filtered/joined columns =====
         try {
@@ -82,13 +84,15 @@ return new class extends Migration
             });
         } catch (\Exception $e) {}
 
-        try {
-            Schema::table('merch_reservations', function (Blueprint $table) {
-                $table->index('user_id', 'merch_reservations_user_id_index');
-                $table->index('status', 'merch_reservations_status_index');
-                $table->index('merchandise_id', 'merch_reservations_merchandise_id_index');
-            });
-        } catch (\Exception $e) {}
+        if (Schema::hasTable('merch_reservations')) {
+            try {
+                Schema::table('merch_reservations', function (Blueprint $table) {
+                    $table->index('user_id', 'merch_reservations_user_id_index');
+                    $table->index('status', 'merch_reservations_status_index');
+                    $table->index('merchandise_id', 'merch_reservations_merchandise_id_index');
+                });
+            } catch (\Exception $e) {}
+        }
     }
 
     public function down(): void

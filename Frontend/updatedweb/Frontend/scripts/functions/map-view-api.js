@@ -560,7 +560,7 @@ function _runMapView() {
                     ${hasImage ? `<img src="${spot.images[0].photo_url}" style="width:100%; height:80px; object-fit:cover; border-radius:6px; margin-bottom:6px;" alt="${spot.name}">` : ''}
                     <h4 style="margin: 0 0 2px 0; font-size: 12.5px; font-weight: 700; color: #1E293B;">${spot.name}</h4>
                     <div style="font-size: 10px; color: #6B7280; margin-bottom: 4px;">
-                        <i class="fas fa-map-marker-alt" style="margin-right: 3px; color: #2563EB;"></i> ${spot.municipality}, La Union
+                        <i class="fas fa-map-marker-alt" style="margin-right: 3px; color: #2563EB;"></i> ${(spot.barangay ? spot.barangay + ', ' : '') + (spot.municipality || '')}, La Union
                     </div>
                     <div style="display: flex; gap: 3px; flex-wrap: wrap; margin-bottom: 6px;">
                         <div style="display: inline-flex; align-items: center; gap: 3px; background: #EEF2FF; color: #2563EB; padding: 1.5px 5px; border-radius: 4px; font-size: 9px; font-weight: 600; text-transform: uppercase;">
@@ -916,7 +916,7 @@ function _runMapView() {
             <h2 class="spot-detail-title">${spot.name}</h2>
             <div class="spot-detail-location">
                 <i class="fas fa-map-marker-alt" style="color: #2563EB;"></i>
-                ${spot.municipality}, La Union
+                ${spot.barangay ? spot.barangay + ', ' : ''}${spot.municipality}, La Union
             </div>
 
             <div class="spot-detail-tags">

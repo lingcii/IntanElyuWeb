@@ -193,7 +193,7 @@
             (hasImage ? '<div class="dash-spot-card-img"><img src="' + escapeHtml(spot.images[0].photo_url) + '" alt="' + escapeHtml(spot.name) + '"></div>' :
                 '<div class="dash-spot-card-img dash-spot-card-img-placeholder"><i class="fas fa-' + icon + '" style="font-size:36px;color:' + bgColor + ';"></i></div>') +
             '<h3 class="dash-spot-card-name">' + escapeHtml(spot.name || 'Unnamed Spot') + '</h3>' +
-            '<div class="dash-spot-card-loc"><i class="fas fa-map-marker-alt"></i> ' + escapeHtml(muniName) + ', La Union</div>' +
+            '<div class="dash-spot-card-loc"><i class="fas fa-map-marker-alt"></i> ' + escapeHtml((spot.barangay ? spot.barangay + ', ' : '') + muniName) + ', La Union</div>' +
             '<div class="dash-spot-card-badges">' +
             '<span class="dash-spot-card-badge" style="background:' + bgColor + ';color:white;"><i class="fas fa-' + icon + '"></i> ' + escapeHtml(spot.category || 'N/A') + '</span>' +
             getClassificationBadge(spot.classification_status) +
@@ -363,7 +363,7 @@
         body.innerHTML =
             imagesHtml +
             '<div class="dash-spot-meta">' +
-            '<div class="dash-spot-location"><i class="fas fa-map-marker-alt"></i> ' + escapeHtml(muniName) + ', La Union</div>' +
+            '<div class="dash-spot-location"><i class="fas fa-map-marker-alt"></i> ' + escapeHtml((spot.barangay ? spot.barangay + ', ' : '') + muniName) + ', La Union</div>' +
             '<div class="dash-spot-badges">' +
             '<span class="dash-badge dash-badge-cat" style="background:' + bgColor + ';"><i class="fas fa-' + icon + '"></i> ' + escapeHtml(spot.category || 'N/A') + '</span>' +
             '<span class="dash-badge dash-badge-class" style="background:' + classColor + ';">' + classLabel + '</span>' +

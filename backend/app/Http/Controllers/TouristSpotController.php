@@ -9,6 +9,7 @@ use App\Models\TouristSpotImage;
 use App\Models\User;
 use App\Enums\ActivityAction;
 use App\Services\ActivityLogService;
+use App\Services\CloudflareR2Service;
 use App\Services\NotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -65,7 +66,7 @@ class TouristSpotController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $role           = $request->session()->get('user_role');
+        $role           = strtolower((string) ($request->session()->get('user_role') ?? 'lupto'));
         $municipalityId = (int) $request->session()->get('user_municipality_id', 0);
 
         $cacheKey = "tourist-spots:list:{$role}:{$municipalityId}";
@@ -126,12 +127,35 @@ class TouristSpotController extends Controller
     /** POST /api/tourist-spots/upload-image */
     public function uploadImage(Request $request): JsonResponse
     {
-        $request->validate(['image' => 'required|image|mimes:jpeg,jpg,png|max:10240']); // 10MB
+        $request->validate(['image' => 'required|image|mimes:jpeg,jpg,png,webp|max:10240']); // 10MB
 
         $file     = $request->file('image');
-        $filename = 'spot_' . uniqid() . '.' . $file->extension();
-        
-        // Ensure directory exists and is writable
+        $extension = $file->getClientOriginalExtension() ?: $file->extension();
+        $filename = 'spot_' . uniqid() . '.' . strtolower($extension);
+
+        $r2 = new CloudflareR2Service();
+
+        // 1. Primary Storage: Upload directly to Cloudflare R2 if configured (bypassing local disk save)
+        if ($r2->isConfigured()) {
+            try {
+                $r2Url = $r2->upload($file, self::UPLOAD_DIR, $filename);
+                \Log::info("[R2] Direct upload successful to Cloudflare R2: " . self::UPLOAD_DIR . "/{$filename}");
+
+                $url = '/api/serve-image.php?file=' . urlencode($filename);
+
+                return response()->json([
+                    'success'   => true,
+                    'photo_url' => $url,
+                    'r2_url'    => $r2Url,
+                    'filename'  => $filename,
+                    'storage'   => 'r2',
+                ]);
+            } catch (\Exception $e) {
+                \Log::error('[R2] Cloudflare R2 direct upload failed: ' . $e->getMessage() . '. Falling back to local.');
+            }
+        }
+
+        // Fallback for unconfigured local environments
         $directory = storage_path('app/public/' . self::UPLOAD_DIR);
         if (!is_dir($directory)) {
             mkdir($directory, 0777, true);
@@ -142,16 +166,15 @@ class TouristSpotController extends Controller
                 @exec('attrib -r "' . $directory . '" /d');
             }
         }
-        
-        $file->move($directory, $filename);
 
-        // Return the proxy URL instead of the full storage URL
+        $file->move($directory, $filename);
         $url = '/api/serve-image.php?file=' . urlencode($filename);
 
         return response()->json([
             'success'   => true,
             'photo_url' => $url,
             'filename'  => $filename,
+            'storage'   => 'local',
         ]);
     }
 
@@ -304,12 +327,15 @@ class TouristSpotController extends Controller
 
     public function store(Request $request): JsonResponse
     {
-        $role = $request->session()->get('user_role');
+        $role = strtolower((string) ($request->session()->get('user_role') ?? 'lupto'));
         if (in_array($role, ['picto', 'pitco'])) {
             return response()->json(['error' => 'PICTO users have read-only access to tourist sites.'], 403);
         }
-        if (in_array($role, User::$MUNICIPAL_ROLES)) {
-            $request->merge(['points' => 0]);
+        $pointsInput = (int) $request->input('points', 0);
+        if ($pointsInput <= 0) {
+            $classUpper = strtoupper($request->input('classification_status', 'EXISTING'));
+            $pointsInput = TouristSpot::getDefaultPointsForClassification($classUpper);
+            $request->merge(['points' => $pointsInput]);
         }
 
         $rules = [
@@ -342,7 +368,7 @@ class TouristSpotController extends Controller
 
         $data = $request->validate($rules);
 
-        $role           = $request->session()->get('user_role');
+        $role           = strtolower((string) ($request->session()->get('user_role') ?? 'lupto'));
         $sessionMuniId  = (int) $request->session()->get('user_municipality_id', 0);
 
         // Municipal users always use their own municipality and cannot submit for another municipality
@@ -467,29 +493,32 @@ class TouristSpotController extends Controller
         });
 
         try {
+            $muniName = $spot->municipality?->name ?? 'Municipal MTO';
             if ($role === 'lupto' || $initialStatus === 'approved') {
                 NotificationService::notifyProvincial(
                     'spot_added',
                     'New Tourist Spot Added',
-                    "A new tourist spot \"" . $spot->name . "\" has been added.",
+                    "A new tourist spot \"" . $spot->name . "\" has been added in " . $muniName . ".",
                     [
-                        'module'            => 'TouristSpots',
-                        'action_url'        => 'tourist-spots.php',
+                        'module'            => 'Tourist Spots',
+                        'action_url'        => "tourist-spots.php?tab=approved&spot_id={$spot->id}",
+                        'spot_id'           => $spot->id,
                         'spot_name'         => $spot->name,
-                        'municipality_name' => $spot->municipality?->name,
+                        'municipality_name' => $muniName,
                         'actor_name'        => $request->session()->get('user_name'),
                     ]
                 );
             } else {
-                NotificationService::notifyProvincial(
+                NotificationService::notifyLupto(
                     'spot_pending',
-                    'New Tourist Spot Pending',
-                    "A new tourist spot \"" . $spot->name . "\" has been submitted for approval.",
+                    'New Tourist Spot Pending Approval',
+                    "New tourist spot \"" . $spot->name . "\" was submitted by " . $muniName . " MTO and is pending approval.",
                     [
-                        'module'            => 'TouristSpots',
-                        'action_url'        => 'tourist-spots.php',
+                        'module'            => 'Tourist Spots',
+                        'action_url'        => "tourist-spots.php?tab=pending&spot_id={$spot->id}",
+                        'spot_id'           => $spot->id,
                         'spot_name'         => $spot->name,
-                        'municipality_name' => $spot->municipality?->name,
+                        'municipality_name' => $muniName,
                         'actor_name'        => $request->session()->get('user_name'),
                     ]
                 );
@@ -510,7 +539,7 @@ class TouristSpotController extends Controller
 
     public function update(Request $request, int $id): JsonResponse
     {
-        $role = $request->session()->get('user_role');
+        $role = strtolower((string) ($request->session()->get('user_role') ?? 'lupto'));
         if (in_array($role, ['picto', 'pitco'])) {
             return response()->json(['error' => 'PICTO users have read-only access to tourist sites.'], 403);
         }
@@ -521,8 +550,12 @@ class TouristSpotController extends Controller
                 $query->where('municipality_id', $municipalityId);
             }
             $spot = $query->first();
-            $existingPoints = $spot ? (int)$spot->points : 0;
-            $request->merge(['points' => $existingPoints]);
+        }
+        $pointsInput = (int) $request->input('points', 0);
+        if ($pointsInput <= 0) {
+            $classUpper = strtoupper($request->input('classification_status', 'EXISTING'));
+            $pointsInput = TouristSpot::getDefaultPointsForClassification($classUpper);
+            $request->merge(['points' => $pointsInput]);
         }
 
         $rules = [
@@ -554,7 +587,7 @@ class TouristSpotController extends Controller
 
         $data = $request->validate($rules);
 
-        $role           = $request->session()->get('user_role');
+        $role           = strtolower((string) ($request->session()->get('user_role') ?? 'lupto'));
         $municipalityId = (int) $request->session()->get('user_municipality_id', 0);
 
         if (in_array($role, User::$MUNICIPAL_ROLES)) {
@@ -642,7 +675,7 @@ class TouristSpotController extends Controller
     /** DELETE /api/tourist-spots/{id} */
     public function destroy(Request $request, int $id): JsonResponse
     {
-        $role           = $request->session()->get('user_role');
+        $role           = strtolower((string) ($request->session()->get('user_role') ?? 'lupto'));
         if (in_array($role, ['picto', 'pitco'])) {
             return response()->json(['error' => 'PICTO users have read-only access to tourist sites.'], 403);
         }
@@ -738,23 +771,34 @@ class TouristSpotController extends Controller
     }
 
     /**
-     * Ensure a stored photo_url uses the frontend proxy format whenever possible.
+     * Ensure a stored photo_url uses the appropriate format.
      * Handles:
+     * - Full R2/CDN URLs (https://...) → returned as-is (no conversion needed)
      * - Proxy URLs (e.g. "/api/serve-image.php?file=xxx.jpg") → kept as-is
      * - Full Laravel serveImage URLs → converted back to proxy format
      * - Bare filenames (e.g. "urbiztondo.jpg") → wrapped in proxy format
-     * - Full storage URLs (any protocol/host) → converted to proxy format
      * - Legacy paths (e.g. "/Gaw-at-GO-System/...") → converted to proxy format
      *
-     * The proxy URL format (/api/serve-image.php?file=...) is relative and works
-     * regardless of the domain/port the frontend is accessed from.
+     * R2 URLs are always full https:// URLs and are returned unchanged so the
+     * frontend can use them directly in <img> tags without going through the
+     * backend serve-image proxy.
      */
     private function normalizePhotoUrl(?string $url): ?string
     {
         if (!$url) return null;
 
-        // If it's a full web URL (e.g. Unsplash), do NOT convert to serve-image.php unless it points to serve-image
+        // If it's a Cloudflare R2 S3 API endpoint URL (r2.cloudflarestorage.com), convert to proxy URL so browser <img> tags can render it
+        if (str_contains($url, 'r2.cloudflarestorage.com')) {
+            $path = parse_url($url, PHP_URL_PATH) ?? '';
+            $filename = basename($path);
+            if ($filename) {
+                return '/api/serve-image.php?file=' . urlencode($filename);
+            }
+        }
+
+        // ── Full https:// / http:// URL → return as-is (includes public CDNs, r2.dev, Unsplash) ──
         if (str_starts_with($url, 'http://') || str_starts_with($url, 'https://')) {
+            // Legacy: if it's a serve-image.php absolute URL, strip to relative proxy format
             if (str_contains($url, 'serve-image.php')) {
                 $parsed = parse_url($url);
                 parse_str($parsed['query'] ?? '', $params);
@@ -763,6 +807,7 @@ class TouristSpotController extends Controller
                     return '/api/serve-image.php?file=' . urlencode($filename);
                 }
             }
+            // All other full URLs pass through unchanged
             return $url;
         }
 
@@ -792,7 +837,7 @@ class TouristSpotController extends Controller
      * Proxy-compatible image serving — mirrors the frontend serve-image.php.
      * Used by the mobile app and any client that can't reach the frontend PHP server.
      */
-    public function serveImageProxy(Request $request): \Symfony\Component\HttpFoundation\BinaryFileResponse
+    public function serveImageProxy(Request $request): \Symfony\Component\HttpFoundation\Response
     {
         $filename = $request->query('file', '');
         return $this->serveImage($filename);
@@ -800,18 +845,41 @@ class TouristSpotController extends Controller
 
     /**
      * GET /api/images/tourist-spots/{filename}
-     * Serves an image file from the filesystem, searching frontend + backend
-     * storage directories. No auth required — intended for <img> tags.
+     * Serves an image file. Fetches directly from Cloudflare R2 without saving local disk copies.
      */
-    public function serveImage(string $filename): \Symfony\Component\HttpFoundation\BinaryFileResponse
+    public function serveImage(string $filename): \Symfony\Component\HttpFoundation\Response
     {
         if (!preg_match('/^[a-zA-Z0-9_\-\.]+$/', $filename)) {
             abort(400, 'Invalid filename');
         }
 
+        // 1. Attempt to fetch from Cloudflare R2 directly (no local disk saving)
+        $r2 = new CloudflareR2Service();
+        if ($r2->isConfigured()) {
+            try {
+                $content = $r2->getObject('tourist_spots/' . $filename);
+                if ($content) {
+                    $ext = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
+                    $mime = match($ext) {
+                        'png'  => 'image/png',
+                        'gif'  => 'image/gif',
+                        'webp' => 'image/webp',
+                        default => 'image/jpeg',
+                    };
+                    return response($content, 200, [
+                        'Content-Type'  => $mime,
+                        'Cache-Control' => 'public, max-age=31536000',
+                    ]);
+                }
+            } catch (\Exception $e) {
+                \Log::warning("[R2] Failed to fetch image {$filename} from R2: " . $e->getMessage());
+            }
+        }
+
+        // 2. Fallback check for existing local files if R2 is unconfigured
         $directories = [
-            base_path('../Frontend/Website/Frontend/images/tourist_spots/'),
             storage_path('app/public/tourist_spots/'),
+            base_path('../Frontend/Website/Frontend/images/tourist_spots/'),
             storage_path('app/public/'),
             public_path('storage/tourist_spots/'),
             base_path('../Frontend/Website/Frontend/images/'),
@@ -826,7 +894,7 @@ class TouristSpotController extends Controller
             }
         }
 
-        if (!$imagePath) {
+        if (!$imagePath || !file_exists($imagePath)) {
             abort(404, 'File not found');
         }
 

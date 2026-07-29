@@ -336,7 +336,7 @@
             document.getElementById('modalBody').innerHTML = `
             ${imagesHtml}
             <div style="display:flex;gap:8px;align-items:center;margin-bottom:16px;flex-wrap:wrap;">
-                <span style="font-size:13px;color:#6B7280;"><i class="fas fa-map-marker-alt"></i> ${spot.municipality_name}, La Union</span>
+                <span style="font-size:13px;color:#6B7280;"><i class="fas fa-map-marker-alt"></i> ${(spot.barangay ? spot.barangay + ', ' : '') + (spot.municipality_name || '')}, La Union</span>
                 <span style="font-size:13px;font-weight:700;padding:4px 12px;border-radius:20px;background:${statusColor[spot.classification_status] || '#6B7280'};color:white;">${displayStatus}</span>
                 ${spot.is_maintenance ? '<span style="font-size:13px;font-weight:700;padding:4px 12px;border-radius:20px;background:#F59E0B;color:#92400E;"><i class="fas fa-exclamation-triangle"></i> Under Maintenance</span>' : ''}
             </div>

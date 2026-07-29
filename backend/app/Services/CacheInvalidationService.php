@@ -145,23 +145,23 @@ class CacheInvalidationService
      */
     public static function invalidateTouristSpots(?int $muniId = null): void
     {
-        // Clear province-wide list caches
-        foreach (['lupto', 'picto', 'pitco'] as $role) {
+        $roles = ['lupto', 'LUPTO', 'picto', 'PICTO', 'pitco', 'PITCO', 'admin', 'ADMIN', 'municipal', 'MUNICIPAL', 'mto', 'MTO'];
+
+        // Clear all role and municipality combinations
+        foreach ($roles as $role) {
             Cache::forget("tourist-spots:list:{$role}:0");
+            Cache::forget("tourist-spots:list:{$role}:");
+            for ($id = 1; $id <= 30; $id++) {
+                Cache::forget("tourist-spots:list:{$role}:{$id}");
+            }
         }
 
-        // Clear municipality-scoped list caches
-        if ($muniId && $muniId > 0) {
-            Cache::forget("tourist-spots:list:municipal:{$muniId}");
+        for ($id = 1; $id <= 30; $id++) {
+            Cache::forget("tourist-spots:list:municipal:{$id}");
             foreach (User::$MUNICIPAL_ROLES as $role) {
-                Cache::forget("tourist-spots:list:{$role}:{$muniId}");
-            }
-        } else {
-            for ($id = 1; $id <= 30; $id++) {
-                Cache::forget("tourist-spots:list:municipal:{$id}");
-                foreach (User::$MUNICIPAL_ROLES as $role) {
-                    Cache::forget("tourist-spots:list:{$role}:{$id}");
-                }
+                Cache::forget("tourist-spots:list:{$role}:{$id}");
+                Cache::forget("tourist-spots:list:" . strtolower($role) . ":{$id}");
+                Cache::forget("tourist-spots:list:" . strtoupper($role) . ":{$id}");
             }
         }
     }

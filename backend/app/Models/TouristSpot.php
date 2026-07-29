@@ -99,4 +99,24 @@ class TouristSpot extends Model
     {
         return $this->hasMany(SiteFeedback::class, 'tourist_spot_id');
     }
+
+    public static function getDefaultPointsForClassification(?string $classification): int
+    {
+        $upper = strtoupper((string)$classification);
+        return match ($upper) {
+            'EMERGING', 'EMERGE' => 100,
+            'POTENTIAL'          => 75,
+            'EXISTING', 'EXIST'  => 50,
+            default              => 50,
+        };
+    }
+
+    public function getPointsAttribute($value): int
+    {
+        $val = (int) $value;
+        if ($val > 0) {
+            return $val;
+        }
+        return self::getDefaultPointsForClassification($this->attributes['classification_status'] ?? null);
+    }
 }

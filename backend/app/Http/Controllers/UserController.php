@@ -212,11 +212,12 @@ class UserController extends Controller
         $muniName = $user->municipality?->name;
         NotificationService::notifyProvincial(
             'user_created',
-            'New User Created',
-            "{$user->name} created a new " . ucfirst($user->role) . " account" . ($muniName ? " for {$muniName}" : ''),
+            'New User Registered',
+            "New user account \"{$user->name}\" (" . ucfirst($user->role) . ") has been created" . ($muniName ? " for {$muniName}" : '') . '.',
             [
-                'module'            => 'Users',
-                'action_url'        => 'user-management.php',
+                'module'            => 'User Management',
+                'action_url'        => "user-management.php?user_id={$user->id}",
+                'user_id'           => $user->id,
                 'municipality_name' => $muniName,
                 'actor_name'        => $request->session()->get('user_name'),
             ]
@@ -339,6 +340,35 @@ class UserController extends Controller
         Cache::forget('users:role_stats');
         Cache::forget('users:stats');
         Cache::forget('activity_stats');
+
+        try {
+            NotificationService::notify(
+                $user->id,
+                'user_updated',
+                'Account Status Changed',
+                "Your account status has been updated to {$request->status}.",
+                [
+                    'module'     => 'User Management',
+                    'action_url' => "user-management.php?user_id={$user->id}",
+                    'user_id'    => $user->id,
+                    'actor_name' => $request->session()->get('user_name'),
+                ]
+            );
+
+            NotificationService::notifyProvincial(
+                'user_updated',
+                'User Account Status Updated',
+                "Account status for \"{$user->name}\" was set to {$request->status}.",
+                [
+                    'module'     => 'User Management',
+                    'action_url' => "user-management.php?user_id={$user->id}",
+                    'user_id'    => $user->id,
+                    'actor_name' => $request->session()->get('user_name'),
+                ]
+            );
+        } catch (\Exception $e) {
+            \Log::warning('User status notification failed: ' . $e->getMessage());
+        }
 
         return response()->json(['success' => true, 'user' => User::select('id','status','role')->find($id), 'message' => 'Account status updated.']);
     }

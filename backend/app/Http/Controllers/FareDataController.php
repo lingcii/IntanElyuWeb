@@ -11,6 +11,7 @@ use App\Models\ValidationError;
 use App\Enums\ActivityAction;
 use App\Services\ActivityLogService;
 use App\Services\FareDataProcessor;
+use App\Services\CloudflareR2Service;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -97,7 +98,7 @@ class FareDataController extends Controller
                 }
             }
 
-            return $query->latest()->get()->map(function ($guide) {
+            return $query->latest()->get()->map(function (FareGuide $guide) {
                 if ($guide->vehicle_type === 'PUJ_Aircon') {
                     $guide->vehicle_type = 'MPUJ';
                     $guide->save();
@@ -140,7 +141,7 @@ class FareDataController extends Controller
             $query->whereHas('uploader', fn($q) => $q->where('municipality_id', $municipalityId));
         }
 
-        $uploads = $query->latest()->get()->map(function ($upload) {
+        $uploads = $query->latest()->get()->map(function (FareUpload $upload) {
             $uploadArray = $upload->toArray();
             $uploadArray['uploaded_by_name'] = $upload->uploader?->name ?? '—';
             return $uploadArray;
@@ -170,6 +171,7 @@ class FareDataController extends Controller
     /** POST /api/{role}/fare-data/upload */
     public function upload(Request $request): JsonResponse
     {
+        @set_time_limit(120);
         $role = $request->session()->get('user_role');
         if ($role === 'lupto') {
             return response()->json(['success' => false, 'error' => 'LUPTO users have view-only access to transportation fare.'], 403);
@@ -210,6 +212,18 @@ class FareDataController extends Controller
                 'uploads', $file, $uniquePrefix . $originalName
             );
             $filePath = Storage::disk('local')->path($storedPath);
+
+            // Upload fare matrix file to Cloudflare R2 under fare_matrices/
+            $r2 = new CloudflareR2Service();
+            if ($r2->isConfigured()) {
+                try {
+                    $r2Key = 'fare_matrices/' . $uniquePrefix . $originalName;
+                    $r2Url = $r2->uploadContent($r2Key, file_get_contents($filePath), $mimeType ?: 'text/csv');
+                    \Log::info("[R2] Successfully uploaded fare matrix to Cloudflare R2: {$r2Key}");
+                } catch (\Exception $e) {
+                    \Log::error('[R2] Fare matrix upload to Cloudflare R2 failed: ' . $e->getMessage());
+                }
+            }
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
