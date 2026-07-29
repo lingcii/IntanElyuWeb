@@ -155,42 +155,52 @@ class EmailService
             return ['success' => false, 'error' => 'PHPMailer not loaded'];
         }
 
-        try {
-            $mail = new \PHPMailer\PHPMailer\PHPMailer(true);
-            $mail->isSMTP();
-            $mail->Host       = 'smtp.gmail.com';
-            $mail->SMTPAuth   = true;
-            $mail->Username   = $username;
-            $mail->Password   = $password;
-            $mail->SMTPSecure = \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS;
-            $mail->Port       = 587;
-            $mail->SMTPOptions = [
-                'ssl' => [
-                    'verify_peer'       => false,
-                    'verify_peer_name'  => false,
-                    'allow_self_signed' => true,
-                ],
-            ];
-            $mail->Timeout = 15;
+        $configs = [
+            ['port' => 587, 'secure' => \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS],
+            ['port' => 465, 'secure' => \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_SMTPS],
+        ];
 
-            $mail->setFrom($username, $fromName);
-            $mail->addAddress($to);
-            $mail->addReplyTo($username, $fromName);
+        $lastError = '';
+        foreach ($configs as $cfg) {
+            try {
+                $mail = new \PHPMailer\PHPMailer\PHPMailer(true);
+                $mail->isSMTP();
+                $mail->Host       = 'smtp.gmail.com';
+                $mail->SMTPAuth   = true;
+                $mail->Username   = $username;
+                $mail->Password   = $password;
+                $mail->SMTPSecure = $cfg['secure'];
+                $mail->Port       = $cfg['port'];
+                $mail->SMTPOptions = [
+                    'ssl' => [
+                        'verify_peer'       => false,
+                        'verify_peer_name'  => false,
+                        'allow_self_signed' => true,
+                    ],
+                ];
+                $mail->Timeout = 6;
 
-            $mail->isHTML(true);
-            $mail->Subject = $subject;
-            $mail->Body    = $html;
-            if ($altBody) {
-                $mail->AltBody = $altBody;
+                $mail->setFrom($username, $fromName);
+                $mail->addAddress($to);
+                $mail->addReplyTo($username, $fromName);
+
+                $mail->isHTML(true);
+                $mail->Subject = $subject;
+                $mail->Body    = $html;
+                if ($altBody) {
+                    $mail->AltBody = $altBody;
+                }
+
+                $mail->send();
+                error_log("Email sent via Gmail SMTP ($username) port {$cfg['port']} to $to");
+                return ['success' => true, 'error' => ''];
+            } catch (\PHPMailer\PHPMailer\Exception $e) {
+                $lastError = $e->getMessage();
+                error_log("Gmail SMTP port {$cfg['port']} error ($username): " . $lastError);
             }
-
-            $mail->send();
-            error_log("Email sent via Gmail SMTP ($username) to $to");
-            return ['success' => true, 'error' => ''];
-        } catch (\PHPMailer\PHPMailer\Exception $e) {
-            error_log("Gmail SMTP error ($username): " . $e->getMessage());
-            return ['success' => false, 'error' => $e->getMessage()];
         }
+
+        return ['success' => false, 'error' => $lastError];
     }
 
     private static function sendViaResend(
