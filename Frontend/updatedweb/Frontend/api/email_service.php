@@ -377,24 +377,32 @@ class EmailService
 
     public static function decrypt(string $encoded): string
     {
-        $data = base64_decode($encoded);
-        if ($data === false || strlen($data) < 16) {
+        if (empty($encoded)) {
             return '';
         }
-        $iv         = substr($data, 0, 16);
-        $ciphertext = substr($data, 16);
 
-        // Try primary key first
-        $key    = self::getEncryptionKey();
-        $result = openssl_decrypt($ciphertext, 'aes-256-cbc', $key, OPENSSL_RAW_DATA, $iv);
-        if ($result !== false && $result !== '') {
-            return $result;
+        $data = base64_decode($encoded, true);
+        if ($data !== false && strlen($data) >= 16) {
+            $iv         = substr($data, 0, 16);
+            $ciphertext = substr($data, 16);
+
+            // Try primary key first
+            $key    = self::getEncryptionKey();
+            $result = openssl_decrypt($ciphertext, 'aes-256-cbc', $key, OPENSSL_RAW_DATA, $iv);
+            if ($result !== false && $result !== '') {
+                return $result;
+            }
+
+            // Fallback to legacy key (if encrypted under old host/database salt)
+            $legacyKey = self::getLegacyEncryptionKey();
+            $result = openssl_decrypt($ciphertext, 'aes-256-cbc', $legacyKey, OPENSSL_RAW_DATA, $iv);
+            if ($result !== false && $result !== '') {
+                return $result;
+            }
         }
 
-        // Fallback to legacy key (if encrypted under old host/database salt)
-        $legacyKey = self::getLegacyEncryptionKey();
-        $result = openssl_decrypt($ciphertext, 'aes-256-cbc', $legacyKey, OPENSSL_RAW_DATA, $iv);
-        return $result !== false ? $result : '';
+        // Fallback: If input string is already plain text (e.g. unencrypted App Password)
+        return $encoded;
     }
 
     /**

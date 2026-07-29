@@ -665,8 +665,14 @@ async function confirmSaveUser() {
                     password: body.password
                 })
             }).then(r => r.json()).then(d => {
-                if (d.success) showToast('info', 'Welcome email sent to ' + body.email);
-            }).catch(() => {});
+                if (d.success) {
+                    showToast('info', 'Welcome email sent to ' + body.email);
+                } else {
+                    showToast('warning', 'User created, but welcome email failed: ' + (d.error || d.message || 'Check Railway mail settings.'));
+                }
+            }).catch(() => {
+                showToast('warning', 'User created, but welcome email trigger failed.');
+            });
         }
 
         if (savedUser) {

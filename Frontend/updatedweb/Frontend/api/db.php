@@ -17,6 +17,10 @@ function getEnvValue(string $key): ?string
         return $_ENV[$key];
     }
 
+    if (!empty($_SERVER[$key])) {
+        return $_SERVER[$key];
+    }
+
     return null;
 }
 
@@ -196,8 +200,8 @@ function getResendApiKey(): ?string
 
 function getGmailCredentials(): array
 {
-    $user     = getEnvValue('GMAIL_APP_USER');
-    $password = getEnvValue('GMAIL_APP_PASSWORD');
+    $user     = getEnvValue('GMAIL_APP_USER')     ?? getEnvValue('GMAIL_USER')     ?? getEnvValue('MAIL_USERNAME');
+    $password = getEnvValue('GMAIL_APP_PASSWORD') ?? getEnvValue('GMAIL_PASSWORD') ?? getEnvValue('MAIL_PASSWORD');
 
     if ($user && $password && $password !== 'your_gmail_app_password_here') {
         return ['user' => $user, 'password' => $password];
@@ -206,8 +210,8 @@ function getGmailCredentials(): array
     $envPath = __DIR__ . '/../../../../backend/.env';
     if (file_exists($envPath)) {
         $vars = parseEnvFile($envPath);
-        $u    = $vars['GMAIL_APP_USER']     ?? '';
-        $p    = $vars['GMAIL_APP_PASSWORD'] ?? '';
+        $u    = $vars['GMAIL_APP_USER']     ?? $vars['GMAIL_USER']     ?? $vars['MAIL_USERNAME'] ?? '';
+        $p    = $vars['GMAIL_APP_PASSWORD'] ?? $vars['GMAIL_PASSWORD'] ?? $vars['MAIL_PASSWORD'] ?? '';
         if ($u && $p && $p !== 'your_gmail_app_password_here') {
             return ['user' => $u, 'password' => $p];
         }
