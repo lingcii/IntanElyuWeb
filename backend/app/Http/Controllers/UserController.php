@@ -242,12 +242,12 @@ class UserController extends Controller
         try {
             $loginUrl = env('APP_FRONTEND_URL', config('app.url', 'http://localhost:8080'));
             Mail::to($user->email)
-                ->queue(new WelcomeUserMail($user, $plainPassword, $loginUrl));
+                ->send(new WelcomeUserMail($user, $plainPassword, $loginUrl));
             $emailSent = true;
         } catch (\Throwable $e) {
             // Keep the account — only log and surface the failure
-            $emailError = 'Welcome email could not be queued: ' . $e->getMessage();
-            Log::error('[WelcomeUserMail] Failed to queue email for user #' . $user->id, [
+            $emailError = 'Welcome email could not be sent: ' . $e->getMessage();
+            Log::error('[WelcomeUserMail] Failed to send email for user #' . $user->id, [
                 'email'     => $user->email,
                 'exception' => $e->getMessage(),
             ]);

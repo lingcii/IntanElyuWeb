@@ -273,13 +273,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
                 const data = await resp.json();
 
-                if (data.success) {
+                if (data.success && data.email_sent !== false) {
                     if (sentEmailPlaceholder) {
                         sentEmailPlaceholder.textContent = email;
                     }
                     switchState('recovery-2');
                 } else {
-                    showRecoveryError(data.message || 'An error occurred. Please try again.');
+                    showRecoveryError(data.message || data.email_error || 'An error occurred. Please try again.');
                     recoveryEmailInput.disabled = false;
                     submitBtn.disabled = false;
                     submitBtn.innerHTML = originalBtnHtml;

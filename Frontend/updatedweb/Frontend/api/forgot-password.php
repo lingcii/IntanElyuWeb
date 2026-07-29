@@ -81,11 +81,12 @@ try {
         $stmt->execute([':ip' => $clientIp]);
     }
 
-    $stmt = $db->prepare('SELECT email FROM users WHERE email = :email LIMIT 1');
+    $stmt = $db->prepare('SELECT email FROM users WHERE LOWER(email) = LOWER(:email) LIMIT 1');
     $stmt->execute([':email' => $email]);
     $user = $stmt->fetch();
 
     if ($user) {
+        $email = $user['email']; // Use normalized email from DB
         $rawToken = bin2hex(random_bytes(32));
         $tokenHash = hash('sha256', $rawToken);
         $expiresAt = date('Y-m-d H:i:s', strtotime('+30 minutes'));
@@ -122,24 +123,44 @@ try {
             $emailResult = sendResendDirect($email, 'Reset Your Password - INTAN ELYU', buildEmailHtml($resetUrl));
         }
 
+        if (!$emailResult['success']) {
+            http_response_code(500);
+            echo json_encode([
+                'success'      => false,
+                'message'      => 'Failed to send password reset email: ' . ($emailResult['error'] ?? 'Mail service unavailable.'),
+                'email_sent'   => false,
+                'email_error'  => $emailResult['error'] ?? 'Email delivery failed.',
+            ]);
+            exit;
+        }
+
         echo json_encode([
             'success'      => true,
-            'message'      => 'If an account exists with that email, a password reset link has been sent.',
+            'message'      => 'Password reset link has been sent to ' . $email . '.',
             'reset_url'    => $resetUrl,
-            'email_sent'   => $emailResult['success'],
-            'email_error'  => $emailResult['success'] ? null : ($emailResult['error'] ?? 'Email delivery failed.'),
-            'sender_email' => $emailResult['sender_email'] ?? ($emailResult['success'] ? 'onboarding@resend.dev' : null),
+            'email_sent'   => true,
+            'email_error'  => null,
+            'sender_email' => $emailResult['sender_email'] ?? 'side24250@gmail.com',
+        ]);
+        exit;
+    } else {
+        http_response_code(404);
+        echo json_encode([
+            'success'    => false,
+            'message'    => 'No account found with the email "' . htmlspecialchars($email) . '". Please check your email address.',
+            'email_sent' => false,
         ]);
         exit;
     }
 } catch (Exception $e) {
     error_log('Forgot password error: ' . $e->getMessage());
+    http_response_code(500);
+    echo json_encode([
+        'success' => false,
+        'message' => 'An error occurred while processing your request: ' . $e->getMessage(),
+    ]);
+    exit;
 }
-
-echo json_encode([
-    'success' => true,
-    'message' => 'If an account exists with that email, a password reset link has been sent.',
-]);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Direct Resend API fallback (bypasses EmailService entirely)

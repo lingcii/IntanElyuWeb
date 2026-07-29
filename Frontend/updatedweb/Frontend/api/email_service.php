@@ -351,9 +351,16 @@ class EmailService
         ];
     }
 
-    // ── Crypto Helpers (AES-256-CBC with key derived from DB credentials) ──────
+    // ── Crypto Helpers (AES-256-CBC with stable application key) ───────────────
 
     private static function getEncryptionKey(): string
+    {
+        $appKey = getEnvValue('APP_KEY');
+        $raw = ($appKey ?: 'INTAN_ELYU_APP_KEY_SECRET') . 'INTAN_ELYU_SALT_2026';
+        return hash('sha256', $raw, true);
+    }
+
+    private static function getLegacyEncryptionKey(): string
     {
         $creds = getDbCredentials();
         $raw = $creds['host'] . $creds['database'] . 'INTAN_ELYU_SALT_2026';
@@ -370,14 +377,23 @@ class EmailService
 
     public static function decrypt(string $encoded): string
     {
-        $key  = self::getEncryptionKey();
         $data = base64_decode($encoded);
         if ($data === false || strlen($data) < 16) {
             return '';
         }
         $iv         = substr($data, 0, 16);
         $ciphertext = substr($data, 16);
-        $result     = openssl_decrypt($ciphertext, 'aes-256-cbc', $key, OPENSSL_RAW_DATA, $iv);
+
+        // Try primary key first
+        $key    = self::getEncryptionKey();
+        $result = openssl_decrypt($ciphertext, 'aes-256-cbc', $key, OPENSSL_RAW_DATA, $iv);
+        if ($result !== false && $result !== '') {
+            return $result;
+        }
+
+        // Fallback to legacy key (if encrypted under old host/database salt)
+        $legacyKey = self::getLegacyEncryptionKey();
+        $result = openssl_decrypt($ciphertext, 'aes-256-cbc', $legacyKey, OPENSSL_RAW_DATA, $iv);
         return $result !== false ? $result : '';
     }
 
