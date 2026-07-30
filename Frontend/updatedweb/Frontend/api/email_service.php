@@ -73,13 +73,19 @@ class EmailService
                 return self::send($opts); // Retry with the newly seeded sender
             }
 
-            // No DB senders and no .env Gmail — try Resend as last resort
+            // No DB senders and no .env Gmail — try Brevo then Resend as last resort
+            $brevoResult = self::sendViaBrevo($to, $fromName, $subject, $html);
+            if ($brevoResult['success']) {
+                self::writeLog(0, 'side24250@gmail.com', $to, $subject, 'sent', 'brevo');
+                return self::successResult(0, 'side24250@gmail.com');
+            }
+
             $result = self::sendViaResend($to, $fromName, $subject, $html);
             if ($result['success']) {
                 self::writeLog(0, 'onboarding@resend.dev', $to, $subject, 'sent', 'resend');
                 return self::successResult(0, 'onboarding@resend.dev');
             }
-            return self::logFailure(0, 'resend', $to, $subject, 'No sender accounts configured. Resend fallback also failed: ' . ($result['error'] ?: 'unknown'));
+            return self::logFailure(0, 'resend', $to, $subject, 'No sender accounts configured. Brevo and Resend fallbacks also failed.');
         }
 
         // Get sending strategy
@@ -129,7 +135,13 @@ class EmailService
             self::writeLog($sender['id'], $sender['email'], $to, $subject, 'failed', 'gmail_smtp');
         }
 
-        // All DB senders failed — try Resend as ultimate fallback
+        // All DB senders failed — try Brevo first, then Resend as ultimate fallback
+        $brevoResult = self::sendViaBrevo($to, $fromName, $subject, $html);
+        if ($brevoResult['success']) {
+            self::writeLog(0, 'side24250@gmail.com', $to, $subject, 'sent', 'brevo');
+            return self::successResult(0, 'side24250@gmail.com');
+        }
+
         $resendResult = self::sendViaResend($to, $fromName, $subject, $html);
         if ($resendResult['success']) {
             self::writeLog(0, 'onboarding@resend.dev', $to, $subject, 'sent', 'resend');
@@ -137,7 +149,7 @@ class EmailService
         }
 
         $allErrors = implode(' | ', $errors);
-        return self::logFailure(0, '', $to, $subject, "All senders failed. " . $allErrors);
+        return self::logFailure(0, '', $to, $subject, "All senders failed. Brevo: " . ($brevoResult['error'] ?? 'unknown') . " | " . $allErrors);
     }
 
     // ── Sending Methods ────────────────────────────────────────────────────────
@@ -201,6 +213,64 @@ class EmailService
         }
 
         return ['success' => false, 'error' => $lastError];
+    }
+
+    private static function sendViaBrevo(
+        string $to,
+        string $fromName,
+        string $subject,
+        string $html
+    ): array {
+        $apiKey = getBrevoApiKey();
+        if (!$apiKey) {
+            error_log('Brevo: No BREVO_API_KEY found');
+            return ['success' => false, 'error' => 'BREVO_API_KEY not configured'];
+        }
+
+        $fromEmail = getEnvValue('MAIL_FROM_ADDRESS') ?? 'side24250@gmail.com';
+
+        $payload = json_encode([
+            'sender'      => ['name' => $fromName, 'email' => $fromEmail],
+            'to'          => [['email' => $to]],
+            'subject'     => $subject,
+            'htmlContent' => $html,
+        ]);
+
+        $ch = curl_init('https://api.brevo.com/v3/smtp/email');
+        curl_setopt_array($ch, [
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => $payload,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_HTTPHEADER     => [
+                'accept: application/json',
+                'api-key: ' . $apiKey,
+                'content-type: application/json',
+            ],
+            CURLOPT_TIMEOUT        => 15,
+            CURLOPT_CONNECTTIMEOUT => 10,
+            CURLOPT_SSL_VERIFYPEER => false,
+        ]);
+        $response = curl_exec($ch);
+        $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlErr  = curl_error($ch);
+        curl_close($ch);
+
+        error_log("sendViaBrevo: HTTP $httpCode, error: " . ($curlErr ?: 'none'));
+
+        if ($httpCode >= 200 && $httpCode < 300) {
+            error_log("Email sent via Brevo to $to");
+            return ['success' => true, 'error' => ''];
+        }
+
+        $msg = "Brevo HTTP $httpCode";
+        if ($response) {
+            $decoded = json_decode($response, true);
+            if (!empty($decoded['message'])) {
+                $msg = $decoded['message'];
+            }
+        }
+        error_log("Brevo error: $msg");
+        return ['success' => false, 'error' => $msg];
     }
 
     private static function sendViaResend(

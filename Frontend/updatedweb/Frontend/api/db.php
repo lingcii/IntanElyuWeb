@@ -198,6 +198,24 @@ function getResendApiKey(): ?string
     return null;
 }
 
+function getBrevoApiKey(): ?string
+{
+    $key = getEnvValue('BREVO_API_KEY');
+    if ($key) {
+        return $key;
+    }
+
+    $envPath = __DIR__ . '/../../../../backend/.env';
+    if (file_exists($envPath)) {
+        $vars = parseEnvFile($envPath);
+        if (!empty($vars['BREVO_API_KEY'])) {
+            return $vars['BREVO_API_KEY'];
+        }
+    }
+
+    return null;
+}
+
 function getGmailCredentials(): array
 {
     $user     = getEnvValue('GMAIL_APP_USER')     ?? getEnvValue('GMAIL_USER')     ?? getEnvValue('MAIL_USERNAME');
