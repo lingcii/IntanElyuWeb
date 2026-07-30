@@ -244,8 +244,8 @@ class UserController extends Controller
             $appUrl = config('app.url', 'http://localhost');
             $isRailway = str_contains($appUrl, 'railway.app');
             $loginUrl = $isRailway
-                ? env('APP_FRONTEND_URL', 'https://intanelyuweb-frontend-production.up.railway.app')
-                : 'http://localhost:8080';
+                ? rtrim(env('APP_FRONTEND_URL', 'https://intanelyuwebfrontend-production.up.railway.app'), '/') . '/Frontend/login.php'
+                : 'http://localhost/Intan-Elyu-Tourism-Management-Systemss/Frontend/updatedweb/Frontend/login.php';
             Mail::to($user->email)
                 ->send(new WelcomeUserMail($user, $plainPassword, $loginUrl));
             $emailSent = true;

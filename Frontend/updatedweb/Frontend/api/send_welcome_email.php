@@ -32,7 +32,18 @@ if (empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
     exit;
 }
 
-$loginUrl = dirname(dirname($_SERVER['SCRIPT_NAME']));
+// Detect if running on Railway and build the correct absolute login URL
+$appHost = $_SERVER['HTTP_HOST'] ?? 'localhost';
+$isRailway = str_contains($appHost, 'railway.app');
+if ($isRailway) {
+    // Use the frontend Railway URL from environment (set in Railway dashboard)
+    $loginUrl = rtrim(getenv('APP_FRONTEND_URL') ?: 'https://intanelyuwebfrontend-production.up.railway.app', '/') . '/Frontend/login.php';
+} else {
+    // Local XAMPP fallback
+    $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+    $basePath = rtrim(str_replace('\\', '/', dirname(dirname(dirname($_SERVER['SCRIPT_NAME'])))), '/');
+    $loginUrl = "$protocol://$appHost$basePath/login.php";
+}
 
 $html = <<<HTML
 <!DOCTYPE html>
