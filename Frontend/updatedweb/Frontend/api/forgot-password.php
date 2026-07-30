@@ -105,10 +105,10 @@ try {
             ':expires' => $expiresAt,
         ]);
 
-        $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-        $host = $_SERVER['HTTP_HOST'];
-        $basePath = rtrim(str_replace('\\', '/', dirname(dirname($_SERVER['SCRIPT_NAME']))), '/');
-        $resetUrl = "$protocol://$host$basePath/reset-password.php?token=$rawToken";
+        // Build the reset URL using the centralized helper — no hardcoded hosts.
+        // Resolves from APP_FRONTEND_URL env var (Railway) or falls back to the
+        // current request context (local XAMPP), automatically.
+        $resetUrl = getFrontendBaseUrl() . '/Frontend/reset-password.php?token=' . $rawToken;
 
         error_log("Reset URL generated: $resetUrl");
 

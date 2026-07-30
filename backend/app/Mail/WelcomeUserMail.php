@@ -25,13 +25,12 @@ class WelcomeUserMail extends Mailable
         public string $plainPassword,
         public string $loginUrl = '',
     ) {
-        // Default login URL if none provided — hybrid: Railway when deployed, localhost otherwise
+        // Default login URL if none provided — reads APP_FRONTEND_URL from environment.
+        // Set this in Railway dashboard or in .env locally. Falls back to APP_URL.
+        // No hardcoded hostnames anywhere.
         if (empty($this->loginUrl)) {
-            $appUrl = config('app.url', 'http://localhost');
-            $isRailway = str_contains($appUrl, 'railway.app');
-            $this->loginUrl = $isRailway
-                ? rtrim(env('APP_FRONTEND_URL', 'https://intanelyuwebfrontend-production.up.railway.app'), '/') . '/Frontend/login.php'
-                : 'http://localhost/Intan-Elyu-Tourism-Management-Systemss/Frontend/updatedweb/Frontend/login.php';
+            $frontendBase = rtrim(env('APP_FRONTEND_URL', config('app.url', 'http://localhost')), '/');
+            $this->loginUrl = $frontendBase . '/Frontend/login.php';
         }
     }
 

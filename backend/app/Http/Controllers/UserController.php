@@ -240,12 +240,11 @@ class UserController extends Controller
         $emailSent  = false;
         $emailError = null;
         try {
-            // Hybrid URL: use Railway frontend URL when deployed, localhost when running locally
-            $appUrl = config('app.url', 'http://localhost');
-            $isRailway = str_contains($appUrl, 'railway.app');
-            $loginUrl = $isRailway
-                ? rtrim(env('APP_FRONTEND_URL', 'https://intanelyuwebfrontend-production.up.railway.app'), '/') . '/Frontend/login.php'
-                : 'http://localhost/Intan-Elyu-Tourism-Management-Systemss/Frontend/updatedweb/Frontend/login.php';
+            // Build login URL from environment — APP_FRONTEND_URL is the single source of truth.
+            // Set this variable in Railway dashboard (or .env locally) to point to the frontend.
+            // Falls back to APP_URL so it works even if APP_FRONTEND_URL is not set.
+            $frontendBase = rtrim(env('APP_FRONTEND_URL', config('app.url')), '/');
+            $loginUrl = $frontendBase . '/Frontend/login.php';
             Mail::to($user->email)
                 ->send(new WelcomeUserMail($user, $plainPassword, $loginUrl));
             $emailSent = true;

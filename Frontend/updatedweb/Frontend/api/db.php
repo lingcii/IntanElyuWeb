@@ -219,3 +219,49 @@ function getGmailCredentials(): array
 
     return [];
 }
+
+/**
+ * getFrontendBaseUrl()
+ *
+ * Returns the base URL of the frontend application — no trailing slash.
+ * Used by email links (welcome email, password reset) so they always
+ * point to the correct environment without any hardcoded hostnames.
+ *
+ * Resolution order:
+ *   1. APP_FRONTEND_URL environment variable (set in Railway dashboard or .env)
+ *   2. APP_FRONTEND_URL parsed from the backend .env file (local dev fallback)
+ *   3. Current request protocol + host (final fallback for local development)
+ *
+ * Usage:
+ *   $loginUrl  = getFrontendBaseUrl() . '/Frontend/login.php';
+ *   $resetUrl  = getFrontendBaseUrl() . '/Frontend/reset-password.php?token=abc';
+ */
+function getFrontendBaseUrl(): string
+{
+    // 1. Check live environment variable (Railway sets these automatically)
+    $envUrl = getEnvValue('APP_FRONTEND_URL');
+    if ($envUrl && filter_var($envUrl, FILTER_VALIDATE_URL)) {
+        return rtrim($envUrl, '/');
+    }
+
+    // 2. Parse backend .env file (works for local XAMPP development)
+    $envPath = __DIR__ . '/../../../../backend/.env';
+    if (file_exists($envPath)) {
+        $vars = parseEnvFile($envPath);
+        $envUrl = $vars['APP_FRONTEND_URL'] ?? '';
+        if ($envUrl && filter_var($envUrl, FILTER_VALIDATE_URL)) {
+            return rtrim($envUrl, '/');
+        }
+    }
+
+    // 3. Last resort: build URL from the current HTTP request context
+    //    This handles any local setup (XAMPP, php -S, etc.) automatically.
+    $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+    $host     = $_SERVER['HTTP_HOST'] ?? 'localhost';
+    // Walk up from /api/ → /Frontend/ (the script lives at Frontend/api/xxx.php)
+    $scriptDir = str_replace('\\', '/', dirname(dirname($_SERVER['SCRIPT_NAME'] ?? '')));
+    $base      = rtrim($scriptDir, '/');
+
+    return "$protocol://$host$base";
+}
+

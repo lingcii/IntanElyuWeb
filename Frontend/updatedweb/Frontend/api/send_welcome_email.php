@@ -32,18 +32,9 @@ if (empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
     exit;
 }
 
-// Detect if running on Railway and build the correct absolute login URL
-$appHost = $_SERVER['HTTP_HOST'] ?? 'localhost';
-$isRailway = str_contains($appHost, 'railway.app');
-if ($isRailway) {
-    // Use the frontend Railway URL from environment (set in Railway dashboard)
-    $loginUrl = rtrim(getenv('APP_FRONTEND_URL') ?: 'https://intanelyuwebfrontend-production.up.railway.app', '/') . '/Frontend/login.php';
-} else {
-    // Local XAMPP fallback
-    $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-    $basePath = rtrim(str_replace('\\', '/', dirname(dirname(dirname($_SERVER['SCRIPT_NAME'])))), '/');
-    $loginUrl = "$protocol://$appHost$basePath/login.php";
-}
+// Build login URL using the centralized helper — automatically adapts to
+// local development (XAMPP) or Railway production with no code changes.
+$loginUrl = getFrontendBaseUrl() . '/Frontend/login.php';
 
 $html = <<<HTML
 <!DOCTYPE html>
@@ -74,14 +65,17 @@ $html = <<<HTML
                     </div>
                 </div>
                 <p style="margin:0 0 20px;font-size:12px;color:#F59E0B;font-weight:500;">
-                    <i class="fas fa-exclamation-triangle"></i> For security, please change your password after your first login.
+                    ⚠️ For security, please change your password after your first login.
                 </p>
                 <div style="text-align:center;">
-                    <a href="{$loginUrl}/login.php"
+                    <a href="{$loginUrl}"
                        style="display:inline-block;background:linear-gradient(135deg,#06444D,#0D6557);color:#FFFFFF;text-decoration:none;padding:14px 36px;border-radius:10px;font-size:15px;font-weight:600;">
                         Sign In to INTAN ELYU
                     </a>
                 </div>
+                <p style="margin:16px 0 0;font-size:11px;color:#9CA3AF;text-align:center;word-break:break-all;">
+                    Or copy this link: {$loginUrl}
+                </p>
             </td>
         </tr>
         <tr>
@@ -100,7 +94,7 @@ $result = EmailService::send([
     'to'       => $email,
     'subject'  => 'Welcome to INTAN ELYU - Your Account is Ready',
     'html'     => $html,
-    'altBody'  => "Welcome, $name!\n\nYour INTAN ELYU account has been created.\n\nEmail: $email\nPassword: $password\n\nSign in at: $loginUrl/login.php\n\nPlease change your password after your first login.",
+    'altBody'  => "Welcome, $name!\n\nYour INTAN ELYU account has been created.\n\nEmail: $email\nPassword: $password\n\nSign in at: $loginUrl\n\nPlease change your password after your first login.",
     'fromName' => 'INTAN ELYU Tourism',
 ]);
 
