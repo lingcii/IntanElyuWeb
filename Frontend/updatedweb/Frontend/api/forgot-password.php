@@ -108,7 +108,7 @@ try {
         // Build the reset URL using the centralized helper — no hardcoded hosts.
         // Resolves from APP_FRONTEND_URL env var (Railway) or falls back to the
         // current request context (local XAMPP), automatically.
-        $resetUrl = getFrontendBaseUrl() . '/Frontend/reset-password.php?token=' . $rawToken;
+        $resetUrl = getFrontendBaseUrl() . '/reset-password.php?token=' . $rawToken;
 
         error_log("Reset URL generated: $resetUrl");
 

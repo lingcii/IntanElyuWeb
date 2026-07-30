@@ -34,7 +34,7 @@ if (empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
 
 // Build login URL using the centralized helper — automatically adapts to
 // local development (XAMPP) or Railway production with no code changes.
-$loginUrl = getFrontendBaseUrl() . '/Frontend/login.php';
+$loginUrl = getFrontendBaseUrl() . '/login.php';
 
 $html = <<<HTML
 <!DOCTYPE html>

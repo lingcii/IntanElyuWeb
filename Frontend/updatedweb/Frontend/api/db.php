@@ -251,8 +251,8 @@ function getGmailCredentials(): array
  *   3. Current request protocol + host (final fallback for local development)
  *
  * Usage:
- *   $loginUrl  = getFrontendBaseUrl() . '/Frontend/login.php';
- *   $resetUrl  = getFrontendBaseUrl() . '/Frontend/reset-password.php?token=abc';
+ *   $loginUrl  = getFrontendBaseUrl() . '/login.php';
+ *   $resetUrl  = getFrontendBaseUrl() . '/reset-password.php?token=abc';
  */
 function getFrontendBaseUrl(): string
 {
