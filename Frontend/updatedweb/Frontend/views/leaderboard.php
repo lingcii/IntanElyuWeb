@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 //   Shared Leaderboard page — LUPTO and PICTO.
  

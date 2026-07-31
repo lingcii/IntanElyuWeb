@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 //  _role_guard.php
 //   Shared role guard helper.

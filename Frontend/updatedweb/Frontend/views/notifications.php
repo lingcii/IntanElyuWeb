@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 //   views/shared/notifications.php
  
