@@ -349,6 +349,8 @@ class ActivityLogsModule {
     }
 
     renderRow(log) {
+        if (!log) return '';
+
         let parsed = {};
         try {
             parsed = typeof log.details === 'string' ? JSON.parse(log.details) : (log.details || {});
@@ -356,39 +358,70 @@ class ActivityLogsModule {
             parsed = { description: log.description || log.details || '' };
         }
 
-        const description = log.description || parsed.description || '';
+        const description = log.description || parsed.description || '—';
         const module = log.module || parsed.module || 'System';
-        const user = log.user_name || (log.user ? log.user.name : 'System');
-        const iconInfo = ACTION_ICONS[log.action] || { icon: 'fa-info-circle', color: 'gray' };
-        const color = iconInfo.color;
-        const badgeColor = this.getBadgeColor(log.action);
+
+        // User details
+        const userObj = log.user || {};
+        const userName = log.user_name || userObj.name || 'System User';
+        const userInitials = userName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() || 'SU';
+        const userRole = log.user_role || userObj.role || '';
+        const municipality = log.municipality || (userObj.municipality ? userObj.municipality.name : '');
+
+        // Action styling & badge
+        const actionName = log.action || 'Action Executed';
+        const iconInfo = ACTION_ICONS[actionName] || { icon: 'fa-info-circle', color: 'gray' };
+        const color = iconInfo.color || 'gray';
+        const badgeColor = this.getBadgeColor(actionName);
         const isNew = log._isNew ? ' new-row' : '';
         const rowClass = `row-${color}${isNew}`;
         const formattedDate = this.formatDateTime(log.created_at);
         const relTime = this.timeAgo(log.created_at);
 
-        // Clean up the flag
         if (log._isNew) delete log._isNew;
+
+        const iconColors = {
+            green: '#047857',
+            blue: '#1d4ed8',
+            red: '#b91c1c',
+            orange: '#c2410c',
+            purple: '#7e22ce',
+            gray: '#475569'
+        };
+        const iconColor = iconColors[color] || '#475569';
 
         return `
             <tr class="${rowClass}" data-log-id="${log.id}">
-                <td class="activity-icon-cell">
-                    <i class="fas ${iconInfo.icon}" style="color: var(--accent-${color === 'gray' ? 'gray' : color}); font-size: 15px;"></i>
+                <td class="activity-icon-cell" style="text-align: center; width: 42px;">
+                    <div style="width:30px; height:30px; border-radius:50%; background:${iconColor}15; display:inline-flex; align-items:center; justify-content:center;">
+                        <i class="fas ${iconInfo.icon}" style="color: ${iconColor}; font-size: 13px;"></i>
+                    </div>
                 </td>
                 <td>
-                    <span class="action-badge badge-${badgeColor}">${log.action}</span>
+                    <span class="activity-badge ${badgeColor}">${this.escapeHTML(actionName)}</span>
                 </td>
-                <td style="font-weight: 600; color: #475569;">${module}</td>
-                <td style="color: #1e293b; max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                <td>
+                    <span class="module-tag">${this.escapeHTML(module)}</span>
+                </td>
+                <td style="color: #1e293b; max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500;">
                     ${this.escapeHTML(description)}
                 </td>
-                <td style="font-weight: 600; color: #334155;">
-                    <span title="${user}">${user}</span>
-                    ${log.municipality ? `<div style="font-size: 10px; color: var(--text-muted);">${log.municipality}</div>` : ''}
-                </td>
                 <td>
-                    <div style="font-weight: 600; color: #334155;">${formattedDate}</div>
-                    <div style="font-size: 11px; color: var(--text-muted); font-weight: 500;">${relTime}</div>
+                    <div class="user-cell">
+                        <div class="user-avatar-sm" style="background: #0F2C59; width: 32px; height: 32px; border-radius: 50%; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0;">${userInitials}</div>
+                        <div>
+                            <div style="font-weight: 600; color: #1e293b; font-size: 13px;">${this.escapeHTML(userName)}</div>
+                            <div style="font-size: 11px; color: #64748b; font-weight: 500;">
+                                ${userRole ? `<span style="text-transform: capitalize;">${this.escapeHTML(userRole)}</span>` : ''}
+                                ${userRole && municipality ? ' &bull; ' : ''}
+                                ${municipality ? `<span>${this.escapeHTML(municipality)}</span>` : ''}
+                            </div>
+                        </div>
+                    </div>
+                </td>
+                <td style="white-space: nowrap;">
+                    <div style="font-weight: 600; color: #1e293b; font-size: 12px;">${formattedDate}</div>
+                    <div style="font-size: 11px; color: #64748b; font-weight: 500;">${relTime}</div>
                 </td>
             </tr>
         `;
@@ -431,31 +464,29 @@ class ActivityLogsModule {
         const start = (this.currentPage - 1) * this.perPage + 1;
         const end = Math.min(start + this.perPage - 1, this.totalItems);
 
-        let pageBtns = '';
-        let startPage = Math.max(1, this.currentPage - 2);
-        let endPage = Math.min(this.totalPages, startPage + 4);
-        if (endPage - startPage < 4) startPage = Math.max(1, endPage - 4);
-
-        for (let p = startPage; p <= endPage; p++) {
-            pageBtns += `<button class="pagination-btn ${p === this.currentPage ? 'active' : ''}" data-page="${p}">${p}</button>`;
-        }
-
         footer.innerHTML = `
-            <div>Showing <b>${start}-${end}</b> of <b>${this.totalItems}</b> activity logs</div>
-            <div class="pagination-controls-wrap">
-                <span style="font-weight:500; font-size:12px;">Rows:</span>
-                <select class="pagination-select" id="rows-per-page-select">
-                    <option value="10" ${this.perPage === 10 ? 'selected' : ''}>10</option>
-                    <option value="25" ${this.perPage === 25 ? 'selected' : ''}>25</option>
-                    <option value="50" ${this.perPage === 50 ? 'selected' : ''}>50</option>
-                </select>
-                <div class="pagination-buttons">
-                    <button class="pagination-btn" id="pagination-prev" ${this.currentPage === 1 ? 'disabled' : ''}>
-                        <i class="fas fa-chevron-left"></i>
+            <div style="font-size:13px; color:#64748b;">
+                Showing <b style="color:#0F2C59;">${start}-${end}</b> of <b style="color:#0F2C59;">${this.totalItems.toLocaleString()}</b> activity logs
+            </div>
+            <div class="pagination-controls-wrap" style="display:flex; align-items:center; gap:12px;">
+                <div style="display:flex; align-items:center; gap:6px; font-size:12px; color:#64748b; font-weight:600;">
+                    <span>Rows:</span>
+                    <select class="pagination-select" id="rows-per-page-select" style="padding:4px 8px; border-radius:6px; border:1px solid #cbd5e1; background:#ffffff; font-weight:600; color:#334155; cursor:pointer;">
+                        <option value="10" ${this.perPage === 10 ? 'selected' : ''}>10</option>
+                        <option value="25" ${this.perPage === 25 ? 'selected' : ''}>25</option>
+                        <option value="50" ${this.perPage === 50 ? 'selected' : ''}>50</option>
+                        <option value="100" ${this.perPage === 100 ? 'selected' : ''}>100</option>
+                    </select>
+                </div>
+                <div class="pagination-buttons" style="display:flex; align-items:center; gap:6px;">
+                    <button class="pagination-btn" id="pagination-prev" ${this.currentPage === 1 ? 'disabled' : ''} title="Previous Page" style="height:32px; padding:0 10px; border-radius:6px; border:1px solid #cbd5e1; background:#ffffff; cursor:pointer; display:inline-flex; align-items:center; gap:4px; font-weight:600; font-size:12px; color:#334155;">
+                        <i class="fas fa-chevron-left"></i> Prev
                     </button>
-                    ${pageBtns}
-                    <button class="pagination-btn" id="pagination-next" ${this.currentPage >= this.totalPages ? 'disabled' : ''}>
-                        <i class="fas fa-chevron-right"></i>
+                    <span style="font-size:12px; font-weight:700; color:#0F2C59; padding:0 10px; background:#f1f5f9; border-radius:6px; height:32px; display:inline-flex; align-items:center;">
+                        Page ${this.currentPage} of ${this.totalPages}
+                    </span>
+                    <button class="pagination-btn" id="pagination-next" ${this.currentPage >= this.totalPages ? 'disabled' : ''} title="Next Page" style="height:32px; padding:0 10px; border-radius:6px; border:1px solid #cbd5e1; background:#ffffff; cursor:pointer; display:inline-flex; align-items:center; gap:4px; font-weight:600; font-size:12px; color:#334155;">
+                        Next <i class="fas fa-chevron-right"></i>
                     </button>
                 </div>
             </div>
@@ -465,13 +496,6 @@ class ActivityLogsModule {
     }
 
     wirePaginationEvents(footer) {
-        footer.querySelectorAll('.pagination-btn[data-page]').forEach(btn => {
-            btn.addEventListener('click', () => {
-                this.currentPage = parseInt(btn.getAttribute('data-page'));
-                this.fetchLogs();
-            });
-        });
-
         const prev = footer.querySelector('#pagination-prev');
         if (prev) prev.addEventListener('click', () => {
             if (this.currentPage > 1) { this.currentPage--; this.fetchLogs(); }
@@ -681,9 +705,21 @@ class ActivityLogsModule {
     }
 
     // ── DETAIL DRAWER ───────────────────────────────────────────────
-    openDrawer(logId) {
-        const log = this.allLogs.find(l => l.id === logId);
+    async openDrawer(logId) {
+        let log = this.allLogs.find(l => l.id === logId);
         if (!log) return;
+
+        // Fetch complete detail payload if missing extended fields
+        if (!log.ip_address && !log.user_agent && !log.old_value) {
+            try {
+                const res = await window.API_CONFIG.get(`${this.apiBase}/activity-logs/${logId}`);
+                if (res && res.log) {
+                    log = { ...log, ...res.log };
+                }
+            } catch (e) {
+                console.warn('[ActivityLogs] Failed to fetch extended log details:', e);
+            }
+        }
 
         let parsed = {};
         try {

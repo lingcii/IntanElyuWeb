@@ -593,14 +593,6 @@
             return;
         }
 
-        // Soft refresh: for report generator, re-fetch report data cleanly
-        if (activeTabName === 'report-generator.php' && typeof window.softRefreshReportGenerator === 'function') {
-            window.softRefreshReportGenerator().finally(() => {
-                if (icon) icon.classList.remove('fa-spin');
-            });
-            return;
-        }
-
         // User Management custom reload
         if (activeTabName === 'user-management.php' && typeof window.refreshTable === 'function') {
             window.refreshTable().then(() => {

@@ -319,27 +319,141 @@
         refreshRankings();
     }
 
-    function closeExportModal() {
-        const modal = document.getElementById('exportModal');
-        if (modal) modal.style.display = 'none';
-    }
+    // ── Analytics Export — Downloads all currently displayed data ──
+    let _pendingExportFormat = null;
 
-    function exportData(format) {
-        const modal = document.getElementById('exportModal');
+    function paHandleReportExport(format) {
+        _pendingExportFormat = format;
+
+        // Update modal message
+        const labels = { pdf: 'PDF (.pdf)', csv: 'CSV (.csv)', excel: 'Excel (.xlsx)' };
+        const msgEl = document.getElementById('pa-confirm-msg');
+        if (msgEl) {
+            msgEl.innerHTML = `Download the current Analytics dashboard data as <strong>${labels[format] || format}</strong>?
+                <br><small style="color:#64748b;margin-top:6px;display:block;">
+                    Includes all KPIs, tourist sites, visitor trends, and municipality data for the selected filters.
+                </small>`;
+        }
+
+        // Open confirmation modal
+        const modal = document.getElementById('pa-confirm-modal');
         if (modal) {
-            modal.style.display = 'flex';
-            modal.setAttribute('data-format', format);
+            modal.classList.add('show');
         } else {
-            triggerExport(format, 'full');
+            // No modal — download directly
+            _executeAnalyticsDownload(format);
+        }
+    }
+    window.paHandleReportExport = paHandleReportExport;
+
+    // Wire up modal confirm/cancel buttons (runs after DOM ready)
+    function _bindAnalyticsModalButtons() {
+        const btnConfirm = document.getElementById('pa-modal-btn-confirm');
+        const btnCancel  = document.getElementById('pa-modal-btn-cancel');
+        const modal      = document.getElementById('pa-confirm-modal');
+
+        if (btnConfirm) {
+            btnConfirm.addEventListener('click', function () {
+                const modal = document.getElementById('pa-confirm-modal');
+                if (modal) modal.classList.remove('show');
+                if (_pendingExportFormat) {
+                    _executeAnalyticsDownload(_pendingExportFormat);
+                    _pendingExportFormat = null;
+                }
+            });
+        }
+        if (btnCancel) {
+            btnCancel.addEventListener('click', function () {
+                const modal = document.getElementById('pa-confirm-modal');
+                if (modal) modal.classList.remove('show');
+                _pendingExportFormat = null;
+            });
+        }
+        if (modal) {
+            modal.addEventListener('click', function (e) {
+                if (e.target === modal) {
+                    modal.classList.remove('show');
+                    _pendingExportFormat = null;
+                }
+            });
         }
     }
 
-    function triggerExport(format, type) {
-        closeExportModal();
-        const year = document.getElementById('filterYear')?.value || new Date().getFullYear();
-        const url = `${LA_API}/analytics/export?format=${format}&type=${type}&year=${year}`;
-        window.open(url, '_blank');
+    async function _executeAnalyticsDownload(format) {
+        // Collect current analytics & report filter panel values
+        const year       = document.getElementById('filterYear')?.value  || new Date().getFullYear();
+        const reportType = document.getElementById('pa-report-type')?.value || 'all_summary';
+        const muni       = document.getElementById('pa-report-municipality')?.value || document.getElementById('filterMuni')?.value || 'all';
+        const startDate  = document.getElementById('pa-report-start-date')?.value || '';
+        const endDate    = document.getElementById('pa-report-end-date')?.value || '';
+
+        const params = new URLSearchParams({ format, report_type: reportType, type: reportType, year });
+        if (muni && muni !== 'all') params.set('municipality', muni);
+        if (startDate) params.set('start_date', startDate);
+        if (endDate)   params.set('end_date', endDate);
+
+        const url = `${LA_API}/analytics/export?${params.toString()}`;
+
+        if (format === 'pdf') {
+            window.open(url, '_blank');
+            _showAnalyticsToast('PDF report opened in a new tab for printing.', 'success');
+            return;
+        }
+
+        const toast = _showAnalyticsToast('Generating report file…', 'info', 0);
+        try {
+            const res = await fetch(url, { credentials: 'include' });
+            if (!res.ok) throw new Error(`Server returned status ${res.status}`);
+            const blob = await res.blob();
+            if (!blob.size) throw new Error('The generated report file is empty.');
+
+            // Determine filename
+            const dateStr = new Date().toISOString().slice(0, 10);
+            const ext = format === 'excel' ? 'xlsx' : 'csv';
+            let fileName = `Analytics_Report_${dateStr}.${ext}`;
+            const cd = res.headers.get('Content-Disposition');
+            if (cd && cd.includes('filename=')) {
+                const m = cd.match(/filename="?([^";]+)"?/);
+                if (m && m[1]) fileName = m[1];
+            }
+
+            // Trigger browser download
+            const blobUrl = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = blobUrl; a.download = fileName;
+            document.body.appendChild(a); a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(blobUrl);
+
+            if (toast) toast.remove();
+            _showAnalyticsToast(`Report downloaded: ${fileName}`, 'success');
+        } catch (err) {
+            if (toast) toast.remove();
+            _showAnalyticsToast(`Download failed: ${err.message}`, 'error');
+        }
     }
+
+    function _showAnalyticsToast(message, type = 'info', duration = 3500) {
+        const container = document.getElementById('rg-toast-container');
+        if (!container) return null;
+        const toast = document.createElement('div');
+        toast.className = `rg-toast ${type} show`;
+        const icon = type === 'success' ? 'fa-check-circle' : (type === 'error' ? 'fa-exclamation-circle' : 'fa-spinner fa-spin');
+        toast.innerHTML = `<i class="fas ${icon}"></i> <span>${message}</span>`;
+        container.appendChild(toast);
+        if (duration > 0) {
+            setTimeout(() => { toast.classList.remove('show'); setTimeout(() => toast.remove(), 300); }, duration);
+        }
+        return toast;
+    }
+
+    // Bind modal buttons after DOM is ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', _bindAnalyticsModalButtons);
+    } else {
+        _bindAnalyticsModalButtons();
+    }
+
 
     function startAutoRefresh() {
         if (_autoRefreshTimer) clearInterval(_autoRefreshTimer);
@@ -877,5 +991,41 @@
             icon.className = 'fas fa-chevron-right';
             if (btn) btn.title = 'Show more categories';
         }
+    }
+
+    // ── Load Municipalities for Report Filter Panel ────────────────────
+    async function loadReportFilterMunicipalities() {
+        const select = document.getElementById('pa-report-municipality');
+        if (!select) return;
+        try {
+            const apiBase = window.API_CONFIG?.BASE_URL || 'http://localhost:8000';
+            const res = await fetch(`${apiBase}/api/municipalities`, { credentials: 'include' });
+            if (!res.ok) return;
+            const json = await res.json();
+            const munis = json.municipalities || json.data || json || [];
+            let html = '<option value="all">All Municipalities</option>';
+            munis.forEach(m => {
+                const id = m.id || m.municipality_id;
+                const name = m.name || m.municipality_name;
+                if (id && name) html += `<option value="${id}">${name}</option>`;
+            });
+            select.innerHTML = html;
+
+            // MTO / Municipal Role check: lock to assigned municipality
+            const userRole = (document.body.getAttribute('data-role') || '').toLowerCase();
+            const userMuniId = document.body.getAttribute('data-municipality-id');
+            if ((userRole === 'municipal' || userRole.includes('mto')) && userMuniId) {
+                select.value = userMuniId;
+                select.disabled = true;
+            }
+        } catch (err) {
+            console.warn('[Analytics] Failed to populate report filter municipalities:', err);
+        }
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', loadReportFilterMunicipalities);
+    } else {
+        loadReportFilterMunicipalities();
     }
 })();

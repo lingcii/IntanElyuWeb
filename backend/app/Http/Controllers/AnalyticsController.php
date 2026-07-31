@@ -92,8 +92,7 @@ class AnalyticsController extends Controller
                 "COUNT(*) as total,
                  SUM(status='approved') as approved,
                  AVG(rating) as avg_rating,
-                 SUM(CASE WHEN created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY) THEN 1 ELSE 0 END) as new_spots,
-                 category as top_cat_raw"
+                 SUM(CASE WHEN created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY) THEN 1 ELSE 0 END) as new_spots"
             )->first();
 
             // Top category (separate because GROUP BY needed)
@@ -747,104 +746,141 @@ class AnalyticsController extends Controller
         return $this->etagResponse($request, $data);
     }
 
-    public function export(Request $request): StreamedResponse|JsonResponse
+    public function export(Request $request): mixed
     {
-        $format = $request->get('format', 'csv');
-        $type   = $request->get('type', 'summary');
-        $year   = (int) $request->get('year', now()->year);
+        $format    = strtolower($request->get('format', 'csv'));
+        $type      = $request->get('report_type', $request->get('type', 'all_summary'));
+        $year      = (int) $request->get('year', now()->year);
+        $startDate = $request->get('start_date');
+        $endDate   = $request->get('end_date');
+
         $isMuni = $this->isMunicipal();
         $muniId = $isMuni ? $this->municipalityId() : 0;
 
-        if ($format === 'pdf') {
-            return $this->exportPdf($type, $year, $isMuni, $muniId);
+        $selectedMuni = $request->get('municipality', $request->get('municipality_id', 'all'));
+        if (!$isMuni && $selectedMuni !== 'all' && !empty($selectedMuni)) {
+            if (is_numeric($selectedMuni)) {
+                $muniId = (int) $selectedMuni;
+                $isMuni = true;
+            } else {
+                $m = Municipality::where('name', 'like', "%{$selectedMuni}%")->first();
+                if ($m) {
+                    $muniId = $m->id;
+                    $isMuni = true;
+                }
+            }
         }
 
-        return $this->exportCsv($type, $year, $isMuni, $muniId);
+        if ($format === 'pdf') {
+            return $this->exportPdf($type, $year, $isMuni, $muniId, $startDate, $endDate);
+        }
+
+        return $this->exportCsv($type, $year, $isMuni, $muniId, $format, $startDate, $endDate);
     }
 
-    private function exportCsv(string $type, int $year, bool $isMuni, int $muniId): StreamedResponse
+    private function exportCsv(string $type, int $year, bool $isMuni, int $muniId, string $format = 'csv', ?string $startDate = null, ?string $endDate = null): StreamedResponse
     {
-        $filename = "analytics_{$type}_{$year}_" . date('Ymd_His') . '.csv';
+        $ext = ($format === 'excel' || $format === 'xlsx') ? 'xlsx' : 'csv';
+        $filename = "analytics_report_{$type}_{$year}_" . date('Ymd_His') . '.' . $ext;
+        $mimeType = ($ext === 'xlsx')
+            ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            : 'text/csv; charset=utf-8';
 
         $headers = [
-            'Content-Type'        => 'text/csv; charset=utf-8',
+            'Content-Type'        => $mimeType,
             'Content-Disposition' => "attachment; filename=\"{$filename}\"",
             'Cache-Control'       => 'no-cache, no-store, must-revalidate',
         ];
 
-        $callback = function () use ($type, $year, $isMuni, $muniId) {
+        $callback = function () use ($type, $year, $isMuni, $muniId, $startDate, $endDate) {
             $output = fopen('php://output', 'w');
             fprintf($output, chr(0xEF) . chr(0xBB) . chr(0xBF)); // UTF-8 BOM
 
-            switch ($type) {
-                case 'municipalities':
-                    fputcsv($output, ['Rank', 'Municipality', 'Total Spots', 'Approved Spots', 'Total Visits', 'Avg Rating']);
-                    $munis = Municipality::leftJoin('tourist_spots as ts', 'ts.municipality_id', '=', 'municipalities.id')
-                        ->selectRaw("municipalities.name, COUNT(ts.id) as total_spots, COALESCE(SUM(ts.status='approved'),0) as approved_spots, COALESCE(SUM(ts.visits),0) as total_visits, COALESCE(AVG(ts.rating),0) as avg_rating");
-                    if ($isMuni) $munis->where('municipalities.id', $muniId);
-                    $munis = $munis->groupBy('municipalities.id', 'municipalities.name')
-                        ->orderByDesc('total_visits')->get();
-                    $rank = 0;
-                    foreach ($munis as $m) {
-                        $rank++;
-                        fputcsv($output, [$rank, $m->name, $m->total_spots, $m->approved_spots, $m->total_visits, round($m->avg_rating, 1)]);
-                    }
-                    break;
+            $muniName = $isMuni ? (Municipality::find($muniId)?->name ?? 'Municipal') : 'All Municipalities';
 
-                case 'spots':
-                    fputcsv($output, ['Rank', 'Tourist Spot', 'Municipality', 'Category', 'Status', 'Visits', 'Rating']);
-                    $spotsQuery = TouristSpot::with('municipality:id,name');
-                    if ($isMuni) $spotsQuery->where('municipality_id', $muniId);
-                    $spots = $spotsQuery->orderByDesc('visits')->get();
-                    $rank = 0;
-                    foreach ($spots as $s) {
-                        $rank++;
-                        fputcsv($output, [$rank, $s->name, $s->municipality->name ?? '', $s->category, $s->classification_status ?? $s->status, $s->visits, $s->rating]);
-                    }
-                    break;
+            // Document Header
+            fputcsv($output, ['OFFICIAL TOURISM MANAGEMENT & ANALYTICS REPORT']);
+            fputcsv($output, ['Province of La Union — Intan-Elyu Tourism System']);
+            fputcsv($output, ['Date Generated:', date('F j, Y, g:i A')]);
+            fputcsv($output, ['Report Type:', strtoupper(str_replace('_', ' ', $type))]);
+            fputcsv($output, ['Municipality Scope:', $muniName]);
+            fputcsv($output, ['Year Filter:', $year]);
+            if ($startDate) fputcsv($output, ['Start Date:', $startDate]);
+            if ($endDate)   fputcsv($output, ['End Date:', $endDate]);
+            fputcsv($output, ['']);
 
-                case 'trends':
-                    fputcsv($output, ['Year', 'Month', 'Visits']);
-                    $trendsQuery = Analytics::selectRaw('year, month, SUM(visits) as visits');
-                    if ($isMuni) $trendsQuery->where('municipality_id', $muniId);
-                    $trends = $trendsQuery->groupBy('year', 'month')->orderBy('year')->orderBy('month')->get();
-                    foreach ($trends as $t) {
-                        fputcsv($output, [$t->year, date('F', mktime(0, 0, 0, $t->month, 1)), $t->visits]);
-                    }
-                    break;
+            // 1. Executive Summary KPIs
+            if (in_array($type, ['all_summary', 'full', 'tourist_spots_summary', 'tourism_statistics'])) {
+                $summaryData = (new self)->summary(new Request(['year' => $year]))->getData(true);
+                $s = $summaryData['summary'] ?? [];
 
-                case 'full':
-                    fputcsv($output, ['Section: Monthly Trends']);
-                    fputcsv($output, ['Year', 'Month', 'Visits']);
-                    $trendsQuery = Analytics::selectRaw('year, month, SUM(visits) as visits');
-                    if ($isMuni) $trendsQuery->where('municipality_id', $muniId);
-                    $trends = $trendsQuery->groupBy('year', 'month')->orderBy('year')->orderBy('month')->get();
-                    foreach ($trends as $t) {
-                        fputcsv($output, [$t->year, date('F', mktime(0, 0, 0, $t->month, 1)), $t->visits]);
-                    }
-                    fputcsv($output, ['']);
-                    fputcsv($output, ['Section: Top Tourist Spots']);
-                    fputcsv($output, ['Rank', 'Name', 'Municipality', 'Category', 'Visits', 'Rating']);
-                    $spotsQuery = TouristSpot::where('status', 'approved')->with('municipality:id,name');
-                    if ($isMuni) $spotsQuery->where('municipality_id', $muniId);
-                    $spots = $spotsQuery->orderByDesc('visits')->limit(20)->get();
-                    $rank = 0;
-                    foreach ($spots as $s) { $rank++; fputcsv($output, [$rank, $s->name, $s->municipality->name ?? '', $s->category, $s->visits, $s->rating]); }
-                    break;
+                fputcsv($output, ['=== EXECUTIVE SUMMARY STATISTICS ===']);
+                fputcsv($output, ['Metric', 'Value']);
+                fputcsv($output, ['Total Tourist Sites', $s['total_spots'] ?? 0]);
+                fputcsv($output, ['Approved Tourist Sites', $s['approved_spots'] ?? 0]);
+                fputcsv($output, ['Registered Tourist Users', $s['total_users'] ?? 0]);
+                fputcsv($output, ['Total Annual Visitor Arrivals', $s['total_visits'] ?? 0]);
+                fputcsv($output, ['Top Performing Category', $s['top_category'] ?? '—']);
+                fputcsv($output, ['Top Category Spot Count', $s['top_category_cnt'] ?? 0]);
+                fputcsv($output, ['Most Visited Municipality', $s['most_visited_muni'] ?? '—']);
+                fputcsv($output, ['Most Visited Spot', $s['most_visited_spot'] ?? '—']);
+                fputcsv($output, ['Average Overall Rating', $s['avg_rating'] ?? '0.0']);
+                fputcsv($output, ['']);
+            }
 
-                default: // summary
-                    $summaryData = (new self)->summary(new Request())->getData(true);
-                    $s = $summaryData['summary'] ?? [];
-                    fputcsv($output, ['Metric', 'Value']);
-                    fputcsv($output, ['Total Municipalities', $s['total_municipalities'] ?? 0]);
-                    fputcsv($output, ['Total Tourist Spots', $s['total_spots'] ?? 0]);
-                    fputcsv($output, ['Approved Spots', $s['approved_spots'] ?? 0]);
-                    fputcsv($output, ['Total Visits', $s['total_visits'] ?? 0]);
-                    fputcsv($output, ['Analytics Visits', $s['total_analytics_visits'] ?? 0]);
-                    fputcsv($output, ['Active Users', $s['total_users'] ?? 0]);
-                    fputcsv($output, ['Most Visited Municipality', $s['most_visited_muni'] ?? '—']);
-                    fputcsv($output, ['Most Visited Spot', $s['most_visited_spot'] ?? '—']);
-                    break;
+            // 2. Top Tourist Spots
+            if (in_array($type, ['all_summary', 'full', 'tourist_spots_summary', 'tourist_spot_ratings'])) {
+                fputcsv($output, ['=== TOURIST SPOTS / DESTINATIONS ===']);
+                fputcsv($output, ['Rank', 'Destination Name', 'Barangay', 'Municipality', 'Category', 'Visits', 'Rating']);
+                $spotsQuery = TouristSpot::where('status', '!=', 'draft')->with('municipality:id,name');
+                if ($isMuni) $spotsQuery->where('municipality_id', $muniId);
+                if ($startDate) $spotsQuery->whereDate('created_at', '>=', $startDate);
+                if ($endDate)   $spotsQuery->whereDate('created_at', '<=', $endDate);
+                $spots = $spotsQuery->orderByDesc('visits')->get();
+                $rank = 0;
+                foreach ($spots as $sp) {
+                    $rank++;
+                    fputcsv($output, [
+                        $rank,
+                        $sp->name,
+                        $sp->barangay ?? '—',
+                        $sp->municipality->name ?? '—',
+                        $sp->category,
+                        $sp->visits ?? 0,
+                        $sp->rating ?? '0.0'
+                    ]);
+                }
+                fputcsv($output, ['']);
+            }
+
+            // 3. Municipalities Breakdown
+            if (in_array($type, ['all_summary', 'full', 'tourist_spots_by_municipality'])) {
+                fputcsv($output, ['=== VISITORS BY MUNICIPALITY ===']);
+                fputcsv($output, ['Rank', 'Municipality', 'Total Tourist Sites', 'Total Visits', 'Average Rating']);
+                $munis = Municipality::leftJoin('tourist_spots as ts', 'ts.municipality_id', '=', 'municipalities.id')
+                    ->selectRaw("municipalities.name, COUNT(ts.id) as total_spots, COALESCE(SUM(ts.visits),0) as total_visits, COALESCE(AVG(ts.rating),0) as avg_rating")
+                    ->when($isMuni, fn($q) => $q->where('municipalities.id', $muniId))
+                    ->groupBy('municipalities.id', 'municipalities.name')
+                    ->orderByDesc('total_visits')->get();
+                $rank = 0;
+                foreach ($munis as $m) {
+                    $rank++;
+                    fputcsv($output, [$rank, $m->name, $m->total_spots, $m->total_visits, round($m->avg_rating, 1)]);
+                }
+                fputcsv($output, ['']);
+            }
+
+            // 4. Monthly Visitor Trends
+            if (in_array($type, ['all_summary', 'full', 'tourism_statistics'])) {
+                fputcsv($output, ['=== MONTHLY VISITOR TRENDS (' . $year . ') ===']);
+                fputcsv($output, ['Year', 'Month', 'Total Visitors']);
+                $trendsQuery = Analytics::where('year', $year)->selectRaw('year, month, SUM(visits) as visits');
+                if ($isMuni) $trendsQuery->where('municipality_id', $muniId);
+                $trends = $trendsQuery->groupBy('year', 'month')->orderBy('month')->get();
+                foreach ($trends as $t) {
+                    $monthName = date('F', mktime(0, 0, 0, $t->month, 1));
+                    fputcsv($output, [$t->year, $monthName, $t->visits]);
+                }
             }
 
             fclose($output);
@@ -853,116 +889,150 @@ class AnalyticsController extends Controller
         return response()->stream($callback, 200, $headers);
     }
 
-    private function exportPdf(string $type, int $year, bool $isMuni, int $muniId): JsonResponse|StreamedResponse
+    private function exportPdf(string $type, int $year, bool $isMuni, int $muniId, ?string $startDate = null, ?string $endDate = null): mixed
     {
-        $data = [];
+        $role     = $this->role();
+        $muniName = $isMuni ? (Municipality::find($muniId)?->name ?? 'Municipal') : 'Province-Wide (All Municipalities)';
+        $title    = "Official Tourism Analytics & Reports";
+        $dateStr  = date('F j, Y, g:i A');
 
-        switch ($type) {
-            case 'trends':
-                $trendsQuery = Analytics::selectRaw('year, month, SUM(visits) as visits');
-                if ($isMuni) $trendsQuery->where('municipality_id', $muniId);
-                $data['trends'] = $trendsQuery->groupBy('year', 'month')->orderBy('year')->orderBy('month')->get();
-                break;
-            case 'spots':
-                $spotsQuery = TouristSpot::with('municipality:id,name');
-                if ($isMuni) $spotsQuery->where('municipality_id', $muniId);
-                $data['spots'] = $spotsQuery->orderByDesc('visits')->get();
-                break;
-            case 'municipalities':
-                $data['munis'] = Municipality::leftJoin('tourist_spots as ts', 'ts.municipality_id', '=', 'municipalities.id')
-                    ->selectRaw("municipalities.name, COUNT(ts.id) as total_spots, COALESCE(SUM(ts.visits),0) as total_visits, COALESCE(AVG(ts.rating),0) as avg_rating")
-                    ->when($isMuni, fn($q) => $q->where('municipalities.id', $muniId))
-                    ->groupBy('municipalities.id', 'municipalities.name')
-                    ->orderByDesc('total_visits')->get();
-                break;
-            default:
-                $summaryData = (new self)->summary(new Request())->getData(true);
-                $data['summary'] = $summaryData['summary'] ?? [];
-                break;
-        }
+        // Summary metrics
+        $summaryData = (new self)->summary(new Request(['year' => $year]))->getData(true);
+        $s = $summaryData['summary'] ?? [];
 
-        $role    = $this->role();
-        $muniName = $isMuni ? Municipality::find($muniId)?->name : 'Province-Wide';
-        $title   = "Analytics Report — {$muniName} — {$year}";
+        // Spots
+        $spotsQuery = TouristSpot::where('status', '!=', 'draft')->with('municipality:id,name');
+        if ($isMuni) $spotsQuery->where('municipality_id', $muniId);
+        if ($startDate) $spotsQuery->whereDate('created_at', '>=', $startDate);
+        if ($endDate)   $spotsQuery->whereDate('created_at', '<=', $endDate);
+        $spots = $spotsQuery->orderByDesc('visits')->get();
 
-        $html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' . htmlspecialchars($title) . '</title>';
+        // Municipalities
+        $munis = Municipality::leftJoin('tourist_spots as ts', 'ts.municipality_id', '=', 'municipalities.id')
+            ->selectRaw("municipalities.name, COUNT(ts.id) as total_spots, COALESCE(SUM(ts.visits),0) as total_visits, COALESCE(AVG(ts.rating),0) as avg_rating")
+            ->when($isMuni, fn($q) => $q->where('municipalities.id', $muniId))
+            ->groupBy('municipalities.id', 'municipalities.name')
+            ->orderByDesc('total_visits')->get();
+
+        // Monthly trends
+        $trendsQuery = Analytics::where('year', $year)->selectRaw('year, month, SUM(visits) as visits');
+        if ($isMuni) $trendsQuery->where('municipality_id', $muniId);
+        $trends = $trendsQuery->groupBy('year', 'month')->orderBy('month')->get();
+
+        $html = '<!DOCTYPE html><html><head><meta charset="utf-8">';
+        $html .= '<title>' . htmlspecialchars($title) . '</title>';
         $html .= '<style>
-            body { font-family: "Segoe UI", Arial, sans-serif; padding: 40px; color: #1e293b; }
-            h1 { color: #185FA5; border-bottom: 3px solid #185FA5; padding-bottom: 10px; margin-bottom: 24px; }
-            h2 { color: #334155; margin-top: 28px; }
-            table { width: 100%; border-collapse: collapse; margin: 12px 0 24px; }
-            th { background: #185FA5; color: #fff; padding: 10px 12px; text-align: left; font-size: 13px; text-transform: uppercase; }
-            td { padding: 8px 12px; border-bottom: 1px solid #e2e8f0; font-size: 13px; }
-            tr:nth-child(even) td { background: #f8fafc; }
-            .kpi-grid { display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 20px; }
-            .kpi-card { border: 1px solid #e2e8f0; border-radius: 10px; padding: 16px 20px; flex: 1; min-width: 180px; }
-            .kpi-card h4 { margin: 0 0 6px; font-size: 11px; color: #64748b; text-transform: uppercase; }
-            .kpi-card .val { font-size: 24px; font-weight: 800; color: #185FA5; }
-            .footer { margin-top: 40px; color: #94a3b8; font-size: 11px; border-top: 1px solid #e2e8f0; padding-top: 12px; }
+            @page { size: A4; margin: 15mm; }
+            body { font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 24px; color: #1e293b; background: #ffffff; font-size: 13px; line-height: 1.5; }
+            .header-banner { border-bottom: 3px double #0F2C59; padding-bottom: 14px; margin-bottom: 20px; }
+            .gov-sub { font-size: 11px; font-weight: 700; text-transform: uppercase; color: #64748b; letter-spacing: 1px; margin: 0; }
+            .doc-title { font-size: 22px; font-weight: 800; color: #0F2C59; margin: 4px 0 0; text-transform: uppercase; letter-spacing: 0.5px; }
+            .meta-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 18px; margin-bottom: 24px; display: table; width: 100%; box-sizing: border-box; }
+            .meta-row { display: table-row; }
+            .meta-cell { display: table-cell; padding: 4px 12px; }
+            .meta-label { font-size: 10px; text-transform: uppercase; color: #64748b; font-weight: 700; letter-spacing: 0.5px; }
+            .meta-val { font-size: 13px; font-weight: 700; color: #0F2C59; }
+
+            .section-title { font-size: 13px; font-weight: 700; color: #0F2C59; text-transform: uppercase; border-bottom: 2px solid #0F2C59; padding-bottom: 4px; margin: 24px 0 12px; letter-spacing: 0.5px; }
+            .kpi-table { width: 100%; border-collapse: separate; border-spacing: 10px; margin-bottom: 14px; }
+            .kpi-td { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px 16px; text-align: center; vertical-align: top; }
+            .kpi-label { font-size: 10px; font-weight: 700; text-transform: uppercase; color: #64748b; letter-spacing: 0.5px; }
+            .kpi-val { font-size: 22px; font-weight: 800; color: #0F2C59; margin-top: 4px; }
+            table.report-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 12px; }
+            table.report-table th { background: #0F2C59; color: #ffffff; text-align: left; padding: 9px 12px; font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+            table.report-table td { padding: 9px 12px; border-bottom: 1px solid #e2e8f0; color: #334155; }
+            table.report-table tr:nth-child(even) td { background: #f8fafc; }
+            .rank-num { font-weight: 700; color: #64748b; }
+            .footer-bar { margin-top: 40px; border-top: 1px solid #e2e8f0; padding-top: 12px; text-align: center; font-size: 11px; color: #94a3b8; }
         </style></head><body>';
-        $html .= '<h1>' . htmlspecialchars($title) . '</h1>';
-        $html .= '<p>Generated: ' . date('F j, Y, g:i A') . ' | Role: ' . strtoupper($role) . ' | Scope: ' . htmlspecialchars($muniName) . '</p>';
 
-        if (isset($data['summary'])) {
-            $s = $data['summary'];
-            $html .= '<h2>Summary</h2><div class="kpi-grid">';
-            $kpiItems = [
-                'Municipalities' => $s['total_municipalities'] ?? 0,
-                'Tourist Spots' => $s['total_spots'] ?? 0,
-                'Approved Spots' => $s['approved_spots'] ?? 0,
-                'Total Visits' => $s['total_visits'] ?? 0,
-                'Analytics Visits' => $s['total_analytics_visits'] ?? 0,
-                'Active Users' => $s['total_users'] ?? 0,
-            ];
-            foreach ($kpiItems as $label => $value) {
-                $html .= '<div class="kpi-card"><h4>' . $label . '</h4><div class="val">' . number_format((int)$value) . '</div></div>';
-            }
-            $html .= '</div>';
-            $html .= '<p><strong>Most Visited Municipality:</strong> ' . htmlspecialchars($s['most_visited_muni'] ?? '—') . '</p>';
-            $html .= '<p><strong>Most Visited Spot:</strong> ' . htmlspecialchars($s['most_visited_spot'] ?? '—') . '</p>';
+        // Official Header
+        $html .= '<div class="header-banner">';
+        $html .= '<p class="gov-sub">Republic of the Philippines &bull; Province of La Union</p>';
+        $html .= '<h1 class="doc-title">Official Tourism Analytics &amp; Reports</h1>';
+        $html .= '</div>';
+
+        // Metadata Box
+        $html .= '<div class="meta-box"><div class="meta-row">';
+        $html .= '<div class="meta-cell"><div class="meta-label">Coverage Scope</div><div class="meta-val">' . htmlspecialchars($muniName) . '</div></div>';
+        $html .= '<div class="meta-cell"><div class="meta-label">Selected Year</div><div class="meta-val">' . $year . '</div></div>';
+        $html .= '<div class="meta-cell"><div class="meta-label">Date Generated</div><div class="meta-val">' . $dateStr . '</div></div>';
+        $html .= '<div class="meta-cell"><div class="meta-label">Authorized Role</div><div class="meta-val">' . strtoupper($role) . '</div></div>';
+        $html .= '</div></div>';
+
+        // 1. Executive Summary KPIs Table Grid
+        $html .= '<div class="section-title"><i class="fas fa-chart-pie"></i> Executive Summary Statistics</div>';
+        $html .= '<table class="kpi-table"><tr>';
+        $html .= '<td class="kpi-td"><div class="kpi-label">Total Tourist Sites</div><div class="kpi-val">' . number_format($s['total_spots'] ?? 0) . '</div></td>';
+        $html .= '<td class="kpi-td"><div class="kpi-label">Approved Sites</div><div class="kpi-val">' . number_format($s['approved_spots'] ?? 0) . '</div></td>';
+        $html .= '<td class="kpi-td"><div class="kpi-label">Registered Tourist Users</div><div class="kpi-val">' . number_format($s['total_users'] ?? 0) . '</div></td>';
+        $html .= '<td class="kpi-td"><div class="kpi-label">Annual Visitor Arrivals</div><div class="kpi-val">' . number_format($s['total_visits'] ?? 0) . '</div></td>';
+        $html .= '</tr></table>';
+
+
+        // 2. Top Tourist Spots Table
+        $html .= '<div class="section-title">Top Tourist Sites / Destinations</div>';
+        $html .= '<table class="report-table"><thead><tr><th>#</th><th>Destination Name</th><th>Barangay</th><th>Municipality</th><th>Category</th><th>Visits</th><th>Rating</th></tr></thead><tbody>';
+        $rank = 0;
+        foreach ($spots as $sp) {
+            $rank++;
+            $html .= '<tr>';
+            $html .= '<td class="rank-num">' . sprintf('%02d', $rank) . '</td>';
+            $html .= '<td><strong>' . htmlspecialchars($sp->name) . '</strong></td>';
+            $html .= '<td>' . htmlspecialchars($sp->barangay ?? '—') . '</td>';
+            $html .= '<td>' . htmlspecialchars($sp->municipality->name ?? '—') . '</td>';
+            $html .= '<td><span class="badge-cat">' . htmlspecialchars($sp->category) . '</span></td>';
+            $html .= '<td><strong>' . number_format($sp->visits ?? 0) . '</strong></td>';
+            $html .= '<td>★ ' . number_format((float)($sp->rating ?? 0), 1) . '</td>';
+            $html .= '</tr>';
         }
-
-        if (isset($data['trends'])) {
-            $html .= '<h2>Monthly Trends</h2><table><tr><th>Year</th><th>Month</th><th>Visits</th></tr>';
-            foreach ($data['trends'] as $t) {
-                $monthName = date('F', mktime(0, 0, 0, $t->month, 1));
-                $html .= '<tr><td>' . $t->year . '</td><td>' . $monthName . '</td><td>' . number_format($t->visits) . '</td></tr>';
-            }
-            $html .= '</table>';
+        if (count($spots) === 0) {
+            $html .= '<tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:16px;">No tourist sites recorded for this scope.</td></tr>';
         }
+        $html .= '</tbody></table>';
 
-        if (isset($data['spots'])) {
-            $html .= '<h2>Tourist Spots</h2><table><tr><th>#</th><th>Name</th><th>Municipality</th><th>Category</th><th>Visits</th><th>Rating</th></tr>';
-            $rank = 0;
-            foreach ($data['spots'] as $s) { $rank++;
-                $html .= '<tr><td>' . $rank . '</td><td>' . htmlspecialchars($s->name) . '</td><td>' . htmlspecialchars($s->municipality->name ?? '') . '</td><td>' . htmlspecialchars($s->category) . '</td><td>' . number_format($s->visits) . '</td><td>' . $s->rating . '</td></tr>';
-            }
-            $html .= '</table>';
+        // 3. Municipalities Comparison
+        $html .= '<div class="section-title">Visitors by Municipality</div>';
+        $html .= '<table class="report-table"><thead><tr><th>#</th><th>Municipality Name</th><th>Total Tourist Sites</th><th>Total Visitor Arrivals</th><th>Average Rating</th></tr></thead><tbody>';
+        $rank = 0;
+        foreach ($munis as $m) {
+            $rank++;
+            $html .= '<tr>';
+            $html .= '<td class="rank-num">' . sprintf('%02d', $rank) . '</td>';
+            $html .= '<td><strong>' . htmlspecialchars($m->name) . '</strong></td>';
+            $html .= '<td>' . number_format($m->total_spots) . '</td>';
+            $html .= '<td><strong>' . number_format($m->total_visits) . '</strong></td>';
+            $html .= '<td>★ ' . number_format((float)$m->avg_rating, 1) . '</td>';
+            $html .= '</tr>';
         }
+        $html .= '</tbody></table>';
 
-        if (isset($data['munis'])) {
-            $html .= '<h2>Top Municipalities</h2><table><tr><th>#</th><th>Municipality</th><th>Spots</th><th>Visits</th><th>Rating</th></tr>';
-            $rank = 0;
-            foreach ($data['munis'] as $m) { $rank++;
-                $html .= '<tr><td>' . $rank . '</td><td>' . htmlspecialchars($m->name) . '</td><td>' . $m->total_spots . '</td><td>' . number_format($m->total_visits) . '</td><td>' . round($m->avg_rating, 1) . '</td></tr>';
-            }
-            $html .= '</table>';
+        // 4. Monthly Trend Breakdown
+        $html .= '<div class="section-title">Monthly Visitor Trends (' . $year . ')</div>';
+        $html .= '<table class="report-table"><thead><tr><th>Month</th><th>Year</th><th>Visitor Arrivals</th></tr></thead><tbody>';
+        foreach ($trends as $t) {
+            $monthName = date('F', mktime(0, 0, 0, $t->month, 1));
+            $html .= '<tr><td>' . $monthName . '</td><td>' . $t->year . '</td><td><strong>' . number_format($t->visits) . '</strong></td></tr>';
         }
+        if (count($trends) === 0) {
+            $html .= '<tr><td colspan="3" style="text-align:center;color:#94a3b8;padding:16px;">No monthly visitor trend data recorded for ' . $year . '.</td></tr>';
+        }
+        $html .= '</tbody></table>';
 
-        $html .= '<div class="footer">Intan Elyu Tourism Management System — Generated on ' . date('F j, Y') . ' at ' . date('g:i A') . '</div>';
+        // Footer
+        $html .= '<div class="footer-bar">Intan-Elyu Tourism Management &amp; Information System &bull; Province of La Union &bull; Generated ' . $dateStr . '</div>';
         $html .= '</body></html>';
 
         $pdfClass = 'Barryvdh\DomPDF\Facade\Pdf';
         if (class_exists($pdfClass)) {
             $pdf = $pdfClass::loadHTML($html);
-            return response()->streamDownload(function () use ($pdf) { echo $pdf->output(); }, "analytics_{$type}_{$year}.pdf", ['Content-Type' => 'application/pdf']);
+            return response()->streamDownload(function () use ($pdf) { echo $pdf->output(); }, "analytics_report_{$year}.pdf", ['Content-Type' => 'application/pdf']);
         }
 
-        return response()->json([
-            'success' => true,
-            'format' => 'pdf',
-            'html'   => $html,
-            'message' => 'PDF library not installed. Opening printable HTML view.',
+        // Printable HTML view fallback with auto-print
+        $printableHtml = str_replace('</body>', '<script>window.onload=function(){setTimeout(function(){window.print();},500);};</script></body>', $html);
+        return response($printableHtml, 200, [
+            'Content-Type' => 'text/html; charset=utf-8'
         ]);
     }
 }

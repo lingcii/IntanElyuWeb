@@ -100,15 +100,39 @@ class TouristSpot extends Model
         return $this->hasMany(SiteFeedback::class, 'tourist_spot_id');
     }
 
+    public function vehicleTypes()
+    {
+        return $this->belongsToMany(VehicleType::class, 'tourist_spot_vehicle_type', 'tourist_spot_id', 'vehicle_type_id');
+    }
+
     public static function getDefaultPointsForClassification(?string $classification): int
     {
         $upper = strtoupper((string)$classification);
-        return match ($upper) {
-            'EMERGING', 'EMERGE' => 100,
-            'POTENTIAL'          => 75,
-            'EXISTING', 'EXIST'  => 50,
-            default              => 50,
+        $key = match ($upper) {
+            'EMERGING', 'EMERGE' => 'EMERGING',
+            'POTENTIAL'          => 'POTENTIAL',
+            'EXISTING', 'EXIST'  => 'EXISTING',
+            default              => 'EXISTING',
         };
+
+        $pointsMap = \Illuminate\Support\Facades\Cache::remember('classification_points', 3600, function () {
+            $map = [
+                'EXISTING'  => 50,
+                'EMERGING'  => 100,
+                'POTENTIAL' => 75,
+            ];
+            try {
+                $records = \App\Models\Classification::all();
+                foreach ($records as $record) {
+                    $map[strtoupper($record->name)] = (int) $record->points;
+                }
+            } catch (\Throwable $e) {
+                // Fallback to hardcoded defaults if table doesn't exist yet
+            }
+            return $map;
+        });
+
+        return (int) ($pointsMap[$key] ?? 50);
     }
 
     public function getPointsAttribute($value): int

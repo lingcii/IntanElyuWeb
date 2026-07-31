@@ -13,13 +13,12 @@ function mtoSections()
         'MAIN MENU' => [
             ['href' => 'dashboard.php', 'icon' => 'fa-gauge-high', 'label' => 'Dashboard Overview'],
             ['href' => 'tourist-spots.php', 'icon' => 'fa-location-dot', 'label' => 'Manage Tourist Sites'],
-            ['href' => 'analytics.php', 'icon' => 'fa-chart-simple', 'label' => 'Analytics and Statistics'],
+            ['href' => 'analytics.php', 'icon' => 'fa-chart-simple', 'label' => 'Analytics & Reports'],
             ['href' => 'fare-data.php', 'icon' => 'fa-money-bill-trend-up', 'label' => 'Fare Management'],
         ],
         'ADMINISTRATION' => [
             ['href' => 'proof-validation.php', 'icon' => 'fa-images', 'label' => 'Proof Validation'],
             ['href' => 'feedback.php', 'icon' => 'fa-comments', 'label' => 'Feedback'],
-            ['href' => 'report-generator.php', 'icon' => 'fa-file-lines', 'label' => 'Report Generation'],
         ],
         'SETTINGS & PRIVACY' => [
             ['href' => 'settings.php', 'icon' => 'fa-cog', 'label' => 'System Settings'],
@@ -41,14 +40,13 @@ $sidebarConfig = [
             'MAIN MENU' => [
                 ['href' => 'dashboard.php', 'icon' => 'fa-gauge-high', 'label' => 'Dashboard'],
                 ['href' => 'tourist-spots.php', 'icon' => 'fa-location-dot', 'label' => 'Manage Tourist Sites'],
-                ['href' => 'analytics.php', 'icon' => 'fa-chart-simple', 'label' => 'Analytics'],
+                ['href' => 'analytics.php', 'icon' => 'fa-chart-simple', 'label' => 'Analytics & Reports'],
                 ['href' => 'fare-data.php', 'icon' => 'fa-money-bill-trend-up', 'label' => 'Transportation Fare'],
                 ['href' => 'leaderboard.php', 'icon' => 'fa-trophy', 'label' => 'Leaderboard'],
             ],
             'ADMINISTRATION' => [
                 ['href' => 'proof-validation.php', 'icon' => 'fa-images', 'label' => 'Proof Validation'],
                 ['href' => 'feedback.php', 'icon' => 'fa-comments', 'label' => 'Feedback'],
-                ['href' => 'report-generator.php', 'icon' => 'fa-file-lines', 'label' => 'Report Generation'],
                 ['href' => 'user-management.php', 'icon' => 'fa-user', 'label' => 'User Management'],
                 ['href' => 'activity-logs.php', 'icon' => 'fa-history', 'label' => 'Activity Logs'],
             ],
@@ -67,14 +65,13 @@ $sidebarConfig = [
             'MAIN MENU' => [
                 ['href' => 'dashboard.php', 'icon' => 'fa-gauge-high', 'label' => 'Dashboard'],
                 ['href' => 'tourist-spots.php', 'icon' => 'fa-location-dot', 'label' => 'Manage Tourist Sites'],
-                ['href' => 'analytics.php', 'icon' => 'fa-chart-simple', 'label' => 'Analytics'],
+                ['href' => 'analytics.php', 'icon' => 'fa-chart-simple', 'label' => 'Analytics & Reports'],
                 ['href' => 'fare-data.php', 'icon' => 'fa-money-bill-trend-up', 'label' => 'Transportation Fare'],
                 ['href' => 'leaderboard.php', 'icon' => 'fa-trophy', 'label' => 'Leaderboard'],
             ],
             'ADMINISTRATION' => [
                 ['href' => 'proof-validation.php', 'icon' => 'fa-images', 'label' => 'Proof Validation'],
                 ['href' => 'feedback.php', 'icon' => 'fa-comments', 'label' => 'Feedback'],
-                ['href' => 'report-generator.php', 'icon' => 'fa-file-lines', 'label' => 'Report Generation'],
                 ['href' => 'user-management.php', 'icon' => 'fa-user', 'label' => 'User Management'],
                 ['href' => 'activity-logs.php', 'icon' => 'fa-history', 'label' => 'Activity Logs'],
                 ['href' => 'archive-management.php', 'icon' => 'fa-box-archive', 'label' => 'Archive Management'],

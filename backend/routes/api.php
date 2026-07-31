@@ -11,7 +11,6 @@ use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\Picto\ArchiveManagementController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProofValidationController;
-use App\Http\Controllers\ReportGeneratorController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\TouristSpotController;
 use App\Http\Controllers\UserController;
@@ -22,6 +21,7 @@ use App\Http\Controllers\Auth\SessionController;
 use App\Http\Controllers\Admin\FeedbackManagementController;
 use App\Http\Controllers\FeedbackController;
 use App\Http\Controllers\BackupController;
+use App\Http\Controllers\ClassificationPointController;
 
 use Illuminate\Support\Facades\Route;
 
@@ -62,6 +62,7 @@ Route::middleware('auth.session')->group(function () {
         Route::get('/draft', [TouristSpotController::class, 'getDraft']);
         Route::post('/draft', [TouristSpotController::class, 'saveDraft']);
         Route::delete('/draft/{id}', [TouristSpotController::class, 'deleteDraft']);
+        Route::get('/vehicle-types', [TouristSpotController::class, 'getVehicleTypes']);
         Route::get('/', [TouristSpotController::class, 'index']);
         Route::get('/{id}', [TouristSpotController::class, 'show']);
         Route::post('/upload-image', [TouristSpotController::class, 'uploadImage']);
@@ -73,6 +74,9 @@ Route::middleware('auth.session')->group(function () {
     // Municipalities (shared read)
     Route::get('/municipalities', [MunicipalityController::class, 'index']);
     Route::get('/municipalities/{id}', [MunicipalityController::class, 'show']);
+
+    // Classification Points (shared read)
+    Route::get('/classification-points', [ClassificationPointController::class, 'index']);
 
     // ─────────────────────────────────────────────────────────────────────────
     //  PITCO (picto role)
@@ -138,15 +142,12 @@ Route::middleware('auth.session')->group(function () {
             Route::delete('/fares/{id}', [ArchiveManagementController::class, 'permanentDelete']);
         });
 
-        // Reports
-        Route::get('/reports', [ReportGeneratorController::class, 'index']);
-        Route::get('/reports/generate', [ReportGeneratorController::class, 'generate']);
-        Route::get('/reports/export', [ReportGeneratorController::class, 'export']);
 
         // Activity Logs
         Route::get('/activity-logs', [ActivityLogController::class, 'index']);
         Route::get('/activity-logs/stream', [ActivityLogController::class, 'stream']);
         Route::get('/activity-logs/stats', [ActivityLogController::class, 'stats']);
+        Route::get('/activity-logs/{id}', [ActivityLogController::class, 'show']);
 
         // Notifications
         Route::get('/notifications/recent', [NotificationController::class, 'recent']);
@@ -199,6 +200,10 @@ Route::middleware('auth.session')->group(function () {
     //  LUPTO (lupto role)
     // ─────────────────────────────────────────────────────────────────────────
     Route::prefix('lupto')->middleware('role:lupto')->group(function () {
+        // Classification Points configuration
+        Route::get('/classification-points', [ClassificationPointController::class, 'index']);
+        Route::put('/classification-points', [ClassificationPointController::class, 'update']);
+
         // Dashboard
         Route::get('/dashboard', [DashboardController::class, 'index']);
         Route::get('/dashboard/poll', [DashboardController::class, 'poll']);
@@ -258,10 +263,6 @@ Route::middleware('auth.session')->group(function () {
         Route::delete('/notifications/{id}', [NotificationController::class, 'destroy']);
         Route::delete('/notifications/clear-all', [NotificationController::class, 'clearAll']);
 
-        // Reports
-        Route::get('/reports', [ReportGeneratorController::class, 'index']);
-        Route::get('/reports/generate', [ReportGeneratorController::class, 'generate']);
-        Route::get('/reports/export', [ReportGeneratorController::class, 'export']);
 
         // User Management (full CRUD — can only add municipal users)
         Route::prefix('users')->group(function () {
@@ -376,10 +377,6 @@ Route::middleware('auth.session')->group(function () {
         Route::delete('/notifications/{id}', [NotificationController::class, 'destroy']);
         Route::delete('/notifications/clear-all', [NotificationController::class, 'clearAll']);
 
-        // Reports
-        Route::get('/reports', [ReportGeneratorController::class, 'index']);
-        Route::get('/reports/generate', [ReportGeneratorController::class, 'generate']);
-        Route::get('/reports/export', [ReportGeneratorController::class, 'export']);
 
         // Settings
         Route::prefix('settings')->group(function () {

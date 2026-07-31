@@ -17,7 +17,7 @@ require_once __DIR__ . '/_role_guard.php';
 
 // Default page title if stub didn't set one
 if (!isset($pageTitle)) {
-    $pageTitle = strtoupper($userRole) . ' Analytics Dashboard';
+    $pageTitle = strtoupper($userRole) . ' Analytics & Reports';
 }
 
 // Build the correct relative CSS / JS path from views/ → go one level up
@@ -33,20 +33,31 @@ ob_start();
 
 <!-- Page Header -->
 <div class="pa-page-header">
-    <h2><i class="fas fa-chart-line"></i> Tourism Analytics Dashboard</h2>
+    <h2><i class="fas fa-chart-line"></i> Analytics &amp; Reports</h2>
     <div class="pa-header-actions">
-        <select class="pa-filter-select" id="filterYear" onchange="refreshAll()" style="font-size:13px; padding:6px 12px; margin:0; height:34px;" aria-label="Year">
+        <select class="pa-filter-select" id="filterYear" onchange="window.refreshAll?.()" style="font-size:13px; padding:6px 12px; margin:0; height:34px;" aria-label="Year">
             <option value="2026">2026</option>
             <option value="2025">2025</option>
         </select>
-        <div class="pa-export-group">
-            <button class="btn-gov btn-gov-secondary" onclick="exportData('csv')" title="Export as CSV">
-                <i class="fas fa-file-csv"></i> CSV
+
+        <!-- Download Report dropdown button -->
+        <div class="pa-download-dropdown-wrap" id="pa-download-dropdown-wrap">
+            <button class="btn-gov btn-gov-primary pa-download-toggle" id="pa-btn-download" title="Download Report" onclick="paToggleDownloadDropdown(event)">
+                <i class="fas fa-file-download"></i> Download Report <i class="fas fa-chevron-down" style="margin-left:4px; font-size:0.75rem;"></i>
             </button>
-            <button class="btn-gov btn-gov-secondary" onclick="exportData('pdf')" title="Export as PDF">
-                <i class="fas fa-file-pdf"></i> PDF
-            </button>
+            <div class="pa-download-menu" id="pa-download-menu">
+                <button type="button" class="pa-download-item" data-format="pdf" onclick="paSelectDownloadFormat('pdf', event)">
+                    <i class="fas fa-file-pdf" style="color:#EF4444; width:16px;"></i> PDF (.pdf)
+                </button>
+                <button type="button" class="pa-download-item" data-format="csv" onclick="paSelectDownloadFormat('csv', event)">
+                    <i class="fas fa-file-csv" style="color:#10B981; width:16px;"></i> CSV (.csv)
+                </button>
+                <button type="button" class="pa-download-item" data-format="excel" onclick="paSelectDownloadFormat('excel', event)">
+                    <i class="fas fa-file-excel" style="color:#16A34A; width:16px;"></i> Excel (.xlsx)
+                </button>
+            </div>
         </div>
+
         <button class="btn-gov btn-gov-secondary" onclick="refreshAll(true)" title="Refresh all data">
             <i class="fas fa-sync-alt" id="refreshIcon"></i> Refresh
         </button>
@@ -97,6 +108,61 @@ ob_start();
     </div>
 </div>
 
+<!-- ── Report Filters Panel ──────────────────────── -->
+<div class="pa-report-filter-card" id="pa-report-filter-card">
+    <div class="pa-report-filter-header" id="pa-report-filter-header" onclick="paToggleReportFilters()">
+        <div style="display:flex; align-items:center; gap:10px;">
+            <i class="fas fa-sliders" style="color:#2563EB;"></i>
+            <span style="font-weight:600; font-size:15px; color:#0F172A;">Report Filters</span>
+            <span class="pa-filter-badge" id="pa-active-filters-badge" style="display:none;">Filters Active</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:12px;">
+            <span class="pa-filter-hint" id="pa-filter-hint-text">Configure report filters</span>
+            <i class="fas fa-chevron-down pa-filter-toggle-icon" id="pa-filter-chevron"></i>
+        </div>
+    </div>
+    <div class="pa-report-filter-body" id="pa-report-filter-body">
+        <form id="pa-report-filter-form" onsubmit="return false;">
+            <div class="pa-filter-grid">
+                <!-- Report Type -->
+                <div class="pa-form-group">
+                    <label for="pa-report-type"><i class="fas fa-list-check"></i> Report Type</label>
+                    <select id="pa-report-type" class="pa-filter-select pa-form-select">
+                        <option value="all_summary">All Summary (Master Report)</option>
+                        <option value="tourist_spots_summary">Tourist Spots Summary</option>
+                        <option value="tourist_spots_by_municipality">Tourist Spots by Municipality</option>
+                        <option value="visitor_feedback_summary">Visitor Feedback Summary</option>
+                        <option value="tourist_spot_ratings">Tourist Spot Ratings</option>
+                        <option value="tourism_statistics">Tourism Statistics</option>
+                        <option value="user_accounts_summary">User Accounts Summary</option>
+                    </select>
+                </div>
+
+                <!-- Municipality -->
+                <div class="pa-form-group">
+                    <label for="pa-report-municipality"><i class="fas fa-location-dot"></i> Municipality</label>
+                    <select id="pa-report-municipality" class="pa-filter-select pa-form-select">
+                        <option value="all">All Municipalities</option>
+                    </select>
+                </div>
+
+                <!-- Start Date -->
+                <div class="pa-form-group">
+                    <label for="pa-report-start-date"><i class="fas fa-calendar-alt"></i> Start Date</label>
+                    <input type="date" id="pa-report-start-date" class="pa-report-date-input">
+                </div>
+
+                <!-- End Date -->
+                <div class="pa-form-group">
+                    <label for="pa-report-end-date"><i class="fas fa-calendar-check"></i> End Date</label>
+                    <input type="date" id="pa-report-end-date" class="pa-report-date-input">
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+
 <!-- Row 1: Line Chart + Classification Status -->
 <div class="pa-row-flex">
     <!-- Monthly Visitor Trend Panel -->
@@ -112,7 +178,7 @@ ob_start();
                 </div>
                 <div class="pa-trend-stat-item">
                     <span class="pa-trend-stat-label">Select Month</span>
-                    <select class="pa-filter-select pa-month-filter" id="filterMonth" onchange="onMonthFilterChange()">
+                    <select class="pa-filter-select pa-month-filter" id="filterMonth" onchange="window.onMonthFilterChange?.()">
                         <option value="all">All Months</option>
                         <option value="1">January</option>
                         <option value="2">February</option>
@@ -221,30 +287,59 @@ ob_start();
     </div>
 </div>
 
-<!-- Export Modal -->
-<div id="exportModal" class="modal" style="display:none;">
-    <div class="modal-content" style="max-width:480px;">
-        <div class="modal-header">
-            <h3><i class="fas fa-file-export"></i> Export Analytics Data</h3>
-            <button class="modal-close" onclick="closeExportModal()">&times;</button>
-        </div>
-        <div class="modal-body" style="padding:20px;">
-            <p style="margin-bottom:16px;">Select the data you want to export:</p>
-            <div style="display:flex; flex-direction:column; gap:10px;">
-                <button class="btn-gov" onclick="triggerExport('csv','summary')"><i class="fas fa-file-csv"></i> Export Summary as CSV</button>
-                <button class="btn-gov" onclick="triggerExport('csv','municipalities')"><i class="fas fa-file-csv"></i> Export Municipalities as CSV</button>
-                <button class="btn-gov" onclick="triggerExport('csv','spots')"><i class="fas fa-file-csv"></i> Export Spots as CSV</button>
-                <button class="btn-gov" onclick="triggerExport('csv','trends')"><i class="fas fa-file-csv"></i> Export Trends as CSV</button>
-                <button class="btn-gov" onclick="triggerExport('csv','full')"><i class="fas fa-file-csv"></i> Export All Data as CSV</button>
-                <button class="btn-gov btn-gov-secondary" onclick="triggerExport('pdf','full')"><i class="fas fa-file-pdf"></i> Export Full Report as PDF</button>
-            </div>
+
+
+<!-- ── Export Confirmation Modal ── -->
+<div id="pa-confirm-modal" class="pa-modal-overlay">
+    <div class="pa-modal">
+        <div class="pa-modal-icon"><i class="fas fa-file-download"></i></div>
+        <h3 class="pa-modal-title">Confirm Download</h3>
+        <p id="pa-confirm-msg" class="pa-modal-msg">Are you sure you want to download this report?</p>
+        <div class="pa-modal-actions">
+            <button type="button" id="pa-modal-btn-cancel" class="pa-modal-btn pa-modal-btn-cancel">No, Cancel</button>
+            <button type="button" id="pa-modal-btn-confirm" class="pa-modal-btn pa-modal-btn-confirm">Yes, Download</button>
         </div>
     </div>
-    <div class="modal-backdrop" onclick="closeExportModal()"></div>
 </div>
+
+<!-- ── Toast Notification Container ── -->
+<div id="rg-toast-container"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="../scripts/functions/analytics-api.js"></script>
+
+<script>
+// ── Analytics page download dropdown helpers ──────────────────────
+function paToggleDownloadDropdown(e) {
+    if (e) { e.preventDefault(); e.stopPropagation(); }
+    var menu = document.getElementById('pa-download-menu');
+    if (menu) menu.classList.toggle('show');
+}
+function paSelectDownloadFormat(format, e) {
+    if (e) { e.preventDefault(); e.stopPropagation(); }
+    var menu = document.getElementById('pa-download-menu');
+    if (menu) menu.classList.remove('show');
+    paHandleReportExport(format);
+}
+// Close dropdown when clicking outside
+document.addEventListener('click', function(e) {
+    var menu = document.getElementById('pa-download-menu');
+    if (menu && !e.target.closest('#pa-download-dropdown-wrap')) {
+        menu.classList.remove('show');
+    }
+});
+
+
+// ── Report filter panel toggle ────────────────────────────────────
+function paToggleReportFilters() {
+    var body = document.getElementById('pa-report-filter-body');
+    var icon = document.getElementById('pa-filter-chevron');
+    if (!body) return;
+    var isOpen = body.classList.contains('open');
+    body.classList.toggle('open', !isOpen);
+    if (icon) icon.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(180deg)';
+}
+</script>
 
 <?php
 $pageContent = ob_get_clean();

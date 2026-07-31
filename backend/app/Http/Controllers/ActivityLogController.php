@@ -22,8 +22,10 @@ class ActivityLogController extends Controller
         $perPage = min(max((int) $request->get('per_page', 10), 5), 100);
         $page    = max((int) $request->get('page', 1), 1);
 
-        $query = ActivityLog::with('user:id,name,email,role,avatar,municipality_id')
-            ->latest();
+        $query = ActivityLog::select([
+            'id', 'user_id', 'action', 'module', 'description',
+            'user_name', 'user_role', 'municipality', 'created_at', 'details'
+        ])->with('user:id,name,email,role,avatar,municipality_id')->latest();
 
         // Filters
         if ($request->filled('action')) {
@@ -96,6 +98,16 @@ class ActivityLogController extends Controller
     }
 
     /**
+     * GET /api/{role}/activity-logs/{id}
+     * Returns full detail payload for drawer viewer.
+     */
+    public function show(int $id): JsonResponse
+    {
+        $log = ActivityLog::with('user:id,name,email,role,avatar,municipality_id')->findOrFail($id);
+        return response()->json(['log' => $log]);
+    }
+
+    /**
      * GET /api/{role}/activity-logs/stats
      * Returns summary statistics for the dashboard cards.
      */
@@ -106,7 +118,7 @@ class ActivityLogController extends Controller
 
     /**
      * GET /api/{role}/activity-logs/stream
-     * Server-Sent Events (SSE) real-time stream with stats updates.
+     * Fast non-blocking Server-Sent Events (SSE) real-time stream.
      */
     public function stream(Request $request)
     {
@@ -119,70 +131,34 @@ class ActivityLogController extends Controller
             if (session_status() === PHP_SESSION_ACTIVE) {
                 session_write_close();
             }
-            $startTime = time();
-            $currentLastId = $lastId;
-            $lastStatsPush = 0;
 
-            // Send initial stats
-            $stats = Cache::get(self::CACHE_KEY_STATS);
-            if ($stats) {
-                echo "event: stats\n";
-                echo "data: " . json_encode($stats) . "\n\n";
+            // Push stats immediately
+            $stats = $this->computeStats();
+            echo "event: stats\n";
+            echo "data: " . json_encode($stats) . "\n\n";
+
+            // Push any new logs since lastId
+            $newLogs = ActivityLog::with('user:id,name,email,role,avatar,municipality_id')
+                ->where('id', '>', $lastId)
+                ->orderBy('id', 'asc')
+                ->limit(20)
+                ->get();
+
+            foreach ($newLogs as $log) {
+                echo "id: {$log->id}\n";
+                echo "event: log\n";
+                echo "data: " . json_encode($log) . "\n\n";
             }
 
-            while (true) {
-                if (connection_aborted()) {
-                    break;
-                }
-
-                $newLogs = ActivityLog::with('user:id,name,email,role,avatar,municipality_id')
-                    ->where('id', '>', $currentLastId)
-                    ->orderBy('id', 'asc')
-                    ->get();
-
-                if ($newLogs->isNotEmpty()) {
-                    foreach ($newLogs as $log) {
-                        echo "id: {$log->id}\n";
-                        echo "event: log\n";
-                        echo "data: " . json_encode($log) . "\n\n";
-                        $currentLastId = $log->id;
-                    }
-                    if (ob_get_level() > 0) {
-                        ob_flush();
-                    }
-                    flush();
-                }
-
-                // Push stats every 5 seconds if changed
-                if (time() - $lastStatsPush > 5) {
-                    Cache::forget(self::CACHE_KEY_STATS);
-                    $freshStats = $this->computeStats();
-                    Cache::put(self::CACHE_KEY_STATS, $freshStats, 30);
-                    echo "event: stats\n";
-                    echo "data: " . json_encode($freshStats) . "\n\n";
-                    if (ob_get_level() > 0) {
-                        ob_flush();
-                    }
-                    flush();
-                    $lastStatsPush = time();
-                }
-
-                sleep(1);
-
-                if (time() - $startTime > 5) {
-                    // Send retry hint before reconnecting
-                    echo "retry: 3000\n\n";
-                    if (ob_get_level() > 0) {
-                        ob_flush();
-                    }
-                    flush();
-                    break;
-                }
+            echo "retry: 10000\n\n";
+            if (ob_get_level() > 0) {
+                ob_flush();
             }
+            flush();
         }, 200, [
-            'Content-Type' => 'text/event-stream',
-            'Cache-Control' => 'no-cache',
-            'Connection' => 'keep-alive',
+            'Content-Type'      => 'text/event-stream',
+            'Cache-Control'     => 'no-cache, no-store, must-revalidate',
+            'Connection'        => 'keep-alive',
             'X-Accel-Buffering' => 'no',
         ]);
     }

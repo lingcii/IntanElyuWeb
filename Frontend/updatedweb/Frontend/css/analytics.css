@@ -519,3 +519,375 @@ table.data-table tr:hover td {
 .modal-close {
     color: #64748b !important;
 }
+
+/* ============================================================
+   Analytics & Reports — Integrated Report Generation Styles
+   ============================================================ */
+
+/* ── Primary "Download Report" Button ── */
+.btn-gov-primary {
+    background: linear-gradient(135deg, #0F2C59 0%, #1a4080 100%) !important;
+    border: 1px solid #0F2C59 !important;
+    color: #ffffff !important;
+    font-weight: 600;
+    letter-spacing: 0.2px;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+.btn-gov-primary:hover {
+    background: linear-gradient(135deg, #1a4080 0%, #0F2C59 100%) !important;
+    box-shadow: 0 4px 12px rgba(15, 44, 89, 0.3) !important;
+    transform: translateY(-1px);
+}
+
+/* ── Download Dropdown ── */
+.pa-download-dropdown-wrap {
+    position: relative;
+    display: inline-block;
+}
+.pa-download-toggle {
+    padding: 7px 14px !important;
+    height: 34px;
+    font-size: 13px !important;
+    cursor: pointer;
+    border-radius: 6px !important;
+}
+.pa-download-menu {
+    display: none;
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+    z-index: 9999;
+    min-width: 180px;
+    overflow: hidden;
+    animation: paDropdownSlideIn 0.15s ease;
+}
+.pa-download-menu.show {
+    display: block;
+}
+@keyframes paDropdownSlideIn {
+    from { opacity: 0; transform: translateY(-6px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+.pa-download-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 10px 16px;
+    background: transparent;
+    border: none;
+    text-align: left;
+    font-size: 13px;
+    font-weight: 500;
+    color: #1e293b;
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+.pa-download-item:hover {
+    background: #f1f5f9;
+}
+.pa-download-item + .pa-download-item {
+    border-top: 1px solid #f1f5f9;
+}
+
+/* ── Report Filters Collapsible Card ── */
+.pa-report-filter-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    margin-bottom: 20px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    overflow: hidden;
+    transition: box-shadow 0.2s ease;
+}
+.pa-report-filter-card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+.pa-report-filter-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 20px;
+    cursor: pointer;
+    user-select: none;
+    background: #f8fafc;
+    border-bottom: 1px solid transparent;
+    transition: background 0.2s ease, border-color 0.2s ease;
+}
+.pa-report-filter-header:hover {
+    background: #f1f5f9;
+}
+.pa-report-filter-body.open + .pa-report-filter-header,
+.pa-report-filter-card:has(.open) .pa-report-filter-header {
+    border-bottom-color: #e2e8f0;
+}
+.pa-filter-toggle-icon {
+    color: #64748b;
+    font-size: 13px;
+    transition: transform 0.3s ease;
+}
+.pa-filter-hint {
+    font-size: 12px;
+    color: #94a3b8;
+}
+.pa-filter-badge {
+    background: #dbeafe;
+    color: #1d4ed8;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 10px;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+}
+.pa-report-filter-body {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.pa-report-filter-body.open {
+    max-height: 240px;
+}
+.pa-filter-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 16px;
+    padding: 20px;
+    align-items: end;
+}
+.pa-form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.pa-form-group label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #475569;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+.pa-form-group label i {
+    color: #2563EB;
+}
+.pa-form-select {
+    height: 38px !important;
+    padding: 8px 12px !important;
+    font-size: 13px !important;
+    border-radius: 7px !important;
+    border: 1px solid #e2e8f0 !important;
+    background: #ffffff !important;
+    color: #1e293b !important;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    width: 100%;
+}
+.pa-form-select:focus {
+    border-color: #3b82f6 !important;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
+    outline: none;
+}
+.pa-report-date-input {
+    height: 38px;
+    padding: 8px 12px;
+    font-size: 13px;
+    border-radius: 7px;
+    border: 1px solid #e2e8f0;
+    background: #ffffff;
+    color: #1e293b;
+    font-family: inherit;
+    width: 100%;
+    box-sizing: border-box;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+.pa-report-date-input:focus {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    outline: none;
+}
+
+/* ── Export Confirmation Modal ── */
+.pa-modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 10000;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(3px);
+    animation: paModalFadeIn 0.2s ease;
+}
+.pa-modal-overlay.show {
+    display: flex;
+}
+@keyframes paModalFadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+.pa-modal {
+    background: #ffffff;
+    border-radius: 16px;
+    padding: 36px 32px;
+    max-width: 440px;
+    width: calc(100% - 48px);
+    text-align: center;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+    animation: paModalSlideUp 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes paModalSlideUp {
+    from { transform: translateY(20px) scale(0.97); opacity: 0; }
+    to   { transform: translateY(0) scale(1); opacity: 1; }
+}
+.pa-modal-icon {
+    width: 64px;
+    height: 64px;
+    background: linear-gradient(135deg, #dbeafe, #eff6ff);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    color: #2563EB;
+    margin: 0 auto 20px;
+}
+.pa-modal-title {
+    margin: 0 0 10px;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #0F172A;
+}
+.pa-modal-msg {
+    margin: 0 0 24px;
+    color: #475569;
+    font-size: 0.925rem;
+    line-height: 1.5;
+}
+.pa-modal-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+}
+.pa-modal-btn {
+    padding: 10px 24px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s ease;
+    min-width: 110px;
+}
+.pa-modal-btn-cancel {
+    background: #f1f5f9;
+    color: #475569;
+}
+.pa-modal-btn-cancel:hover {
+    background: #e2e8f0;
+    color: #1e293b;
+}
+.pa-modal-btn-confirm {
+    background: linear-gradient(135deg, #0F2C59, #1a4080);
+    color: #ffffff;
+    box-shadow: 0 4px 12px rgba(15, 44, 89, 0.25);
+}
+.pa-modal-btn-confirm:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 18px rgba(15, 44, 89, 0.35);
+}
+
+/* ── Report Preview Loading State ── */
+.pa-rg-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 48px 20px;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    color: #1e293b;
+}
+
+/* ── Section header alignment (Top Sites table) ── */
+.pa-section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    width: 100%;
+}
+
+/* ── Responsive tweaks ── */
+@media (max-width: 768px) {
+    .pa-filter-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+    .pa-kpi-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    .pa-header-actions {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    .pa-download-menu {
+        right: auto;
+        left: 0;
+    }
+}
+@media (max-width: 480px) {
+    .pa-filter-grid {
+        grid-template-columns: 1fr;
+    }
+    .pa-kpi-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ── Toast Notifications ── */
+#rg-toast-container {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.rg-toast {
+    background: #0F172A;
+    color: #FFFFFF;
+    padding: 12px 20px;
+    border-radius: 10px;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    opacity: 0;
+    transform: translateY(20px);
+    transition: all 0.3s ease;
+}
+.rg-toast.show {
+    opacity: 1;
+    transform: translateY(0);
+}
+.rg-toast.success {
+    background: #065F46;
+    color: #ECFDF5;
+}
+.rg-toast.error {
+    background: #991B1B;
+    color: #FEF2F2;
+}
+
+

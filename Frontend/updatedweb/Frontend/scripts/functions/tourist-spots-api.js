@@ -1274,6 +1274,41 @@ window.openSpotModal = async function openSpotModal(spotId) {
             return `${displayHours}:${String(minutes).padStart(2, '0')} ${period}`;
         }
 
+        // Extract vehicle types (Public vs Private)
+        let spotVts = [];
+        if (Array.isArray(spot.vehicle_types)) {
+            spotVts = spot.vehicle_types;
+        } else if (Array.isArray(spot.vehicleTypes)) {
+            spotVts = spot.vehicleTypes;
+        } else if (spot.vehicle_type_ids) {
+            const ids = Array.isArray(spot.vehicle_type_ids)
+                ? spot.vehicle_type_ids.map(Number)
+                : String(spot.vehicle_type_ids).split(',').map(s => parseInt(s.trim())).filter(Boolean);
+            if (window.allVehicleTypes && window.allVehicleTypes.length) {
+                spotVts = window.allVehicleTypes.filter(vt => ids.includes(parseInt(vt.id)));
+            }
+        }
+        spotVts = spotVts.map(item => {
+            if (typeof item === 'object' && item !== null) return item;
+            if (window.allVehicleTypes) return window.allVehicleTypes.find(vt => vt.id == item);
+            return null;
+        }).filter(Boolean);
+
+        const publicVts = spotVts.filter(vt => vt.category === 'Public Vehicle');
+        const privateVts = spotVts.filter(vt => vt.category === 'Private Vehicle');
+
+        function formatVtBadge(vt) {
+            const isPublic = vt.category === 'Public Vehicle';
+            let name = vt.name || '';
+            if (isPublic && name === 'Tricycle') name = 'Public Tricycle';
+            else if (!isPublic && name === 'Tricycle') name = 'Private Tricycle';
+            else name = name.replace(/_/g, ' ');
+
+            const bg = isPublic ? '#DBEAFE' : '#F3E8FF';
+            const fg = isPublic ? '#1E40AF' : '#6B21A8';
+            return `<span class="cat-pill" style="background:${bg};color:${fg};font-weight:600;font-size:12px;padding:3px 10px;border-radius:20px;display:inline-block;margin:2px;">${escapeHtml(name)}</span>`;
+        }
+
         document.getElementById('modalBody').innerHTML = `
             <div class="spot-modal-split-container">
                 <!-- Left Panel (50%): Details -->
@@ -1305,12 +1340,28 @@ window.openSpotModal = async function openSpotModal(spotId) {
                             </div>
                         </div>
                         <div class="spot-detail-card">
+                            <div class="detail-label"><i class="fas fa-bus" style="color:#2563EB;margin-right:4px;"></i> Public Vehicle</div>
+                            <div class="category-badges">
+                                ${publicVts.length > 0 
+                                    ? publicVts.map(vt => formatVtBadge(vt)).join('') 
+                                    : '<span style="font-size:13px;color:#9CA3AF;">None</span>'}
+                            </div>
+                        </div>
+                        <div class="spot-detail-card">
+                            <div class="detail-label"><i class="fas fa-car" style="color:#7C3AED;margin-right:4px;"></i> Private Vehicle</div>
+                            <div class="category-badges">
+                                ${privateVts.length > 0 
+                                    ? privateVts.map(vt => formatVtBadge(vt)).join('') 
+                                    : '<span style="font-size:13px;color:#9CA3AF;">None</span>'}
+                            </div>
+                        </div>
+                        <div class="spot-detail-card">
                             <div class="detail-label">Fees</div>
                             <div class="detail-val">${formatFeesDisplay(spot)}</div>
                         </div>
                         <div class="spot-detail-card points-card">
                             <div class="detail-label points-label">⭐ Points</div>
-                            <div class="points-val">${(spot.points && parseInt(spot.points) > 0) ? parseInt(spot.points) : ((spot.classification_status === 'EMERGE' || spot.classification_status === 'EMERGING') ? 100 : (spot.classification_status === 'POTENTIAL') ? 75 : 50)} Points</div>
+                            <div class="points-val">${(spot.points && parseInt(spot.points) > 0) ? parseInt(spot.points) : getDefaultPointsForStatus(spot.classification_status)} Points</div>
                         </div>
                         <div class="spot-detail-card">
                             <div class="detail-label">Opening Time</div>
@@ -1843,6 +1894,13 @@ function initCategoryChips() {
             const chevron = document.getElementById('feeTypesChevron');
             if (chevron) chevron.style.transform = 'rotate(0deg)';
         }
+
+        const vtBtn = document.getElementById('vehicleTypesBtn'), vtDd = document.getElementById('vehicleTypesDropdown');
+        if (vtDd && vtBtn && !vtBtn.contains(e.target) && !vtDd.contains(e.target)) {
+            vtDd.style.display = 'none';
+            const chevron = document.getElementById('vehicleTypesChevron');
+            if (chevron) chevron.style.transform = 'rotate(0deg)';
+        }
     });
 }
 
@@ -1938,6 +1996,127 @@ function getFeeTypesArray() {
     return val ? val.split(',').map(s => s.trim()).filter(Boolean) : [];
 }
 
+// ── Vehicle Types Multi-Select Dropdown
+window.allVehicleTypes = [];
+
+async function fetchVehicleTypes() {
+    try {
+        const res = await window.API_CONFIG.get(`${API_BASE}/vehicle-types`);
+        const list = (res && res.data) ? res.data : (Array.isArray(res) ? res : []);
+        window.allVehicleTypes = list;
+        renderVehicleTypesOptions();
+    } catch (err) {
+        console.error('Failed to fetch vehicle types:', err);
+    }
+}
+
+function renderVehicleTypesOptions() {
+    const publicContainer = document.getElementById('publicVehicleOptions');
+    const privateContainer = document.getElementById('privateVehicleOptions');
+    if (!publicContainer || !privateContainer) return;
+
+    publicContainer.innerHTML = '';
+    privateContainer.innerHTML = '';
+
+    const publicList = (window.allVehicleTypes || []).filter(vt => vt.category === 'Public Vehicle');
+    const privateList = (window.allVehicleTypes || []).filter(vt => vt.category === 'Private Vehicle');
+
+    publicList.forEach(vt => {
+        const displayName = (vt.category === 'Public Vehicle' && vt.name === 'Tricycle') ? 'Public Tricycle' : vt.name.replace(/_/g, ' ');
+        const label = document.createElement('label');
+        label.style.cssText = 'display:flex;align-items:center;gap:10px;padding:8px 14px;cursor:pointer;transition:background .15s;font-size:14px;';
+        label.onmouseenter = function() { this.style.background = '#F8FAFC'; };
+        label.onmouseleave = function() { this.style.background = 'transparent'; };
+        label.innerHTML = `
+            <input type="checkbox" class="vehicle-type-chk" value="${vt.id}" data-id="${vt.id}" data-category="${vt.category}" data-name="${vt.name}" onchange="onVehicleTypeChange()" style="accent-color:#2563EB;width:15px;height:15px;cursor:pointer;">
+            <i class="fas fa-bus" style="width:18px;text-align:center;color:#2563EB;font-size:13px;"></i>
+            <span style="font-weight:${vt.name === 'Tricycle' ? '700' : '400'};color:${vt.name === 'Tricycle' ? '#1D4ED8' : '#1E293B'};">${displayName}</span>
+        `;
+        publicContainer.appendChild(label);
+    });
+
+    privateList.forEach(vt => {
+        const displayName = (vt.category === 'Private Vehicle' && vt.name === 'Tricycle') ? 'Private Tricycle' : vt.name.replace(/_/g, ' ');
+        const label = document.createElement('label');
+        label.style.cssText = 'display:flex;align-items:center;gap:10px;padding:8px 14px;cursor:pointer;transition:background .15s;font-size:14px;';
+        label.onmouseenter = function() { this.style.background = '#F8FAFC'; };
+        label.onmouseleave = function() { this.style.background = 'transparent'; };
+        label.innerHTML = `
+            <input type="checkbox" class="vehicle-type-chk" value="${vt.id}" data-id="${vt.id}" data-category="${vt.category}" data-name="${vt.name}" onchange="onVehicleTypeChange()" style="accent-color:#7C3AED;width:15px;height:15px;cursor:pointer;">
+            <i class="fas fa-car" style="width:18px;text-align:center;color:#7C3AED;font-size:13px;"></i>
+            <span style="font-weight:${vt.name === 'Tricycle' ? '700' : '400'};color:${vt.name === 'Tricycle' ? '#6D28D9' : '#1E293B'};">${displayName}</span>
+        `;
+        privateContainer.appendChild(label);
+    });
+}
+
+window.toggleVehicleTypesDropdown = function (e) {
+    if (e) e.stopPropagation();
+    const dd = document.getElementById('vehicleTypesDropdown');
+    const chevron = document.getElementById('vehicleTypesChevron');
+    if (!dd) return;
+    const isVisible = dd.style.display === 'block';
+    dd.style.display = isVisible ? 'none' : 'block';
+    if (chevron) chevron.style.transform = isVisible ? 'rotate(0deg)' : 'rotate(180deg)';
+};
+
+window.onVehicleTypeChange = function () {
+    const checkedChks = Array.from(document.querySelectorAll('.vehicle-type-chk:checked'));
+    const selectedIds = checkedChks.map(c => parseInt(c.value));
+    const hiddenInput = document.getElementById('vehicleTypeIds');
+    if (hiddenInput) hiddenInput.value = selectedIds.join(',');
+
+    const chipsContainer = document.getElementById('vehicleTypesChips');
+    if (!chipsContainer) return;
+
+    if (checkedChks.length === 0) {
+        chipsContainer.innerHTML = '<span id="vehicleTypesLabel" style="color:#9CA3AF;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Select one or more vehicle types</span>';
+    } else {
+        chipsContainer.innerHTML = checkedChks.map(chk => {
+            const id = chk.value;
+            const cat = chk.getAttribute('data-category');
+            const name = chk.getAttribute('data-name');
+            const isPublic = (cat === 'Public Vehicle');
+            const displayName = (isPublic && name === 'Tricycle') ? 'Public Tricycle' : ((!isPublic && name === 'Tricycle') ? 'Private Tricycle' : name.replace(/_/g, ' '));
+            const bg = isPublic ? '#DBEAFE' : '#F3E8FF';
+            const color = isPublic ? '#1E40AF' : '#6B21A8';
+            return `<span class="vt-chip" style="background:${bg};color:${color};font-size:12px;font-weight:600;padding:3px 9px;border-radius:12px;display:inline-flex;align-items:center;gap:5px;line-height:1.2;">
+                ${displayName}
+                <i class="fas fa-times" style="cursor:pointer;font-size:11px;opacity:0.8;" onclick="removeVehicleTypeTag(${id}, event)" title="Remove ${displayName}"></i>
+            </span>`;
+        }).join('');
+    }
+};
+
+window.removeVehicleTypeTag = function (id, e) {
+    if (e) e.stopPropagation();
+    const chk = document.querySelector(`.vehicle-type-chk[value="${id}"]`);
+    if (chk) {
+        chk.checked = false;
+        window.onVehicleTypeChange();
+    }
+};
+
+function setVehicleTypesFromData(vehicleTypes) {
+    if (!window.allVehicleTypes || window.allVehicleTypes.length === 0) {
+        fetchVehicleTypes().then(() => setVehicleTypesFromData(vehicleTypes));
+        return;
+    }
+    const ids = Array.isArray(vehicleTypes)
+        ? vehicleTypes.map(v => (typeof v === 'object' && v !== null ? v.id : parseInt(v))).filter(Boolean)
+        : (vehicleTypes ? String(vehicleTypes).split(',').map(s => parseInt(s.trim())).filter(Boolean) : []);
+
+    document.querySelectorAll('.vehicle-type-chk').forEach(chk => {
+        chk.checked = ids.includes(parseInt(chk.value));
+    });
+    window.onVehicleTypeChange();
+}
+
+function getVehicleTypeIdsArray() {
+    const val = document.getElementById('vehicleTypeIds')?.value;
+    return val ? val.split(',').map(s => parseInt(s.trim())).filter(Boolean) : [];
+}
+
 function formatFeesDisplay(spot) {
     const feeTypes = Array.isArray(spot.fee_types) ? spot.fee_types : (spot.fee_types ? String(spot.fee_types).split(',').map(s => s.trim()).filter(Boolean) : []);
     if (feeTypes.length === 0) return '<span style="font-size:13px;color:#9CA3AF;">No Fees</span>';
@@ -1978,8 +2157,151 @@ function formatFeesShort(spot) {
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
-// FORM OPERATIONS - CREATE/EDIT/SAVE
+// CLASSIFICATION POINTS CONFIGURATION
 // ════════════════════════════════════════════════════════════════════════════════
+
+window.classificationPointsConfig = {
+    EXISTING: 50,
+    EMERGING: 100,
+    POTENTIAL: 75
+};
+
+async function fetchClassificationPointsConfig() {
+    try {
+        const baseUrl = window.API_CONFIG?.BASE_URL || ('http://' + (window.location.hostname || '127.0.0.1') + ':8000');
+        let data;
+        if (window.API_CONFIG && typeof window.API_CONFIG.get === 'function') {
+            data = await window.API_CONFIG.get(`${baseUrl}/api/classification-points`);
+        } else {
+            const resp = await fetch(`${baseUrl}/api/classification-points`, { credentials: 'same-origin' });
+            data = await resp.json();
+        }
+        if (data && data.success && data.points) {
+            window.classificationPointsConfig = {
+                EXISTING: parseInt(data.points.EXISTING || data.points.existing) || 50,
+                EMERGING: parseInt(data.points.EMERGING || data.points.emerging) || 100,
+                POTENTIAL: parseInt(data.points.POTENTIAL || data.points.potential) || 75
+            };
+        }
+    } catch (e) {
+        console.warn('Could not fetch classification points config, using defaults.', e);
+    }
+}
+fetchClassificationPointsConfig();
+
+function getDefaultPointsForStatus(status) {
+    const st = (status || '').toUpperCase();
+    if (st === 'EMERGING' || st === 'EMERGE') return window.classificationPointsConfig.EMERGING || 100;
+    if (st === 'POTENTIAL') return window.classificationPointsConfig.POTENTIAL || 75;
+    return window.classificationPointsConfig.EXISTING || 50;
+}
+
+function openCustomizeClassificationPointsModal() {
+    const modal = document.getElementById('customizeClassificationPointsModal');
+    if (!modal) return;
+
+    document.getElementById('customPointsExisting').value = window.classificationPointsConfig.EXISTING || 50;
+    document.getElementById('customPointsEmerging').value = window.classificationPointsConfig.EMERGING || 100;
+    document.getElementById('customPointsPotential').value = window.classificationPointsConfig.POTENTIAL || 75;
+
+    const errDiv = document.getElementById('customizePointsError');
+    if (errDiv) errDiv.style.display = 'none';
+
+    modal.style.display = 'flex';
+    modal.style.alignItems = 'center';
+    modal.style.justifyContent = 'center';
+}
+
+function closeCustomizeClassificationPointsModal() {
+    const modal = document.getElementById('customizeClassificationPointsModal');
+    if (modal) modal.style.display = 'none';
+}
+
+async function saveCustomizeClassificationPoints() {
+    const existingInput = document.getElementById('customPointsExisting')?.value;
+    const emergingInput = document.getElementById('customPointsEmerging')?.value;
+    const potentialInput = document.getElementById('customPointsPotential')?.value;
+
+    const errDiv = document.getElementById('customizePointsError');
+
+    const isWholeNumber = (val) => /^\d+$/.test(val ? val.toString().trim() : '');
+    if (!isWholeNumber(existingInput) || !isWholeNumber(emergingInput) || !isWholeNumber(potentialInput)) {
+        if (errDiv) {
+            errDiv.textContent = 'Please enter valid non-negative whole numbers for all point fields.';
+            errDiv.style.display = 'block';
+        }
+        return;
+    }
+
+    const existingVal = parseInt(existingInput, 10);
+    const emergingVal = parseInt(emergingInput, 10);
+    const potentialVal = parseInt(potentialInput, 10);
+
+    const saveBtn = document.getElementById('saveCustomizePointsBtn');
+    const spinner = document.getElementById('saveCustomizePointsSpinner');
+    if (saveBtn) saveBtn.disabled = true;
+    if (spinner) spinner.style.display = 'inline-block';
+    if (errDiv) errDiv.style.display = 'none';
+
+    try {
+        const baseUrl = window.API_CONFIG?.BASE_URL || ('http://' + (window.location.hostname || '127.0.0.1') + ':8000');
+        const url = `${baseUrl}/api/lupto/classification-points`;
+        const payload = {
+            EXISTING: existingVal,
+            EMERGING: emergingVal,
+            POTENTIAL: potentialVal
+        };
+
+        let data;
+        if (window.API_CONFIG && typeof window.API_CONFIG.put === 'function') {
+            data = await window.API_CONFIG.put(url, payload);
+        } else {
+            const response = await fetch(url, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            });
+            data = await response.json();
+        }
+
+        if (data && data.success) {
+            window.classificationPointsConfig = {
+                EXISTING: existingVal,
+                EMERGING: emergingVal,
+                POTENTIAL: potentialVal
+            };
+
+            closeCustomizeClassificationPointsModal();
+            showToast('Classification points updated successfully.', 'success');
+
+            const selectEl = document.getElementById('spotClassification');
+            if (selectEl && selectEl.value) {
+                const currentVal = selectEl.value.toUpperCase();
+                const ptsInput = document.getElementById('spotPoints');
+                if (ptsInput) {
+                    ptsInput.value = getDefaultPointsForStatus(currentVal);
+                }
+            }
+        } else {
+            if (errDiv) {
+                errDiv.textContent = (data && (data.message || (data.errors ? Object.values(data.errors).flat().join(' ') : data.error))) || 'Failed to update classification points.';
+                errDiv.style.display = 'block';
+            }
+        }
+    } catch (e) {
+        console.error('Error saving classification points:', e);
+        if (errDiv) {
+            errDiv.textContent = 'An error occurred while saving configuration.';
+            errDiv.style.display = 'block';
+        }
+    } finally {
+        if (saveBtn) saveBtn.disabled = false;
+        if (spinner) spinner.style.display = 'none';
+    }
+}
 
 function isMunicipalUser() {
     const role = (window.userRole || document.body?.dataset?.role || document.querySelector('meta[name="user-role"]')?.content || '').toLowerCase();
@@ -2028,7 +2350,8 @@ function buildCurrentFormDraftPayload() {
         opening_time: openingTime,
         closing_time: closingTime,
         is_maintenance: isMaintenance,
-        points: points
+        points: points,
+        vehicle_type_ids: getVehicleTypeIdsArray()
     };
 }
 
@@ -2066,6 +2389,7 @@ function restoreDraftData(draft) {
     if (draft.entrance_fee) document.getElementById('spotFee').value = draft.entrance_fee;
     if (draft.environmental_fee) document.getElementById('environmentalFee').value = draft.environmental_fee;
     if (draft.fee_types) setFeeTypesFromData(draft.fee_types);
+    if (draft.vehicle_types || draft.vehicleTypes || draft.vehicle_type_ids) setVehicleTypesFromData(draft.vehicle_types || draft.vehicleTypes || draft.vehicle_type_ids);
 
     if (draft.latitude) document.getElementById('spotLatitude').value = draft.latitude;
     if (draft.longitude) document.getElementById('spotLongitude').value = draft.longitude;
@@ -2120,7 +2444,7 @@ function initBlankCreateForm() {
 
     const classificationSelect = document.getElementById('spotClassification');
     if (classificationSelect) {
-        // On CREATE: LUPTO → only Existing; MTO → only Potential & Emerging
+        // On CREATE: LUPTO → Existing & Customize...; MTO → Potential & Emerging
         if (isMunicipalUser()) {
             classificationSelect.innerHTML = [
                 '<option value="">— Select Status —</option>',
@@ -2128,15 +2452,18 @@ function initBlankCreateForm() {
                 '<option value="EMERGING">Emerging</option>'
             ].join('');
             classificationSelect.value = 'POTENTIAL';
-            document.getElementById('spotPoints').value = '75';
+            classificationSelect.dataset.lastValidValue = 'POTENTIAL';
+            document.getElementById('spotPoints').value = getDefaultPointsForStatus('POTENTIAL');
         } else {
-            // LUPTO: only Existing allowed on create
+            // LUPTO: Existing and Customize...
             classificationSelect.innerHTML = [
                 '<option value="">— Select Status —</option>',
-                '<option value="EXISTING">Existing</option>'
+                '<option value="EXISTING">Existing</option>',
+                '<option value="CUSTOMIZE">Customize...</option>'
             ].join('');
             classificationSelect.value = 'EXISTING';
-            document.getElementById('spotPoints').value = '50';
+            classificationSelect.dataset.lastValidValue = 'EXISTING';
+            document.getElementById('spotPoints').value = getDefaultPointsForStatus('EXISTING');
         }
     }
 
@@ -2148,6 +2475,8 @@ function initBlankCreateForm() {
     if (label) { label.textContent = 'No Fees'; label.style.color = '#9CA3AF'; }
     document.getElementById('entranceFeeField').style.display = 'none';
     document.getElementById('environmentalFeeField').style.display = 'none';
+    document.querySelectorAll('.vehicle-type-chk').forEach(chk => chk.checked = false);
+    if (typeof window.onVehicleTypeChange === 'function') window.onVehicleTypeChange();
     document.getElementById('spotLatitude').value = '';
     document.getElementById('spotLongitude').value = '';
     document.getElementById('spotDescription').value = '';
@@ -2265,7 +2594,7 @@ window.editSpot = async function (spotId) {
         let formPts = (spot.points && parseInt(spot.points) > 0) ? parseInt(spot.points) : 0;
         if (!formPts) {
             const st = (spot.classification_status || '').toUpperCase();
-            formPts = (st === 'EMERGE' || st === 'EMERGING') ? 100 : (st === 'POTENTIAL') ? 75 : 50;
+            formPts = getDefaultPointsForStatus(st);
         }
         document.getElementById('spotPoints').value = formPts;
 
@@ -2274,18 +2603,30 @@ window.editSpot = async function (spotId) {
         // Convert DB status to form display status
         const formStatus = statusDisplayMap[spot.classification_status] || spot.classification_status;
         const classificationSelect = document.getElementById('spotClassification');
-        // On EDIT: all roles can reclassify to any of the 3 options
-        classificationSelect.innerHTML = [
-            '<option value="">— Select Status —</option>',
-            '<option value="EXISTING">Existing</option>',
-            '<option value="EMERGING">Emerging</option>',
-            '<option value="POTENTIAL">Potential</option>'
-        ].join('');
+        if (isMunicipalUser()) {
+            classificationSelect.innerHTML = [
+                '<option value="">— Select Status —</option>',
+                '<option value="EXISTING">Existing</option>',
+                '<option value="EMERGING">Emerging</option>',
+                '<option value="POTENTIAL">Potential</option>'
+            ].join('');
+        } else {
+            // LUPTO: Existing, Customize..., Emerging, Potential
+            classificationSelect.innerHTML = [
+                '<option value="">— Select Status —</option>',
+                '<option value="EXISTING">Existing</option>',
+                '<option value="CUSTOMIZE">Customize...</option>',
+                '<option value="EMERGING">Emerging</option>',
+                '<option value="POTENTIAL">Potential</option>'
+            ].join('');
+        }
         classificationSelect.value = formStatus;
+        classificationSelect.dataset.lastValidValue = formStatus;
 
         document.getElementById('spotFee').value = spot.entrance_fee || 0;
         document.getElementById('environmentalFee').value = spot.environmental_fee || 0;
         setFeeTypesFromData(spot.fee_types || []);
+        setVehicleTypesFromData(spot.vehicle_types || spot.vehicleTypes || spot.vehicle_type_ids || []);
         document.getElementById('spotLatitude').value = spot.latitude || '';
         document.getElementById('spotLongitude').value = spot.longitude || '';
         document.getElementById('spotDescription').value = spot.description || '';
@@ -2674,7 +3015,8 @@ window.submitSpotForm = async function (e) {
         opening_time: document.getElementById('spotOpeningTime').value || null,
         closing_time: document.getElementById('spotClosingTime').value || null,
         is_maintenance: document.getElementById('spotIsMaintenance').checked ? 1 : 0,
-        points: parseInt(pointsValue)
+        points: parseInt(pointsValue),
+        vehicle_type_ids: getVehicleTypeIdsArray()
     };
 
     void 0;
@@ -2882,6 +3224,7 @@ const sortSpotsPendingFirst = (arr) => {
 
 export async function initializeAll(spotsData, municipalData) {
     loadCachedKpis();
+    fetchVehicleTypes();
 
     // Check window cache first for instantaneous loading
     const cacheKey = '__LUPTO_TOURIST_SPOTS_CACHE__';
@@ -3050,13 +3393,27 @@ export async function initializeAll(spotsData, municipalData) {
     document.getElementById('spotClassification')
         ?.addEventListener('change', function () {
             const val = this.value.toUpperCase();
-            let points = '';
-            if (val === 'EXISTING') points = '50';
-            else if (val === 'EMERGING') points = '100';
-            else if (val === 'POTENTIAL') points = '75';
+            if (val === 'CUSTOMIZE') {
+                this.value = this.dataset.lastValidValue || 'EXISTING';
+                openCustomizeClassificationPointsModal();
+                return;
+            }
+            this.dataset.lastValidValue = this.value;
             const ptsInput = document.getElementById('spotPoints');
-            if (ptsInput) ptsInput.value = points;
+            if (ptsInput) {
+                ptsInput.value = getDefaultPointsForStatus(val);
+            }
         });
+
+    // Customize classification points modal listeners
+    document.querySelectorAll('[data-action="close-customize-points"]').forEach(btn => {
+        btn.addEventListener('click', closeCustomizeClassificationPointsModal);
+    });
+    document.querySelector('[data-action="save-customize-points"]')
+        ?.addEventListener('click', saveCustomizeClassificationPoints);
+    document.getElementById('customizeClassificationPointsModal')?.addEventListener('click', e => {
+        if (e.target.id === 'customizeClassificationPointsModal') closeCustomizeClassificationPointsModal();
+    });
 
     // Municipality change
     document.getElementById('spotMunicipality')
@@ -3316,7 +3673,7 @@ function renderCardsGrid(spotsData) {
         let pointsVal = spot.points !== undefined && parseInt(spot.points) > 0 ? parseInt(spot.points) : 0;
         if (!pointsVal) {
             const st = (spot.classification_status || '').toUpperCase();
-            pointsVal = (st === 'EMERGE' || st === 'EMERGING') ? 100 : (st === 'POTENTIAL') ? 75 : 50;
+            pointsVal = getDefaultPointsForStatus(st);
         }
         html += `<span class="tag" style="background:#FEF3C7;color:#D97706;font-weight:600;">🏆 ${pointsVal} Points</span>`;
         if (approvalStatus && approvalStatus !== 'approved') {
@@ -3399,7 +3756,7 @@ function renderTableRows(spotsData) {
         let tablePts = spot.points !== undefined && parseInt(spot.points) > 0 ? parseInt(spot.points) : 0;
         if (!tablePts) {
             const st = (spot.classification_status || '').toUpperCase();
-            tablePts = (st === 'EMERGE' || st === 'EMERGING') ? 100 : (st === 'POTENTIAL') ? 75 : 50;
+            tablePts = getDefaultPointsForStatus(st);
         }
         html += `<td style="font-weight: 600; color: #D97706;">${tablePts} pts</td>`;
         let tableStatusBadge = '';

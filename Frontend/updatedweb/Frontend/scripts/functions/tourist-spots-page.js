@@ -342,6 +342,32 @@
             </div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
                 <div style="background:#F8FAFC;border-radius:8px;padding:12px;">
+                    <div style="font-size:11px;color:#6B7280;font-weight:700;text-transform:uppercase;margin-bottom:6px;"><i class="fas fa-bus" style="color:#2563EB;margin-right:4px;"></i> Public Vehicle</div>
+                    <div style="display:flex;flex-wrap:wrap;gap:6px;">
+                        ${(() => {
+                            const vts = (spot.vehicle_types || spot.vehicleTypes || []).filter(vt => vt.category === 'Public Vehicle');
+                            if (!vts.length) return '<span style="font-size:13px;color:#9CA3AF;">None</span>';
+                            return vts.map(vt => {
+                                const displayName = vt.name === 'Tricycle' ? 'Public Tricycle' : vt.name.replace(/_/g, ' ');
+                                return `<span style="display:inline-block;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:600;background:#DBEAFE;color:#1E40AF;">${displayName}</span>`;
+                            }).join('');
+                        })()}
+                    </div>
+                </div>
+                <div style="background:#F8FAFC;border-radius:8px;padding:12px;">
+                    <div style="font-size:11px;color:#6B7280;font-weight:700;text-transform:uppercase;margin-bottom:6px;"><i class="fas fa-car" style="color:#7C3AED;margin-right:4px;"></i> Private Vehicle</div>
+                    <div style="display:flex;flex-wrap:wrap;gap:6px;">
+                        ${(() => {
+                            const vts = (spot.vehicle_types || spot.vehicleTypes || []).filter(vt => vt.category === 'Private Vehicle');
+                            if (!vts.length) return '<span style="font-size:13px;color:#9CA3AF;">None</span>';
+                            return vts.map(vt => {
+                                const displayName = vt.name === 'Tricycle' ? 'Private Tricycle' : vt.name.replace(/_/g, ' ');
+                                return `<span style="display:inline-block;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:600;background:#F3E8FF;color:#6B21A8;">${displayName}</span>`;
+                            }).join('');
+                        })()}
+                    </div>
+                </div>
+                <div style="background:#F8FAFC;border-radius:8px;padding:12px;">
                     <div style="font-size:11px;color:#6B7280;font-weight:700;text-transform:uppercase;margin-bottom:6px;">Category</div>
                     <div style="display:flex;flex-wrap:wrap;gap:5px;">
                         ${(spot.category || 'Other').split(',').map(c => c.trim()).filter(Boolean).map(c =>

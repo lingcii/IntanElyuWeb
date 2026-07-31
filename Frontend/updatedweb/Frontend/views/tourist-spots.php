@@ -481,6 +481,32 @@ ob_start();
                         </div>
                     </div>
 
+                    <div class="sfm-field" id="vehicleTypesField">
+                        <label class="sfm-label">
+                            Choose Vehicle Types
+                        </label>
+                        <div class="sfm-fee-dropdown-wrap" style="position:relative; width:100%;">
+                            <div id="vehicleTypesBtn" class="sfm-select" style="cursor:pointer;user-select:none;display:flex;align-items:center;justify-content:space-between;gap:6px;min-height:38px;padding:6px 12px;border:1px solid #E5E7EB;border-radius:8px;background:#fff;" onclick="toggleVehicleTypesDropdown(event)" tabindex="0">
+                                <div id="vehicleTypesChips" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;width:100%;">
+                                    <span id="vehicleTypesLabel" style="color:#9CA3AF;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Select one or more vehicle types</span>
+                                </div>
+                                <i class="fas fa-chevron-down" style="font-size:12px;color:#9CA3AF;transition:transform .2s;flex-shrink:0;" id="vehicleTypesChevron"></i>
+                            </div>
+                            <div id="vehicleTypesDropdown" style="display:none;position:absolute;top:100%;left:0;z-index:9999;background:#fff;border:1px solid #E5E7EB;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.12);padding:8px 0;width:100%;max-height:260px;overflow-y:auto;margin-top:4px;">
+                                <div style="padding:6px 14px 4px;font-size:11px;color:#64748B;font-weight:700;text-transform:uppercase;letter-spacing:.5px;background:#F8FAFC;border-bottom:1px solid #F1F5F9;">
+                                    <i class="fas fa-bus" style="margin-right:4px;color:#2563EB;"></i> Public Vehicle
+                                </div>
+                                <div id="publicVehicleOptions"></div>
+
+                                <div style="padding:6px 14px 4px;font-size:11px;color:#64748B;font-weight:700;text-transform:uppercase;letter-spacing:.5px;background:#F8FAFC;border-bottom:1px solid #F1F5F9;margin-top:4px;">
+                                    <i class="fas fa-car" style="margin-right:4px;color:#7C3AED;"></i> Private Vehicle
+                                </div>
+                                <div id="privateVehicleOptions"></div>
+                            </div>
+                        </div>
+                        <input type="hidden" id="vehicleTypeIds" value="">
+                    </div>
+
                     <div class="sfm-two-col">
                         <div class="sfm-field">
                             <label class="sfm-label" for="spotOpeningTime">
@@ -581,6 +607,70 @@ ob_start();
                     <span id="confirmBtnLabel">Yes, Save</span>
                 </button>
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- Customize Classification Points Modal -->
+<div class="modal" id="customizeClassificationPointsModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; width: 100vw; height: 100vh; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); align-items: center; justify-content: center; z-index: 10005; padding: 16px;">
+    <div class="modal-content" style="max-width: 400px; width: 100%; margin: auto; border-radius: 16px; overflow: hidden; background: #fff; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.15), 0 8px 10px -6px rgba(0,0,0,0.1);">
+        <div style="background: #F8FAFC; padding: 18px 20px 14px 20px; border-bottom: 1px solid #E2E8F0; position: relative;">
+            <button type="button" class="modal-close-btn" data-action="close-customize-points" style="position: absolute; top: 14px; right: 16px; background: transparent; border: none; font-size: 16px; color: #64748B; cursor: pointer; padding: 4px;">
+                <i class="fas fa-times"></i>
+            </button>
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <div style="width: 36px; height: 36px; background: #EEF2FF; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #4F46E5; flex-shrink: 0;">
+                    <i class="fas fa-sliders-h" style="font-size: 15px;"></i>
+                </div>
+                <div>
+                    <h3 style="margin: 0; font-size: 16px; font-weight: 700; color: #0F172A;">Customize Classification Points</h3>
+                </div>
+            </div>
+        </div>
+        <div style="padding: 18px 20px 20px 20px;">
+            <p style="color: #64748B; margin: 0 0 14px 0; font-size: 12px; line-height: 1.45;">
+                Configure the default point values assigned to each tourist spot classification. These values will be used automatically whenever a classification is selected.
+            </p>
+            <form id="customizePointsForm" onsubmit="return false;">
+                <table style="width: 100%; border-collapse: collapse; margin-bottom: 16px;">
+                    <thead>
+                        <tr style="border-bottom: 2px solid #E2E8F0; text-align: left;">
+                            <th style="padding: 6px 8px; font-size: 12px; font-weight: 600; color: #475569;">Classification</th>
+                            <th style="padding: 6px 8px; font-size: 12px; font-weight: 600; color: #475569; width: 110px; text-align: right;">Points</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr style="border-bottom: 1px solid #F1F5F9;">
+                            <td style="padding: 8px; font-size: 13px; font-weight: 500; color: #1E293B;">Existing</td>
+                            <td style="padding: 6px 8px; text-align: right;">
+                                <input type="number" id="customPointsExisting" min="0" step="1" required class="sfm-input" style="width: 90px; font-size: 13px; padding: 5px 8px; text-align: right; margin-left: auto;" value="50">
+                            </td>
+                        </tr>
+                        <tr style="border-bottom: 1px solid #F1F5F9;">
+                            <td style="padding: 8px; font-size: 13px; font-weight: 500; color: #1E293B;">Emerging</td>
+                            <td style="padding: 6px 8px; text-align: right;">
+                                <input type="number" id="customPointsEmerging" min="0" step="1" required class="sfm-input" style="width: 90px; font-size: 13px; padding: 5px 8px; text-align: right; margin-left: auto;" value="100">
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; font-size: 13px; font-weight: 500; color: #1E293B;">Potential</td>
+                            <td style="padding: 6px 8px; text-align: right;">
+                                <input type="number" id="customPointsPotential" min="0" step="1" required class="sfm-input" style="width: 90px; font-size: 13px; padding: 5px 8px; text-align: right; margin-left: auto;" value="75">
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+                <div id="customizePointsError" style="display:none; color: #DC2626; background: #FEE2E2; padding: 8px 12px; border-radius: 6px; font-size: 12px; margin-bottom: 14px;"></div>
+                <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                    <button type="button" class="btn btn-outline" data-action="close-customize-points" style="padding: 6px 16px; font-size: 13px;">
+                        Cancel
+                    </button>
+                    <button type="button" class="btn btn-primary" id="saveCustomizePointsBtn" data-action="save-customize-points" style="padding: 6px 18px; font-size: 13px;">
+                        <i class="fas fa-circle-notch fa-spin" id="saveCustomizePointsSpinner" style="display:none; margin-right:6px;"></i>
+                        Save
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 </div>

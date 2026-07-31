@@ -7,6 +7,7 @@ use App\Models\TouristSpot;
 use App\Models\TouristSpotAudit;
 use App\Models\TouristSpotImage;
 use App\Models\User;
+use App\Models\VehicleType;
 use App\Enums\ActivityAction;
 use App\Services\ActivityLogService;
 use App\Services\CloudflareR2Service;
@@ -64,6 +65,17 @@ class TouristSpotController extends Controller
     //  READ
     // ──────────────────────────────────────────────────────────────────────────
 
+    public function getVehicleTypes(Request $request): JsonResponse
+    {
+        $role  = strtolower((string) ($request->session()->get('user_role') ?? 'lupto'));
+        $types = VehicleType::getAllowedForRole($role);
+        return response()->json([
+            'success' => true,
+            'role'    => $role,
+            'data'    => $types,
+        ]);
+    }
+
     public function index(Request $request): JsonResponse
     {
         $role           = strtolower((string) ($request->session()->get('user_role') ?? 'lupto'));
@@ -76,7 +88,7 @@ class TouristSpotController extends Controller
                 'id', 'name', 'municipality_id', 'barangay', 'category', 'description', 'entrance_fee', 'environmental_fee', 'fee_types',
                 'status', 'photo_url', 'latitude', 'longitude', 'opening_time',
                 'closing_time', 'is_maintenance', 'classification_status', 'rejection_reason', 'visits', 'rating', 'points', 'approved_by', 'approved_at', 'created_by', 'creator_role', 'created_at'
-            ])->with(['municipality:id,name', 'images', 'approver:id,name', 'creator:id,name']);
+            ])->with(['municipality:id,name', 'images', 'approver:id,name', 'creator:id,name', 'vehicleTypes']);
 
             if (in_array($role, User::$MUNICIPAL_ROLES) && $municipalityId) {
                 $query->where('municipality_id', $municipalityId);
@@ -107,7 +119,7 @@ class TouristSpotController extends Controller
         $role           = $request->session()->get('user_role');
         $municipalityId = (int) $request->session()->get('user_municipality_id', 0);
 
-        $query = TouristSpot::with(['municipality:id,name', 'images', 'approver:id,name', 'creator:id,name'])->where('id', $id);
+        $query = TouristSpot::with(['municipality:id,name', 'images', 'approver:id,name', 'creator:id,name', 'vehicleTypes'])->where('id', $id);
 
         if (in_array($role, User::$MUNICIPAL_ROLES) && $municipalityId) {
             $query->where('municipality_id', $municipalityId);
@@ -189,7 +201,7 @@ class TouristSpotController extends Controller
         $role   = $request->session()->get('user_role');
         $muniId = (int) $request->session()->get('user_municipality_id', 0);
 
-        $query = TouristSpot::with(['municipality:id,name', 'images'])
+        $query = TouristSpot::with(['municipality:id,name', 'images', 'vehicleTypes'])
             ->where('status', 'draft');
 
         if ($userId) {
@@ -290,12 +302,16 @@ class TouristSpotController extends Controller
             }
         }
 
+        if ($request->has('vehicle_type_ids') && is_array($request->input('vehicle_type_ids'))) {
+            $draft->vehicleTypes()->sync($request->input('vehicle_type_ids'));
+        }
+
         CacheInvalidationService::forgetTouristSpots();
 
         return response()->json([
             'success' => true,
             'message' => 'Draft saved successfully.',
-            'draft'   => $draft->fresh(['images', 'municipality'])->toArray()
+            'draft'   => $draft->fresh(['images', 'municipality', 'vehicleTypes'])?->toArray()
         ]);
     }
 
@@ -356,6 +372,8 @@ class TouristSpotController extends Controller
             'is_maintenance'        => 'nullable|boolean',
             'images'                => 'nullable|array',
             'points'                => 'required|integer|min:0',
+            'vehicle_type_ids'      => 'nullable|array',
+            'vehicle_type_ids.*'    => 'integer|exists:vehicle_types,id',
         ];
 
         $feeTypes = $request->input('fee_types', []);
@@ -370,6 +388,16 @@ class TouristSpotController extends Controller
 
         $role           = strtolower((string) ($request->session()->get('user_role') ?? 'lupto'));
         $sessionMuniId  = (int) $request->session()->get('user_municipality_id', 0);
+
+        // Validate vehicle types role authorization
+        $vtIds = $data['vehicle_type_ids'] ?? [];
+        if (!empty($vtIds)) {
+            if (!VehicleType::validateIdsForRole($vtIds, $role)) {
+                return response()->json([
+                    'error' => 'One or more selected vehicle types are not permitted for your role.'
+                ], 422);
+            }
+        }
 
         // Municipal users always use their own municipality and cannot submit for another municipality
         if (in_array($role, User::$MUNICIPAL_ROLES)) {
@@ -458,6 +486,9 @@ class TouristSpotController extends Controller
             }
 
             $this->syncImages($spot->id, $data['images'] ?? []);
+            if (array_key_exists('vehicle_type_ids', $data)) {
+                $spot->vehicleTypes()->sync($data['vehicle_type_ids'] ?? []);
+            }
 
             // Clean up any remaining draft entries for this user/municipality so drafts are strictly separate
             $userId = (int) $request->session()->get('user_id', 0);
@@ -533,7 +564,7 @@ class TouristSpotController extends Controller
             'success' => true,
             'message' => 'Tourist spot created successfully.',
             'id' => $spot->id,
-            'spot' => $spot->fresh(['municipality', 'images'])?->toArray()
+            'spot' => $spot->fresh(['municipality', 'images', 'vehicleTypes'])?->toArray()
         ], 201);
     }
 
@@ -575,6 +606,8 @@ class TouristSpotController extends Controller
             'is_maintenance'        => 'nullable|boolean',
             'images'                => 'nullable|array',
             'points'                => 'required|integer|min:0',
+            'vehicle_type_ids'      => 'nullable|array',
+            'vehicle_type_ids.*'    => 'integer|exists:vehicle_types,id',
         ];
 
         $feeTypes = $request->input('fee_types', []);
@@ -589,6 +622,16 @@ class TouristSpotController extends Controller
 
         $role           = strtolower((string) ($request->session()->get('user_role') ?? 'lupto'));
         $municipalityId = (int) $request->session()->get('user_municipality_id', 0);
+
+        // Validate vehicle types role authorization
+        $vtIds = $data['vehicle_type_ids'] ?? [];
+        if (!empty($vtIds)) {
+            if (!VehicleType::validateIdsForRole($vtIds, $role)) {
+                return response()->json([
+                    'error' => 'One or more selected vehicle types are not permitted for your role.'
+                ], 422);
+            }
+        }
 
         if (in_array($role, User::$MUNICIPAL_ROLES)) {
             $submittedMuniId = $request->input('municipality_id');
@@ -656,6 +699,9 @@ class TouristSpotController extends Controller
             $spot->save();
 
             $this->syncImages($spot->id, $data['images'] ?? []);
+            if (array_key_exists('vehicle_type_ids', $data)) {
+                $spot->vehicleTypes()->sync($data['vehicle_type_ids'] ?? []);
+            }
             $this->auditLog($spot->id, (int) $request->session()->get('user_id'), 'updated', ['old' => $old, 'new' => $data], $request);
 
             ActivityLogService::log(
