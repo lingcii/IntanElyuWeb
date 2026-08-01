@@ -172,14 +172,31 @@ ob_start();
             <form id="userForm" novalidate>
                 <input type="hidden" id="formUserId">
                 <div class="um-form-grid">
-                    <!-- Full Name -->
-                    <div class="um-form-group full">
-                        <label class="um-form-label" for="formName"><i class="fas fa-id-card" style="color:#073B6B;"></i> FULL NAME <span class="required">*</span></label>
-                        <div class="um-field-wrap">
-                            <i class="fas fa-user um-field-icon"></i>
-                            <input type="text" id="formName" class="um-form-control with-icon" placeholder="e.g. Juan dela Cruz" maxlength="100" required>
+                    <!-- Name Fields: Last Name, First Name, Middle Name -->
+                    <div class="um-form-grid-3">
+                        <div class="um-form-group">
+                            <label class="um-form-label" for="formLastName"><i class="fas fa-id-card" style="color:#073B6B;"></i> LAST NAME <span class="required">*</span></label>
+                            <div class="um-field-wrap">
+                                <i class="fas fa-user um-field-icon"></i>
+                                <input type="text" id="formLastName" class="um-form-control with-icon" placeholder="e.g. dela Cruz" maxlength="50" required>
+                            </div>
+                        </div>
+                        <div class="um-form-group">
+                            <label class="um-form-label" for="formFirstName"><i class="fas fa-id-card" style="color:#073B6B;"></i> FIRST NAME <span class="required">*</span></label>
+                            <div class="um-field-wrap">
+                                <i class="fas fa-user um-field-icon"></i>
+                                <input type="text" id="formFirstName" class="um-form-control with-icon" placeholder="e.g. Juan" maxlength="50" required>
+                            </div>
+                        </div>
+                        <div class="um-form-group">
+                            <label class="um-form-label" for="formMiddleName"><i class="fas fa-id-card" style="color:#073B6B;"></i> MIDDLE NAME</label>
+                            <div class="um-field-wrap">
+                                <i class="fas fa-user um-field-icon"></i>
+                                <input type="text" id="formMiddleName" class="um-form-control with-icon" placeholder="e.g. Santos" maxlength="50">
+                            </div>
                         </div>
                     </div>
+                    <input type="hidden" id="formName">
                     <!-- Email -->
                     <div class="um-form-group">
                         <label class="um-form-label" for="formEmail"><i class="fas fa-envelope" style="color:#073B6B;"></i> EMAIL ADDRESS <span class="required">*</span></label>

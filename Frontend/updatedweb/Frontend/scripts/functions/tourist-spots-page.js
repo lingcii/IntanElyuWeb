@@ -1135,8 +1135,9 @@
             const id = card.dataset.spotId;
             const spot = window.spotsData.find(s => String(s.id) === String(id));
             if (!spot) return;
+            const spotStatus = (spot.classification_status || '').toUpperCase();
             const matchSearch = !search || spot.name.toLowerCase().includes(search) || (spot.description || '').toLowerCase().includes(search);
-            const matchStatus = !status || (spot.classification_status || '').toUpperCase() === statusMap[status];
+            const matchStatus = !status || spotStatus === status || spotStatus === statusMap[status];
             const show = matchSearch && matchesCat(spot) && matchStatus;
             card.style.display = show ? '' : 'none';
             if (show) visible++;
@@ -1148,8 +1149,9 @@
             const id = row.dataset.spotId;
             const spot = window.spotsData.find(s => String(s.id) === String(id));
             if (!spot) return;
+            const spotStatus = (spot.classification_status || '').toUpperCase();
             const matchSearch = !search || spot.name.toLowerCase().includes(search) || (spot.description || '').toLowerCase().includes(search);
-            const matchStatus = !status || (spot.classification_status || '').toUpperCase() === statusMap[status];
+            const matchStatus = !status || spotStatus === status || spotStatus === statusMap[status];
             row.style.display = (matchSearch && matchesCat(spot) && matchStatus) ? '' : 'none';
         });
 

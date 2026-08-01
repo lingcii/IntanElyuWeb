@@ -5,6 +5,9 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use App\Models\User;
 
+/**
+ * @property \Illuminate\Database\Eloquent\Collection|\App\Models\VehicleType[] $vehicleTypes
+ */
 class TouristSpot extends Model
 {
     protected $table = 'tourist_spots';

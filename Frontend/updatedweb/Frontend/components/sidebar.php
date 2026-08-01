@@ -15,6 +15,7 @@ function mtoSections()
             ['href' => 'tourist-spots.php', 'icon' => 'fa-location-dot', 'label' => 'Manage Tourist Sites'],
             ['href' => 'analytics.php', 'icon' => 'fa-chart-simple', 'label' => 'Analytics & Reports'],
             ['href' => 'fare-data.php', 'icon' => 'fa-money-bill-trend-up', 'label' => 'Fare Management'],
+            ['href' => 'vouchers.php', 'icon' => 'fa-ticket-simple', 'label' => 'Voucher & Rewards'],
         ],
         'ADMINISTRATION' => [
             ['href' => 'proof-validation.php', 'icon' => 'fa-images', 'label' => 'Proof Validation'],
@@ -42,6 +43,7 @@ $sidebarConfig = [
                 ['href' => 'tourist-spots.php', 'icon' => 'fa-location-dot', 'label' => 'Manage Tourist Sites'],
                 ['href' => 'analytics.php', 'icon' => 'fa-chart-simple', 'label' => 'Analytics & Reports'],
                 ['href' => 'fare-data.php', 'icon' => 'fa-money-bill-trend-up', 'label' => 'Transportation Fare'],
+                ['href' => 'vouchers.php', 'icon' => 'fa-ticket-simple', 'label' => 'Voucher & Rewards'],
                 ['href' => 'leaderboard.php', 'icon' => 'fa-trophy', 'label' => 'Leaderboard'],
             ],
             'ADMINISTRATION' => [
@@ -67,6 +69,7 @@ $sidebarConfig = [
                 ['href' => 'tourist-spots.php', 'icon' => 'fa-location-dot', 'label' => 'Manage Tourist Sites'],
                 ['href' => 'analytics.php', 'icon' => 'fa-chart-simple', 'label' => 'Analytics & Reports'],
                 ['href' => 'fare-data.php', 'icon' => 'fa-money-bill-trend-up', 'label' => 'Transportation Fare'],
+                ['href' => 'vouchers.php', 'icon' => 'fa-ticket-simple', 'label' => 'Voucher & Rewards'],
                 ['href' => 'leaderboard.php', 'icon' => 'fa-trophy', 'label' => 'Leaderboard'],
             ],
             'ADMINISTRATION' => [

@@ -77,11 +77,6 @@ class User extends Authenticatable
         return in_array($this->role, self::$MUNICIPAL_ROLES);
     }
 
-    public function favorites()
-    {
-        return $this->hasMany(Favorite::class);
-    }
-
     public function itineraries()
     {
         return $this->hasMany(Itinerary::class);
@@ -90,5 +85,20 @@ class User extends Authenticatable
     public function feedbacks()
     {
         return $this->hasMany(SiteFeedback::class);
+    }
+
+    public function vouchers()
+    {
+        return $this->hasMany(Voucher::class, 'created_by');
+    }
+
+    public function voucherRedemptions()
+    {
+        return $this->hasMany(VoucherRedemption::class, 'user_id');
+    }
+
+    public function userPoint()
+    {
+        return $this->hasOne(UserPoint::class, 'user_id');
     }
 }

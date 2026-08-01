@@ -867,7 +867,7 @@ export function filterSpots(searchValue = '', municipalityValue = '', selectedCa
         const nameMatch = !searchValue || card.dataset.name.includes(searchValue.toLowerCase());
         const muniMatch = !municipalityValue || card.dataset.municipality === municipalityValue;
         const catMatch = matchesCat(card.dataset.category);
-        const statusMatch = !statusValue || card.dataset.status === mappedStatus;
+        const statusMatch = !statusValue || card.dataset.status === statusValue || card.dataset.status === mappedStatus;
 
         const show = nameMatch && muniMatch && catMatch && statusMatch;
         card.style.display = show ? 'block' : 'none';
@@ -879,7 +879,7 @@ export function filterSpots(searchValue = '', municipalityValue = '', selectedCa
         const nameMatch = !searchValue || row.dataset.name.includes(searchValue.toLowerCase());
         const muniMatch = !municipalityValue || row.dataset.municipality === municipalityValue;
         const catMatch = matchesCat(row.dataset.category);
-        const statusMatch = !statusValue || row.dataset.status === mappedStatus;
+        const statusMatch = !statusValue || row.dataset.status === statusValue || row.dataset.status === mappedStatus;
 
         const show = nameMatch && muniMatch && catMatch && statusMatch;
         row.style.display = show ? '' : 'none';

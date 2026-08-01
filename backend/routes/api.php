@@ -22,6 +22,7 @@ use App\Http\Controllers\Admin\FeedbackManagementController;
 use App\Http\Controllers\FeedbackController;
 use App\Http\Controllers\BackupController;
 use App\Http\Controllers\ClassificationPointController;
+use App\Http\Controllers\VoucherController;
 
 use Illuminate\Support\Facades\Route;
 
@@ -194,6 +195,14 @@ Route::middleware('auth.session')->group(function () {
             Route::get('/', [ProofValidationController::class, 'index']);
             Route::get('/{id}', [ProofValidationController::class, 'show']);
         });
+
+        // Voucher & Rewards (view only for PICTO)
+        Route::prefix('vouchers')->group(function () {
+            Route::get('/stats', [VoucherController::class, 'stats']);
+            Route::get('/redemptions', [VoucherController::class, 'redemptions']);
+            Route::get('/', [VoucherController::class, 'index']);
+            Route::get('/{id}', [VoucherController::class, 'show']);
+        });
     });
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -307,6 +316,19 @@ Route::middleware('auth.session')->group(function () {
             Route::get('/', [ProofValidationController::class, 'index']);
             Route::get('/{id}', [ProofValidationController::class, 'show']);
         });
+
+        // Voucher & Rewards (Full Access for LUPTO)
+        Route::prefix('vouchers')->group(function () {
+            Route::get('/stats', [VoucherController::class, 'stats']);
+            Route::get('/redemptions', [VoucherController::class, 'redemptions']);
+            Route::patch('/redemptions/{id}/status', [VoucherController::class, 'updateRedemptionStatus']);
+            Route::get('/', [VoucherController::class, 'index']);
+            Route::get('/{id}', [VoucherController::class, 'show']);
+            Route::post('/', [VoucherController::class, 'store']);
+            Route::put('/{id}', [VoucherController::class, 'update']);
+            Route::patch('/{id}/status', [VoucherController::class, 'toggleStatus']);
+            Route::patch('/{id}/archive', [VoucherController::class, 'archive']);
+        });
     });
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -408,6 +430,14 @@ Route::middleware('auth.session')->group(function () {
             Route::post('/{id}/approve', [ProofValidationController::class, 'approve']);
             Route::post('/{id}/reject', [ProofValidationController::class, 'reject']);
         });
+
+        // Voucher & Rewards (view only for Municipal)
+        Route::prefix('vouchers')->group(function () {
+            Route::get('/stats', [VoucherController::class, 'stats']);
+            Route::get('/redemptions', [VoucherController::class, 'redemptions']);
+            Route::get('/', [VoucherController::class, 'index']);
+            Route::get('/{id}', [VoucherController::class, 'show']);
+        });
     });
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -416,6 +446,13 @@ Route::middleware('auth.session')->group(function () {
     Route::prefix('tourist')->group(function () {
         Route::get('/feedback', [FeedbackController::class, 'index']);
         Route::post('/feedback', [FeedbackController::class, 'store']);
+
+        // Voucher & Rewards (Mobile API endpoints)
+        Route::prefix('vouchers')->group(function () {
+            Route::get('/', [VoucherController::class, 'index']);
+            Route::get('/{id}', [VoucherController::class, 'show']);
+            Route::post('/{id}/redeem', [VoucherController::class, 'redeem']);
+        });
     });
 });
 

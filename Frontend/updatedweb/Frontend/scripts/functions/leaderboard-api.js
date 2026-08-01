@@ -213,7 +213,8 @@
         }
         const max = _maxPoints || 1;
         tbody.innerHTML = users.map((u, idx) => {
-            const isTop3 = u.rank <= 3;
+            const hasPoints = Number(u.total_points || 0) > 0;
+            const isTop3 = u.rank <= 3 && hasPoints;
             const pct = Math.round((u.total_points / max) * 100);
             const initials = getInitials(u.full_name);
             const color = getAvatarColor(u.user_id);

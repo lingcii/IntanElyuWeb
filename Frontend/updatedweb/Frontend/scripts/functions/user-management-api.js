@@ -546,8 +546,34 @@ async function openEditModal(id) {
         _editingUserStatus = u.status;
 
         document.getElementById('formUserId').value = u.id;
-        document.getElementById('formName').value = u.name;
+        document.getElementById('formName').value = u.name || '';
         document.getElementById('formEmail').value = u.email;
+
+        // Split full name into Last Name, First Name, Middle Name for edit modal
+        let rawName = (u.name || '').trim();
+        let lName = '', fName = '', mName = '';
+        if (rawName.includes(',')) {
+            const parts = rawName.split(',');
+            lName = parts[0].trim();
+            const rest = (parts[1] || '').trim().split(/\s+/);
+            fName = rest[0] || '';
+            mName = rest.slice(1).join(' ') || '';
+        } else {
+            const words = rawName.split(/\s+/);
+            if (words.length === 1) {
+                fName = words[0];
+            } else if (words.length === 2) {
+                fName = words[0];
+                lName = words[1];
+            } else if (words.length >= 3) {
+                fName = words[0];
+                mName = words[1];
+                lName = words.slice(2).join(' ');
+            }
+        }
+        if (document.getElementById('formLastName')) document.getElementById('formLastName').value = lName;
+        if (document.getElementById('formFirstName')) document.getElementById('formFirstName').value = fName;
+        if (document.getElementById('formMiddleName')) document.getElementById('formMiddleName').value = mName;
 
         const roleSelect = document.getElementById('formRole');
         const userRoleEnv = (window.userRole || '').toLowerCase();
@@ -606,7 +632,13 @@ function onRoleChange() {
 async function submitUserForm() {
     const id = document.getElementById('formUserId').value;
     const isEdit = !!id;
-    const name = document.getElementById('formName').value.trim();
+    const lastName = (document.getElementById('formLastName')?.value || '').trim();
+    const firstName = (document.getElementById('formFirstName')?.value || '').trim();
+    const middleName = (document.getElementById('formMiddleName')?.value || '').trim();
+    const name = [firstName, middleName, lastName].filter(Boolean).join(' ');
+    const formNameEl = document.getElementById('formName');
+    if (formNameEl) formNameEl.value = name;
+
     const email = document.getElementById('formEmail').value.trim();
     const roleSelect = document.getElementById('formRole');
     const role = roleSelect ? roleSelect.value : 'municipal';
@@ -616,7 +648,8 @@ async function submitUserForm() {
 
     const isMunicipal = role === 'municipal' || role.endsWith('_mto');
 
-    if (!name) { focusError('formName', 'Full name is required.'); return; }
+    if (!lastName) { focusError('formLastName', 'Last name is required.'); return; }
+    if (!firstName) { focusError('formFirstName', 'First name is required.'); return; }
     if (!email) { focusError('formEmail', 'Email is required.'); return; }
     if (!role) { focusError('formRole', 'Role is required.'); return; }
     if (isMunicipal && !muniId) { focusError('formMunicipality', 'Please select a municipality for Municipal user.'); return; }
@@ -695,7 +728,7 @@ function closeFormModal() {
 }
 
 function resetForm() {
-    ['formUserId', 'formName', 'formEmail'].forEach(id => {
+    ['formUserId', 'formName', 'formLastName', 'formFirstName', 'formMiddleName', 'formEmail'].forEach(id => {
         const el = document.getElementById(id);
         if (el) { el.value = ''; el.classList.remove('error'); }
     });
