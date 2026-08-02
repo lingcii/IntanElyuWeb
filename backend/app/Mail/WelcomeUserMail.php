@@ -30,7 +30,13 @@ class WelcomeUserMail extends Mailable
         // No hardcoded hostnames anywhere.
         if (empty($this->loginUrl)) {
             $frontendBase = rtrim(env('APP_FRONTEND_URL', config('app.url', 'http://localhost')), '/');
-            $this->loginUrl = $frontendBase . '/Frontend/login.php';
+            if (str_ends_with(strtolower($frontendBase), '/login.php')) {
+                $this->loginUrl = $frontendBase;
+            } elseif (str_ends_with(strtolower($frontendBase), '/frontend') || str_contains($frontendBase, 'railway.app')) {
+                $this->loginUrl = $frontendBase . '/login.php';
+            } else {
+                $this->loginUrl = $frontendBase . '/Frontend/updatedweb/Frontend/login.php';
+            }
         }
     }
 

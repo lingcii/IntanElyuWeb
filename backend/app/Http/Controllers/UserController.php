@@ -244,7 +244,13 @@ class UserController extends Controller
             // Set this variable in Railway dashboard (or .env locally) to point to the frontend.
             // Falls back to APP_URL so it works even if APP_FRONTEND_URL is not set.
             $frontendBase = rtrim(env('APP_FRONTEND_URL', config('app.url')), '/');
-            $loginUrl = $frontendBase . '/Frontend/login.php';
+            if (str_ends_with(strtolower($frontendBase), '/login.php')) {
+                $loginUrl = $frontendBase;
+            } elseif (str_ends_with(strtolower($frontendBase), '/frontend') || str_contains($frontendBase, 'railway.app')) {
+                $loginUrl = $frontendBase . '/login.php';
+            } else {
+                $loginUrl = $frontendBase . '/Frontend/updatedweb/Frontend/login.php';
+            }
             Mail::to($user->email)
                 ->send(new WelcomeUserMail($user, $plainPassword, $loginUrl));
             $emailSent = true;

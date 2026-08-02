@@ -37,12 +37,15 @@ class PasswordResetMail extends Mailable
     public function content(): Content
     {
         // Hybrid URL: use Railway frontend URL when deployed, localhost when running locally
-        $appUrl = config('app.url', 'http://localhost');
-        $isRailway = str_contains($appUrl, 'railway.app');
-        $frontendBase = $isRailway
-            ? env('APP_FRONTEND_URL', 'https://intanelyuweb-frontend-production.up.railway.app')
-            : 'http://localhost:8080';
-        $resetUrl = $frontendBase . '?view=reset-password&token=' . $this->token . '&email=' . urlencode($this->user->email);
+        $frontendBase = rtrim(env('APP_FRONTEND_URL', config('app.url', 'http://localhost')), '/');
+        if (str_ends_with(strtolower($frontendBase), '/reset-password.php')) {
+            $resetFile = $frontendBase;
+        } elseif (str_ends_with(strtolower($frontendBase), '/frontend') || str_contains($frontendBase, 'railway.app')) {
+            $resetFile = $frontendBase . '/reset-password.php';
+        } else {
+            $resetFile = $frontendBase . '/Frontend/updatedweb/Frontend/reset-password.php';
+        }
+        $resetUrl = $resetFile . '?token=' . $this->token . '&email=' . urlencode($this->user->email);
 
         return new Content(
             view: 'emails.password_reset',
