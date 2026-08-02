@@ -227,21 +227,31 @@
                 : `<span style="color:#94A3B8;font-size:12px;">No image</span>`;
 
             let actionBtns = `
-                <button class="pv-btn pv-btn-view" onclick="window.pvOpenDetail(${item.id})" title="View Details">
-                    <i class="fas fa-eye"></i> View
-                </button>
+                <div class="pv-dropdown">
+                    <button class="pv-dropdown-toggle" onclick="window.pvToggleDropdown(event, ${item.id})" title="Actions">
+                        <i class="fas fa-ellipsis-v"></i>
+                    </button>
+                    <div class="pv-dropdown-menu" id="pv-dropdown-${item.id}">
+                        <button class="pv-dropdown-item" onclick="window.pvCloseAllDropdowns(); window.pvOpenDetail(${item.id});">
+                            <i class="fas fa-eye" style="color:#3B82F6;"></i> View Details
+                        </button>
             `;
 
             if (isMTO && (item.status === 'pending' || item.status === 'under_review')) {
                 actionBtns += `
-                    <button class="pv-btn pv-btn-approve" onclick="window.pvApproveSubmission(${item.id})" title="Approve">
-                        <i class="fas fa-check"></i>
+                    <button class="pv-dropdown-item pv-item-approve" onclick="window.pvCloseAllDropdowns(); window.pvApproveSubmission(${item.id});">
+                        <i class="fas fa-check-circle" style="color:#16A34A;"></i> Approve Submission
                     </button>
-                    <button class="pv-btn pv-btn-reject" onclick="window.pvRejectSubmission(${item.id})" title="Reject">
-                        <i class="fas fa-times"></i>
+                    <button class="pv-dropdown-item pv-item-reject" onclick="window.pvCloseAllDropdowns(); window.pvRejectSubmission(${item.id});">
+                        <i class="fas fa-times-circle" style="color:#DC2626;"></i> Reject Submission
                     </button>
                 `;
             }
+
+            actionBtns += `
+                    </div>
+                </div>
+            `;
 
             return `
                 <tr>
@@ -262,7 +272,7 @@
                     <td>${getStatusBadge(item.status)}</td>
                     <td>${escHtml(item.reviewed_by || '—')}</td>
                     <td style="white-space:nowrap;font-size:12px;color:#64748B;">${escHtml(item.reviewed_at || '—')}</td>
-                    <td>
+                    <td style="text-align:center;">
                         <div class="pv-actions">
                             ${actionBtns}
                         </div>
@@ -621,6 +631,31 @@
             });
         }
     }
+
+    // ── Dropdown Controls ───────────────────────────────────────────────────
+    window.pvToggleDropdown = function (e, id) {
+        if (e) e.stopPropagation();
+        const targetMenu = document.getElementById(`pv-dropdown-${id}`);
+        const isAlreadyOpen = targetMenu && targetMenu.classList.contains('show');
+
+        window.pvCloseAllDropdowns();
+
+        if (targetMenu && !isAlreadyOpen) {
+            targetMenu.classList.add('show');
+        }
+    };
+
+    window.pvCloseAllDropdowns = function () {
+        document.querySelectorAll('.pv-dropdown-menu.show').forEach(el => {
+            el.classList.remove('show');
+        });
+    };
+
+    document.addEventListener('click', function (e) {
+        if (!e.target.closest('.pv-dropdown')) {
+            window.pvCloseAllDropdowns();
+        }
+    });
 
     // ── Module Initialization ─────────────────────────────────────────────────
     function initModule() {
