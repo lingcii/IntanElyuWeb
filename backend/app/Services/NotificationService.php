@@ -34,6 +34,14 @@ class NotificationService
     }
 
     /**
+     * Alias method for sending a notification to a single user.
+     */
+    public static function send(int $userId, string $title, string $message, array $data = []): ?Notification
+    {
+        return self::notify($userId, 'info', $title, $message, $data);
+    }
+
+    /**
      * Notify all users with specified roles.
      */
     public static function notifyRoles(array $roles, string $type, string $title, string $message, array $data = []): void

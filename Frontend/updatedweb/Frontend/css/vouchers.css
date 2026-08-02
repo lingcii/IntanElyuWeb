@@ -208,6 +208,14 @@
     transition: border-color 0.2s;
 }
 
+.vch-input:disabled, .vch-select:disabled, .vch-textarea:disabled {
+    background-color: #f8fafc;
+    color: #64748b;
+    cursor: not-allowed;
+    opacity: 0.85;
+    border-color: #e2e8f0;
+}
+
 .vch-search-wrap .vch-input {
     padding-left: 36px !important;
 }

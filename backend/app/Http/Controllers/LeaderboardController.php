@@ -155,6 +155,7 @@ class LeaderboardController extends Controller
     private function castRows(array $rows): array
     {
         return array_map(function ($r) {
+            $totalPoints = (int) $r->total_points;
             return [
                 'user_id'              => (int) $r->user_id,
                 'full_name'            => $r->full_name,
@@ -162,10 +163,10 @@ class LeaderboardController extends Controller
                 'avatar'               => $r->avatar ?? null,
                 'municipality_name'    => $r->municipality_name ?? null,
                 'last_activity_date'   => $r->last_activity_date ?: null,
-                'total_points'         => (int) $r->total_points,
+                'total_points'         => $totalPoints,
                 'completed_activities' => (int) $r->completed_activities,
                 'spots_managed'        => (int) ($r->spots_managed ?? 0),
-                'rank'                 => (int) $r->user_rank,
+                'rank'                 => $totalPoints > 0 ? (int) $r->user_rank : null,
                 'points_since'         => $r->points_since,
             ];
         }, $rows);

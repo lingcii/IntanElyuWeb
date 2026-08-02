@@ -164,8 +164,9 @@
         if (vchSelect) vchSelect.innerHTML = options;
         if (redSelect) redSelect.innerHTML = options;
         if (formSelect) {
-            formSelect.innerHTML = '<option value="">Provincial / All Municipalities</option>' + 
-                municipalitiesList.map(m => `<option value="${m.id}">${escapeHtml(m.name)}</option>`).join('');
+            formSelect.innerHTML = '<option value="">Provincial / All Municipalities</option>';
+            formSelect.value = '';
+            formSelect.disabled = true;
         }
     }
 
@@ -493,6 +494,10 @@
     function openCreateVoucherModal() {
         document.getElementById('voucherForm')?.reset();
         document.getElementById('formVoucherId').value = '';
+        const formPartner = document.getElementById('formPartner');
+        if (formPartner) { formPartner.value = 'The La Union Agri-Tourism Center Pasalubong Center'; }
+        const formMuni = document.getElementById('formMunicipality');
+        if (formMuni) { formMuni.value = ''; formMuni.disabled = true; }
         document.getElementById('voucherModalTitle').innerHTML = '<i class="fas fa-ticket-simple"></i> Create New Voucher';
         document.getElementById('voucherModal').style.display = 'flex';
         handleDiscountTypeChange();
@@ -517,8 +522,9 @@
                 setVal('formRequiredPoints', v.required_points || 0);
                 setVal('formAvailableQuantity', v.available_quantity || 1);
                 setVal('formMaxRedemption', v.maximum_redemption_per_user || 1);
-                setVal('formMunicipality', v.municipality_id);
-                setVal('formPartner', v.partner_establishment);
+                const formMuni = document.getElementById('formMunicipality');
+                if (formMuni) { formMuni.value = v.municipality_id ?? ''; formMuni.disabled = true; }
+                setVal('formPartner', v.partner_establishment || 'The La Union Agri-Tourism Center Pasalubong Center');
                 setVal('formValidFrom', formatISOForInput(v.valid_from));
                 setVal('formExpiresAt', formatISOForInput(v.expires_at));
                 setVal('formStatus', v.status || 'active');

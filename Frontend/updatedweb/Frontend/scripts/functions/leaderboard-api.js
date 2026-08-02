@@ -214,7 +214,7 @@
         const max = _maxPoints || 1;
         tbody.innerHTML = users.map((u, idx) => {
             const hasPoints = Number(u.total_points || 0) > 0;
-            const isTop3 = u.rank <= 3 && hasPoints;
+            const isTop3 = hasPoints && u.rank && u.rank <= 3;
             const pct = Math.round((u.total_points / max) * 100);
             const initials = getInitials(u.full_name);
             const color = getAvatarColor(u.user_id);
@@ -225,9 +225,11 @@
                 isTop3 ? `lb-row-top3 lb-row-rank-${u.rank}` : '',
                 isCurrent ? 'lb-row-current' : '',
             ].filter(Boolean).join(' ');
-            const rankHtml = isTop3
-                ? `<span class="lb-rank-medal" data-rank="${u.rank}">${MEDALS[u.rank]}</span>`
-                : `<span class="lb-rank-plain">#${u.rank}</span>`;
+            const rankHtml = (hasPoints && u.rank)
+                ? (isTop3
+                    ? `<span class="lb-rank-medal" data-rank="${u.rank}">${MEDALS[u.rank]}</span>`
+                    : `<span class="lb-rank-plain">#${u.rank}</span>`)
+                : `<span class="lb-rank-plain">\u2014</span>`;
             const animDelay = Math.min(idx * 40, 600);
             const tagStyle = `animation: lbRowSlideIn 0.35s ease ${animDelay}ms both`;
 

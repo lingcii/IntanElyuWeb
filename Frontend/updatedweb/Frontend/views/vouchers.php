@@ -301,12 +301,12 @@ ob_start();
 
                         <div class="vch-form-group">
                             <label for="formPartner">Partner Establishment</label>
-                            <input type="text" id="formPartner" class="vch-input" placeholder="e.g. Kahuna Beach Resort">
+                            <input type="text" id="formPartner" class="vch-input" value="The La Union Agri-Tourism Center Pasalubong Center" placeholder="e.g. The La Union Agri-Tourism Center Pasalubong Center">
                         </div>
 
                         <div class="vch-form-group">
                             <label for="formMunicipality">Municipality</label>
-                            <select id="formMunicipality" class="vch-select">
+                            <select id="formMunicipality" class="vch-select" disabled>
                                 <option value="">Provincial / All Municipalities</option>
                             </select>
                         </div>

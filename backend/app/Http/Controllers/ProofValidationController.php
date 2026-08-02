@@ -29,6 +29,8 @@ class ProofValidationController extends Controller
 
     /**
      * Build base query for itinerary items that have proof images.
+     *
+     * @return mixed
      */
     private function baseQuery(Request $request)
     {
@@ -182,6 +184,7 @@ class ProofValidationController extends Controller
      */
     public function show(Request $request, int $id): JsonResponse
     {
+        /** @var \App\Models\ItineraryItem|null $item */
         $item = $this->baseQuery($request)->where('itinerary_items.id', $id)->first();
 
         if (!$item) {
@@ -221,6 +224,7 @@ class ProofValidationController extends Controller
             return response()->json(['error' => 'Only Municipal Officers can approve proof submissions.'], 403);
         }
 
+        /** @var \App\Models\ItineraryItem|null $item */
         $item = $this->baseQuery($request)->where('itinerary_items.id', $id)->first();
         if (!$item) {
             return response()->json(['error' => 'Proof submission not found or not in your municipality.'], 404);
@@ -236,33 +240,50 @@ class ProofValidationController extends Controller
         // Award points to tourist if not already rewarded for this item
         $touristId = $item->itinerary?->user_id;
         if ($touristId) {
-            UserPoint::firstOrCreate([
-                'user_id'     => $touristId,
-                'source'      => 'proof_validation_' . $item->id,
-            ], [
-                'points'      => 50,
-                'description' => 'Proof validated for ' . ($item->touristSpot?->name ?? 'tourist spot'),
-            ]);
+            try {
+                UserPoint::firstOrCreate([
+                    'user_id'     => $touristId,
+                    'source'      => 'proof_validation_' . $item->id,
+                ], [
+                    'points'      => 50,
+                    'description' => 'Proof validated for ' . ($item->touristSpot?->name ?? 'tourist spot'),
+                ]);
+            } catch (\Throwable $e) {
+                \Log::warning("Failed to award points for proof validation {$item->id}: " . $e->getMessage());
+            }
         }
 
         // Notification & Activity Log
         try {
             ActivityLogService::log(
-                $userId,
                 'APPROVE_PROOF',
-                "Approved proof image submission #{$item->id} for spot '{$item->touristSpot?->name}'"
+                'Proof Validation',
+                "Approved proof image submission #{$item->id} for spot '{$item->touristSpot?->name}'",
+                null,
+                null,
+                $request
             );
-        } catch (\Exception $e) {}
+        } catch (\Throwable $e) {
+            \Log::warning("Failed to log activity for proof validation approval: " . $e->getMessage());
+        }
 
         try {
             if ($touristId) {
-                NotificationService::send(
+                NotificationService::notify(
                     $touristId,
+                    'proof_validation',
                     'Proof Image Approved',
-                    "Your proof submission for {$item->touristSpot?->name} has been approved! You earned 50 points."
+                    "Your proof submission for {$item->touristSpot?->name} has been approved! You earned 50 points.",
+                    [
+                        'module'            => 'Proof Validation',
+                        'spot_name'         => $item->touristSpot?->name,
+                        'municipality_name' => $item->touristSpot?->municipality?->name,
+                    ]
                 );
             }
-        } catch (\Exception $e) {}
+        } catch (\Throwable $e) {
+            \Log::warning("Failed to send notification for proof validation approval: " . $e->getMessage());
+        }
 
         return response()->json([
             'message' => 'Submission approved successfully.',
@@ -286,6 +307,7 @@ class ProofValidationController extends Controller
             'rejection_reason' => 'required|string|min:5|max:1000',
         ]);
 
+        /** @var \App\Models\ItineraryItem|null $item */
         $item = $this->baseQuery($request)->where('itinerary_items.id', $id)->first();
         if (!$item) {
             return response()->json(['error' => 'Proof submission not found or not in your municipality.'], 404);
@@ -305,21 +327,34 @@ class ProofValidationController extends Controller
         // Notification & Activity Log
         try {
             ActivityLogService::log(
-                $userId,
                 'REJECT_PROOF',
-                "Rejected proof image submission #{$item->id} for spot '{$item->touristSpot?->name}'. Reason: {$reason}"
+                'Proof Validation',
+                "Rejected proof image submission #{$item->id} for spot '{$item->touristSpot?->name}'. Reason: {$reason}",
+                null,
+                null,
+                $request
             );
-        } catch (\Exception $e) {}
+        } catch (\Throwable $e) {
+            \Log::warning("Failed to log activity for proof validation rejection: " . $e->getMessage());
+        }
 
         try {
             if ($touristId) {
-                NotificationService::send(
+                NotificationService::notify(
                     $touristId,
+                    'proof_validation',
                     'Proof Image Rejected',
-                    "Your proof submission for {$item->touristSpot?->name} was rejected. Reason: {$reason}"
+                    "Your proof submission for {$item->touristSpot?->name} was rejected. Reason: {$reason}",
+                    [
+                        'module'            => 'Proof Validation',
+                        'spot_name'         => $item->touristSpot?->name,
+                        'municipality_name' => $item->touristSpot?->municipality?->name,
+                    ]
                 );
             }
-        } catch (\Exception $e) {}
+        } catch (\Throwable $e) {
+            \Log::warning("Failed to send notification for proof validation rejection: " . $e->getMessage());
+        }
 
         return response()->json([
             'message' => 'Submission rejected successfully.',
