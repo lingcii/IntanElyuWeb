@@ -401,7 +401,16 @@
                 ` : ''}
                 <div style="background:#F8FAFC;border-radius:8px;padding:12px;">
                     <div style="font-size:11px;color:#6B7280;font-weight:700;text-transform:uppercase;margin-bottom:4px;">Submitted</div>
-                    <div style="font-size:14px;font-weight:600;">${new Date(spot.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>
+                    <div style="font-size:14px;font-weight:600;">${(() => {
+                        let dPg = (spot.created_at || spot.approved_at) ? new Date(spot.created_at || spot.approved_at) : new Date();
+                        if (isNaN(dPg.getTime()) || dPg.getFullYear() <= 1970) {
+                            dPg = spot.approved_at ? new Date(spot.approved_at) : new Date();
+                        }
+                        if (isNaN(dPg.getTime()) || dPg.getFullYear() <= 1970) {
+                            dPg = new Date();
+                        }
+                        return dPg.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                    })()}</div>
                 </div>
             </div>
             <div style="margin-bottom:20px;">

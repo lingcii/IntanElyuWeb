@@ -1259,7 +1259,15 @@ window.openSpotModal = async function openSpotModal(spotId) {
         if (modalTitleEl) modalTitleEl.textContent = spot.name;
         const classificationStyle = spot.classification_status ? getClassificationStyle(spot.classification_status) : null;
 
-        const formattedDate = new Date(spot.created_at).toLocaleDateString('en-US', {
+        let rawSpotDate = spot.created_at || spot.approved_at;
+        let dSpot = rawSpotDate ? new Date(rawSpotDate) : new Date();
+        if (isNaN(dSpot.getTime()) || dSpot.getFullYear() <= 1970) {
+            dSpot = spot.approved_at ? new Date(spot.approved_at) : new Date();
+        }
+        if (isNaN(dSpot.getTime()) || dSpot.getFullYear() <= 1970) {
+            dSpot = new Date();
+        }
+        const formattedDate = dSpot.toLocaleDateString('en-US', {
             month: 'short',
             day: 'numeric',
             year: 'numeric'
@@ -3743,7 +3751,13 @@ function renderTableRows(spotsData) {
         const approvalTextColor = '#FFFFFF';
         const cats = (spot.category || 'Other').split(',').map(c => c.trim()).filter(Boolean);
         const catTags = cats.map(c => `<span class="tag" style="background:#DBEAFE;color:#2563EB;font-size:11px;">${c}</span>`).join(' ');
-        const date = spot.created_at ? new Date(spot.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+        let dTbl = (spot.created_at || spot.approved_at) ? new Date(spot.created_at || spot.approved_at) : null;
+        if (dTbl && (isNaN(dTbl.getTime()) || dTbl.getFullYear() <= 1970)) {
+            dTbl = spot.approved_at ? new Date(spot.approved_at) : null;
+        }
+        const date = (dTbl && !isNaN(dTbl.getTime()) && dTbl.getFullYear() > 1970)
+            ? dTbl.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+            : new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
         const feeDisplay = formatFeesShort(spot);
         const spotId = String(spot.id).padStart(4, '0');
         html += `<tr data-spot-id="${spot.id}" data-municipality="${munName}" data-category="${spot.category || ''}" data-status="${statusClass}" data-name="${(spot.name || '').toLowerCase()}" style="cursor: pointer;">`;

@@ -11,7 +11,7 @@ use App\Models\User;
 class TouristSpot extends Model
 {
     protected $table = 'tourist_spots';
-    public $timestamps = false;
+    public $timestamps = true;
 
     protected $fillable = [
         'name',
@@ -38,6 +38,8 @@ class TouristSpot extends Model
         'approved_at',
         'created_by',
         'creator_role',
+        'created_at',
+        'updated_at',
     ];
 
     protected $casts = [
@@ -51,6 +53,8 @@ class TouristSpot extends Model
         'rating'         => 'float',
         'points'         => 'integer',
         'approved_at'    => 'datetime',
+        'created_at'     => 'datetime',
+        'updated_at'     => 'datetime',
     ];
 
     public static array $VALID_CATEGORIES = [
