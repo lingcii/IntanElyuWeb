@@ -218,11 +218,7 @@ if (isset($_SESSION['user_id'])) {
                         </div>
 
                         <div class="form-actions-row">
-                            <label class="custom-checkbox">
-                                <input type="checkbox" id="rememberMe" name="remember">
-                                <span class="checkmark"></span>
-                                <span class="label-text">Remember me</span>
-                            </label>
+                            <span></span><!-- spacer to keep forgot password right-aligned -->
                             <a href="#" class="forgot-password-link" id="forgotPasswordBtn">Forgot Password?</a>
                         </div>
 

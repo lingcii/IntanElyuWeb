@@ -37,11 +37,8 @@ class RoleMiddleware
         }
 
         if (!in_array($userRole, $expanded)) {
-            return response()->json([
-                'error'    => 'Forbidden: insufficient role',
-                'required' => $roles,
-                'got'      => $userRole,
-            ], 403);
+            // Fix #8: Generic message only — don't leak required or current role info
+            return response()->json(['error' => 'Forbidden.'], 403);
         }
 
         return $next($request);

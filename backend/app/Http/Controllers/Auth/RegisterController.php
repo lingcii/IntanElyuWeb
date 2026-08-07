@@ -23,7 +23,9 @@ class RegisterController extends Controller
             'password' => 'required|string|min:8|confirmed',
         ]);
 
-        $token = Str::random(60);
+        // Fix #4: Store a SHA-256 hash of the token — never the plain token.
+        // Return the plain token to the client only once (at registration).
+        $plainToken = Str::random(60);
 
         $user = User::create([
             'name'      => $request->name,
@@ -31,13 +33,13 @@ class RegisterController extends Controller
             'password'  => Hash::make($request->password),
             'role'      => 'tourist',
             'status'    => 'active',
-            'api_token' => $token,
+            'api_token' => hash('sha256', $plainToken),
         ]);
 
         return response()->json([
             'success' => true,
             'message' => 'Account created successfully.',
-            'token'   => $token,
+            'token'   => $plainToken,  // plain token returned once — never stored
             'user'    => [
                 'id'     => $user->id,
                 'name'   => $user->name,

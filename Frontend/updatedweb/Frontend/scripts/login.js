@@ -189,11 +189,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 params.append('email', email);
                 params.append('password', password);
 
+                // Fix #2: Send CSRF token header on login
+                const csrfToken = window.API_CONFIG.getCsrfToken();
+
                 const response = await fetch(window.API_CONFIG.AUTH + '/login', {
                     method: 'POST',
                     headers: {
                         'Accept': 'application/json',
-                        'Content-Type': 'application/x-www-form-urlencoded'
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        ...(csrfToken ? { 'X-CSRF-TOKEN': csrfToken } : {})
                     },
                     credentials: 'include',
                     body: params
@@ -215,12 +219,16 @@ document.addEventListener('DOMContentLoaded', () => {
                         successModal.classList.add('active');
                     }
 
-                    // Sync PHP session — must await so browser doesn't cancel it on redirect
+                    // Fix #1: Pass one-time _sync_token so sync-session.php can verify
+                    // the request is legitimate before writing to the PHP session.
                     await fetch('sync-session.php', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         credentials: 'same-origin',
-                        body: JSON.stringify({ user: response.user })
+                        body: JSON.stringify({
+                            user: response.user,
+                            _sync_token: response._sync_token || ''
+                        })
                     });
 
                     // Brief modal display then redirect
@@ -296,6 +304,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // ----------------------------------------------------
     // RESEND EMAIL HANDLER
     // ----------------------------------------------------
+    // Fix #13: Track resend cooldown to prevent email flooding
+    let resendCooldownTimer = null;
+
     if (btnResendEmail) {
         btnResendEmail.addEventListener('click', async () => {
             const email = sentEmailPlaceholder ? sentEmailPlaceholder.textContent.trim() : '';
@@ -321,11 +332,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
                 const data = await resp.json();
 
-                btnResendEmail.disabled = false;
                 btnResendEmail.innerHTML = '<i class="fas fa-check-circle"></i> Email Resent!';
-                setTimeout(() => {
-                    btnResendEmail.innerHTML = originalBtnHtml;
-                }, 3000);
+
+                // 60-second cooldown: prevent email bombing
+                let countdown = 60;
+                clearInterval(resendCooldownTimer);
+                resendCooldownTimer = setInterval(() => {
+                    countdown--;
+                    btnResendEmail.innerHTML = `<i class="fas fa-clock"></i> Resend in ${countdown}s`;
+                    if (countdown <= 0) {
+                        clearInterval(resendCooldownTimer);
+                        btnResendEmail.disabled = false;
+                        btnResendEmail.innerHTML = originalBtnHtml;
+                    }
+                }, 1000);
+
             } catch (err) {
                 btnResendEmail.disabled = false;
                 btnResendEmail.innerHTML = originalBtnHtml;

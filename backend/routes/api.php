@@ -30,11 +30,15 @@ use Illuminate\Support\Facades\Route;
 //  Auth (public)
 // ─────────────────────────────────────────────────────────────────────────────
 Route::prefix('auth')->group(function () {
-    Route::post('/login', [LoginController::class, 'login']);
-    Route::post('/logout', [LogoutController::class, 'logout']);
-    Route::post('/register', [RegisterController::class, 'register']);
-    Route::get('/check', [SessionController::class, 'check']);
+    // Fix #3: Rate limiting — 5 login attempts per minute per IP (brute-force protection)
+    Route::post('/login',    [LoginController::class, 'login'])->middleware('throttle:5,1');
+    // 10 registrations per minute per IP
+    Route::post('/register', [RegisterController::class, 'register'])->middleware('throttle:10,1');
+    // Logout is light — no throttle needed but still limit to prevent DoS
+    Route::post('/logout',   [LogoutController::class, 'logout'])->middleware('throttle:20,1');
+    Route::get('/check',     [SessionController::class, 'check']);
 });
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Public image serving (no auth required — served to <img> tags in HTML)
@@ -442,8 +446,9 @@ Route::middleware('auth.session')->group(function () {
 
     // ─────────────────────────────────────────────────────────────────────────
     //  TOURIST (mobile / public tourist endpoints)
+    //  Fix #5: Requires valid Bearer token via 'tourist.auth' middleware
     // ─────────────────────────────────────────────────────────────────────────
-    Route::prefix('tourist')->group(function () {
+    Route::prefix('tourist')->middleware('tourist.auth')->group(function () {
         Route::get('/feedback', [FeedbackController::class, 'index']);
         Route::post('/feedback', [FeedbackController::class, 'store']);
 
@@ -455,4 +460,5 @@ Route::middleware('auth.session')->group(function () {
         });
     });
 });
+
 

@@ -4,11 +4,7 @@
      * Central configuration for all API calls.
      *
      * All JS scripts should import/use API_CONFIG 
-     *
-     * IMPORTANT: Never hardcode a host (e.g. 127.0.0.1 or localhost) anywhere
-     * else in the codebase — always go through window.API_CONFIG.* below.
-     * Mixing hosts breaks the session cookie because browsers treat
-     * 127.0.0.1 and localhost as different origins, even on the same machine.
+     
      */
 
     // ── Top-level guard ──────────────────────────────────────────────────────────
@@ -191,10 +187,9 @@ const baseUrl = USE_RAILWAY
         },
 
         async _executeFetch(url, options = {}) {
-            // Guard against accidental hardcoded hosts slipping through
-            // from other parts of the codebase — warn loudly in dev.
+            // Fix #10: Warn loudly in dev when a hardcoded local host is detected
             if (/^https?:\/\/(127\.0\.0\.1|localhost)/i.test(url) && !url.startsWith(baseUrl)) {
-                void 0;
+                if (IS_LOCAL) console.warn('[API_CONFIG] Hardcoded local host detected in URL — use API_CONFIG.BASE_URL instead:', url);
             }
 
             const method = (options.method || 'GET').toUpperCase();
@@ -238,7 +233,7 @@ const baseUrl = USE_RAILWAY
 
             if (!response.ok) {
                 if (response.status === 401) {
-                    void 0;
+                    // Session expired or unauthenticated — redirect to login
                     let loginRedirect = 'login.php';
                     const path = window.location.pathname;
                     if (path.includes('/views/')) {

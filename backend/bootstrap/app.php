@@ -14,8 +14,10 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         // Register CORS globally so error responses & preflights always include CORS headers
+        // Fix #7: SecurityHeaders adds HTTP security headers to every response
         $middleware->use([
             \Illuminate\Http\Middleware\HandleCors::class,
+            \App\Http\Middleware\SecurityHeaders::class,
         ]);
 
         $middleware->api(prepend: [
