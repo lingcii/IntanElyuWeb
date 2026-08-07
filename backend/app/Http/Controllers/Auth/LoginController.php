@@ -76,11 +76,6 @@ class LoginController extends Controller
         // Clear failed-attempt counter on successful login
         RateLimiter::clear($rateLimitKey);
 
-        // Generate a one-time sync token for sync-session.php to verify.
-        // This prevents unauthenticated users from forging PHP sessions by posting
-        // directly to sync-session.php with arbitrary user data.
-        $syncToken = Str::random(40);
-
         // Store session
         $request->session()->put('user_id',              $user->id);
         $request->session()->put('user_name',            $user->name);
@@ -88,7 +83,6 @@ class LoginController extends Controller
         $request->session()->put('user_role',            $user->role);
         $request->session()->put('user_municipality_id', $user->municipality_id);
         $request->session()->put('must_change_password',  $user->is_default_password ? true : false);
-        $request->session()->put('_pending_sync_token',  $syncToken); // consumed by sync-session.php
         if ($user->is_default_password) {
             $request->session()->put('just_logged_in', true);
         }
@@ -109,8 +103,7 @@ class LoginController extends Controller
             ->update(['last_activity' => now()]);
 
         return response()->json([
-            'success'     => true,
-            '_sync_token' => $syncToken, // passed to sync-session.php, consumed once
+            'success' => true,
             'user'    => [
                 'id'                   => $user->id,
                 'name'                 => $user->name,

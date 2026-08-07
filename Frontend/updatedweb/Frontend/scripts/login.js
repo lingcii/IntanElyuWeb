@@ -219,15 +219,16 @@ document.addEventListener('DOMContentLoaded', () => {
                         successModal.classList.add('active');
                     }
 
-                    // Fix #1: Pass one-time _sync_token so sync-session.php can verify
-                    // the request is legitimate before writing to the PHP session.
+                    // Pass the page CSRF token so sync-session.php can verify the
+                    // request comes from the legitimate login page (same PHP session).
+                    const pageCsrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
                     await fetch('sync-session.php', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         credentials: 'same-origin',
                         body: JSON.stringify({
                             user: response.user,
-                            _sync_token: response._sync_token || ''
+                            _csrf: pageCsrf
                         })
                     });
 
