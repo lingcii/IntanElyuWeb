@@ -81,11 +81,23 @@ try {
         $stmt->execute([':ip' => $clientIp]);
     }
 
-    $stmt = $db->prepare('SELECT email FROM users WHERE LOWER(email) = LOWER(:email) LIMIT 1');
+    $stmt = $db->prepare('SELECT id, email, status FROM users WHERE LOWER(email) = LOWER(:email) LIMIT 1');
     $stmt->execute([':email' => $email]);
     $user = $stmt->fetch();
 
     if ($user) {
+        // Block Forgot Password for pending accounts — they must use first-login flow
+        if ($user['status'] === 'pending') {
+            http_response_code(403);
+            echo json_encode([
+                'success'      => false,
+                'error_code'   => 'pending_account',
+                'message'      => 'Your account is still pending activation.',
+                'email_sent'   => false,
+            ]);
+            exit;
+        }
+
         $email = $user['email']; // Use normalized email from DB
         $rawToken = bin2hex(random_bytes(32));
         $tokenHash = hash('sha256', $rawToken);

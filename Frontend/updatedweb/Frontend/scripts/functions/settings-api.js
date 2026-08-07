@@ -387,20 +387,57 @@ window.confirmUpdateSecuritySettings = async function() {
             setTimeout(() => { toast.style.opacity = '0'; }, 4000);
             if (updateBtn) { updateBtn.disabled = false; updateBtn.style.background = ''; updateBtn.innerHTML = originalText; }
         } else {
-            // SUCCESS — always show the modal (whether first-time or regular change)
+            // SUCCESS
             document.getElementById('currentPassword').value = '';
             document.getElementById('newPassword').value = '';
             document.getElementById('confirmPassword').value = '';
             if (updateBtn) { updateBtn.disabled = false; updateBtn.style.background = ''; updateBtn.innerHTML = originalText; }
-            const successModal = document.getElementById('firstTimeSuccessModal');
-            if (successModal) {
-                successModal.style.display = 'flex';
-            } else {
-                // Fallback if modal not found
+
+            const isFirst = data.first_time_reset || window.isFirstLogin;
+
+            if (isFirst) {
+                // Clear session flags in PHP session
+                try {
+                    await fetch('../sync-session.php', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ clear_must_change_password: true })
+                    });
+                } catch (e) {}
+
                 toast.style.background = '#16a34a';
-                toast.innerHTML = '<i class="fas fa-check-circle"></i> Password updated successfully!';
+                toast.innerHTML = '<i class="fas fa-check-circle"></i> Password updated! Your account is now <strong>ACTIVE</strong>. Redirecting...';
                 toast.style.opacity = '1';
-                setTimeout(() => { toast.style.opacity = '0'; }, 4000);
+
+                const banner = document.getElementById('firstLoginBanner');
+                if (banner) {
+                    banner.style.background = 'linear-gradient(135deg, #DCFCE7, #BBF7D0)';
+                    banner.style.borderColor = '#16A34A';
+                    banner.innerHTML = `
+                        <div style="width:44px;height:44px;background:#16A34A;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                            <i class="fas fa-check" style="color:#fff;font-size:18px;"></i>
+                        </div>
+                        <div>
+                            <h3 style="margin:0 0 6px;color:#14532D;font-size:15px;font-weight:700;">Account Activated Successfully!</h3>
+                            <p style="margin:0;color:#166534;font-size:13px;">Your password has been set. Redirecting you to the dashboard...</p>
+                        </div>
+                    `;
+                }
+
+                setTimeout(() => {
+                    window.location.href = 'dashboard.php';
+                }, 1800);
+
+            } else {
+                const successModal = document.getElementById('firstTimeSuccessModal');
+                if (successModal) {
+                    successModal.style.display = 'flex';
+                } else {
+                    toast.style.background = '#16a34a';
+                    toast.innerHTML = '<i class="fas fa-check-circle"></i> Password updated successfully!';
+                    toast.style.opacity = '1';
+                    setTimeout(() => { toast.style.opacity = '0'; }, 4000);
+                }
             }
         }
     } catch (err) {
@@ -413,3 +450,17 @@ window.confirmUpdateSecuritySettings = async function() {
         if (updateBtn) { updateBtn.disabled = false; updateBtn.style.background = ''; updateBtn.innerHTML = originalText; }
     }
 };
+
+// Auto-scroll and focus currentPassword if first_login
+if (window.isFirstLogin) {
+    document.addEventListener('DOMContentLoaded', () => {
+        setTimeout(() => {
+            const cp = document.getElementById('currentPassword');
+            if (cp) {
+                cp.focus();
+                cp.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }, 300);
+    });
+}
+

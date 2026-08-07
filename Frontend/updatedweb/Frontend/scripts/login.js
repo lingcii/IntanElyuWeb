@@ -287,6 +287,18 @@ document.addEventListener('DOMContentLoaded', () => {
                         sentEmailPlaceholder.textContent = email;
                     }
                     switchState('recovery-2');
+                } else if (data.error_code === 'pending_account' || resp.status === 403) {
+                    // Fix 6: Show Pending Account modal instead of generic error
+                    recoveryEmailInput.disabled = false;
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = originalBtnHtml;
+
+                    const pendingModal = document.getElementById('pendingAccountModal');
+                    if (pendingModal) {
+                        pendingModal.style.display = 'flex';
+                    } else {
+                        alert('Your account is still pending activation. Please log in using your assigned default password first.');
+                    }
                 } else {
                     showRecoveryError(data.message || data.email_error || 'An error occurred. Please try again.');
                     recoveryEmailInput.disabled = false;
@@ -367,6 +379,16 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // Close Pending Account modal
+    const closePendingModalBtn = document.getElementById('closePendingModal');
+    const pendingAccountModal = document.getElementById('pendingAccountModal');
+    if (closePendingModalBtn && pendingAccountModal) {
+        closePendingModalBtn.addEventListener('click', () => {
+            pendingAccountModal.style.display = 'none';
+            switchState('login');
+        });
+    }
+
     function showRecoveryError(msg) {
         if (recoveryErrorMessage) {
             recoveryErrorMessage.textContent = msg;
@@ -374,3 +396,4 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 });
+

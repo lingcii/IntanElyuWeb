@@ -22,18 +22,29 @@ if (!function_exists('is_ajax_request')) {
     }
 }
 
-// Force password change on first login (blocks API calls)
+// Force password change on first login — blocks ALL navigation.
+// Only settings.php and logout.php are allowed through.
 if (!empty($_SESSION['must_change_password'])) {
     $scriptName = basename($_SERVER['SCRIPT_NAME']);
-    if ($scriptName !== 'settings.php' && $scriptName !== 'logout.php' && $scriptName !== 'sync-session.php') {
+    $allowedScripts = ['settings.php', 'logout.php', 'sync-session.php'];
+
+    if (!in_array($scriptName, $allowedScripts)) {
         if (is_ajax_request()) {
+            // Block AJAX/SPA calls with a structured JSON error
             http_response_code(403);
             header('Content-Type: application/json');
             echo json_encode([
-                'error' => 'First-time login password change required.',
+                'error'                => 'First-time login password change required.',
                 'must_change_password' => true,
-                'redirect' => 'settings.php'
+                'redirect'             => 'settings.php?first_login=1'
             ]);
+            exit;
+        } else {
+            // Block full page loads — hard redirect to settings
+            $settingsRedirect = str_contains($_SERVER['SCRIPT_NAME'] ?? '', '/views/')
+                ? 'settings.php?first_login=1'
+                : 'views/settings.php?first_login=1';
+            header('Location: ' . $settingsRedirect);
             exit;
         }
     }

@@ -15,10 +15,14 @@ if (!isset($pageTitle)) {
     $pageTitle = strtoupper($userRole) . ' Settings';
 }
 
+// Detect first-login forced redirect from session-bridge.php
+$isFirstLogin = isset($_GET['first_login']) && $_GET['first_login'] === '1';
+
 $settingsScriptPath = '../scripts/functions/settings-api.js';
 
 $extraHeadContent = '
     <script>window.userRole = "' . htmlspecialchars($userRole ?? 'lupto') . '";</script>
+    <script>window.isFirstLogin = ' . ($isFirstLogin ? 'true' : 'false') . ';</script>
     <script src="../scripts/api-config.js"></script>
     <link rel="stylesheet" href="../css/settings.css">
     <script src="' . $settingsScriptPath . '" defer></script>
@@ -28,9 +32,38 @@ ob_start();
 ?>
     <h2 class="section-title">System Settings</h2>
 
+    <?php if ($isFirstLogin): ?>
+    <!-- ── First-Login Mandatory Banner ─────────────────────────────────── -->
+    <div id="firstLoginBanner" style="
+        background: linear-gradient(135deg,#FEF3C7,#FDE68A);
+        border: 2px solid #F59E0B;
+        border-radius: 12px;
+        padding: 18px 24px;
+        margin-bottom: 20px;
+        display: flex;
+        align-items: flex-start;
+        gap: 16px;
+        box-shadow: 0 4px 16px rgba(245,158,11,0.18);
+    ">
+        <div style="width:44px;height:44px;background:#F59E0B;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <i class="fas fa-key" style="color:#fff;font-size:18px;"></i>
+        </div>
+        <div>
+            <h3 style="margin:0 0 6px;color:#92400E;font-size:15px;font-weight:700;">
+                Action Required: Change Your Password
+            </h3>
+            <p style="margin:0;color:#78350F;font-size:13px;line-height:1.6;">
+                Welcome! Your account was set up with a temporary default password.
+                <strong>You must change your password before accessing the system.</strong>
+                Your account will be automatically activated once you complete this step.
+            </p>
+        </div>
+    </div>
+    <?php endif; ?>
+
     <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:16px;">
         <!-- General Settings -->
-        <div class="card">
+        <div class="card" <?php if ($isFirstLogin): ?>style="opacity:0.5; pointer-events:none;" title="Complete your password change first"<?php endif; ?>>
             <div class="card-header">
                 <h3 class="card-title"><i class="fas fa-cog"></i> General Settings</h3>
             </div>
@@ -57,10 +90,15 @@ ob_start();
             </div>
         </div>
 
-        <!-- Security Settings (Column 2) -->
-        <div class="card">
-            <div class="card-header">
-                <h3 class="card-title"><i class="fas fa-shield-alt"></i> Security Settings</h3>
+        <!-- Security Settings (Column 2) — highlighted when first login -->
+        <div class="card" id="securitySettingsCard" <?php if ($isFirstLogin): ?>style="border:2px solid #F59E0B;box-shadow:0 0 0 4px rgba(245,158,11,0.12);"<?php endif; ?>>
+            <div class="card-header" <?php if ($isFirstLogin): ?>style="background:linear-gradient(135deg,#FFFBEB,#FEF3C7);"<?php endif; ?>>
+                <h3 class="card-title">
+                    <i class="fas fa-shield-alt"></i> Security Settings
+                    <?php if ($isFirstLogin): ?>
+                    <span style="margin-left:10px;background:#F59E0B;color:#fff;font-size:11px;padding:2px 10px;border-radius:20px;font-weight:700;vertical-align:middle;">REQUIRED</span>
+                    <?php endif; ?>
+                </h3>
             </div>
             <div class="card-body">
                 <div class="lupto-form-group">

@@ -352,6 +352,53 @@ if (isset($_SESSION['user_id'])) {
         </div>
     </div>
 
+    <!-- ── Pending Account Info Modal (shown when Forgot Password is attempted by a pending user) -->
+    <div id="pendingAccountModal" style="
+        display:none; position:fixed; inset:0;
+        background:rgba(0,0,0,0.55); backdrop-filter:blur(4px);
+        z-index:99999; align-items:center; justify-content:center;
+    ">
+        <div style="
+            background:#fff; border-radius:20px; padding:36px 32px;
+            max-width:460px; width:90%; box-shadow:0 24px 64px rgba(0,0,0,0.2);
+            text-align:center; animation: fadeSlideIn 0.3s ease;
+        ">
+            <div style="
+                width:64px; height:64px; background:linear-gradient(135deg,#FEF3C7,#FDE68A);
+                border-radius:50%; margin:0 auto 20px; display:flex;
+                align-items:center; justify-content:center;
+                border:3px solid #F59E0B;
+            ">
+                <i class="fas fa-user-clock" style="font-size:26px; color:#D97706;"></i>
+            </div>
+            <h3 style="margin:0 0 12px; color:#1E293B; font-size:18px; font-weight:700;">
+                Account Pending Activation
+            </h3>
+            <p style="margin:0 0 20px; color:#475569; font-size:14px; line-height:1.7;">
+                Your account is still <strong>pending activation</strong>. Please log in using your
+                <strong>assigned default password</strong> and change your password first before
+                using the Forgot Password feature.
+            </p>
+            <div style="background:#FEF3C7; border:1px solid #FDE68A; border-radius:10px; padding:14px 18px; margin-bottom:24px; text-align:left;">
+                <p style="margin:0; font-size:13px; color:#92400E; line-height:1.6;">
+                    <i class="fas fa-info-circle" style="margin-right:6px;"></i>
+                    <strong>How to activate:</strong> Go back to the login page, sign in with your
+                    default password, then change it when prompted. Your account will become
+                    <strong>Active</strong> automatically.
+                </p>
+            </div>
+            <button id="closePendingModal" style="
+                background:linear-gradient(135deg,#06444D,#0D6557);
+                color:#fff; border:none; border-radius:10px;
+                padding:12px 32px; font-size:14px; font-weight:600;
+                cursor:pointer; width:100%; transition:opacity 0.2s;
+            " onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">
+                <i class="fas fa-arrow-left" style="margin-right:8px;"></i>
+                Back to Login
+            </button>
+        </div>
+    </div>
+
     <!-- JavaScripts -->
     <script src="scripts/api-config.js?v=<?php echo time(); ?>"></script>
     <script src="scripts/login.js?v=<?php echo time(); ?>"></script>

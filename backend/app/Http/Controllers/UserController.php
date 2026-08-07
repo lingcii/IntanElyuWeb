@@ -189,7 +189,10 @@ class UserController extends Controller
             return response()->json(['error' => 'Forbidden: LUPTO accounts can only create Municipal users.'], 403);
         }
 
-        $status            = $request->get('status', 'active');
+        // Account Activation Workflow: ALL newly created accounts start as Pending.
+        // Status is automatically promoted to Active ONLY after the user logs in
+        // and successfully changes their default password on first login.
+        $status            = 'pending';
         $isDefaultPassword = true;
 
         // Capture plain-text password BEFORE hashing so it can be included in the welcome email.

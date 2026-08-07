@@ -45,9 +45,9 @@ return new class extends Migration
             DB::statement("ALTER TABLE itineraries ADD CONSTRAINT itineraries_status_check CHECK (status IN ('pending', 'completed'))");
         } catch (\Exception $e) {}
 
-        // users.status: only 'active', 'inactive', or 'banned'
+        // users.status: only 'active', 'inactive', 'pending', 'archived', or 'banned'
         try {
-            DB::statement("ALTER TABLE users ADD CONSTRAINT users_status_check CHECK (status IN ('active', 'inactive', 'banned'))");
+            DB::statement("ALTER TABLE users ADD CONSTRAINT users_status_check CHECK (status IN ('active', 'inactive', 'pending', 'archived', 'banned'))");
         } catch (\Exception $e) {}
 
         // users.role: tourist, pitco, lupto, municipal, and null/empty values (no admin role)
