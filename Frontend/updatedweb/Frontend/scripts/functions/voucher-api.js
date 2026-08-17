@@ -224,7 +224,7 @@
         const isLupto = userRole === 'lupto';
 
         tbody.innerHTML = vouchers.map(v => {
-            const rawImg = v.image || '../images/placeholder-spot.jpg';
+            const rawImg = v.image || '../images/LOGO.png';
             const imgUrl = (window.API_CONFIG && typeof window.API_CONFIG.resolveImageUrl === 'function') 
                 ? window.API_CONFIG.resolveImageUrl(rawImg) 
                 : rawImg;
@@ -273,7 +273,7 @@
             return `
                 <tr>
                     <td>
-                        <img src="${escapeHtml(imgUrl)}" class="vch-table-img" alt="${escapeHtml(v.voucher_name)}" onerror="this.onerror=null;this.src='../images/placeholder-spot.jpg';">
+                        <img src="${escapeHtml(imgUrl)}" class="vch-table-img" alt="${escapeHtml(v.voucher_name)}" onerror="this.onerror=null;this.src='../images/LOGO.png';">
                     </td>
                     <td>
                         <div style="font-weight: 700; color: #1e3a8a;">${escapeHtml(v.voucher_name)}</div>
@@ -667,14 +667,14 @@
                 const v = result.data;
                 const muniName = v.municipality ? v.municipality.name : 'Provincial';
                 const creator = v.user ? v.user.name : 'System Admin';
-                const rawImg = v.image || '../images/placeholder-spot.jpg';
+                const rawImg = v.image || '../images/LOGO.png';
                 const imgUrl = (window.API_CONFIG && typeof window.API_CONFIG.resolveImageUrl === 'function')
                     ? window.API_CONFIG.resolveImageUrl(rawImg)
                     : rawImg;
 
                 body.innerHTML = `
                     <div style="text-align: center; margin-bottom: 16px;">
-                        <img src="${escapeHtml(imgUrl)}" style="max-height: 160px; border-radius: 10px; object-fit: cover;" onerror="this.onerror=null;this.src='../images/placeholder-spot.jpg';">
+                        <img src="${escapeHtml(imgUrl)}" style="max-height: 160px; border-radius: 10px; object-fit: cover;" onerror="this.onerror=null;this.src='../images/LOGO.png';">
                         <h2 style="font-family: Outfit, sans-serif; margin: 10px 0 4px; color: #1e3a8a;">${escapeHtml(v.voucher_name)}</h2>
                         <span class="vch-badge ${v.status_badge}">${v.status}</span>
                     </div>

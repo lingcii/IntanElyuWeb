@@ -2443,7 +2443,7 @@ function initBlankCreateForm() {
     window.DraftManager?.setActiveDraftId(null);
     window.DraftManager?.setDirty(false);
 
-    document.getElementById('formModalTitle').textContent = 'Add New Spot';
+    document.getElementById('formModalTitle').textContent = 'Add New Sites';
     document.getElementById('spotId').value = '';
     document.getElementById('spotName').value = '';
     document.getElementById('nameCharCount').textContent = '0';

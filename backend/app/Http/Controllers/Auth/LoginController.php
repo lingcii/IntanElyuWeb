@@ -29,7 +29,7 @@ class LoginController extends Controller
         // ── Account lockout: per-email + per-IP rate limiter ─────────────────
         $rateLimitKey = 'login:' . Str::lower($loginInput) . '|' . $request->ip();
 
-        if (RateLimiter::tooManyAttempts($rateLimitKey, 5)) {
+        if (RateLimiter::tooManyAttempts($rateLimitKey, 30)) {
             $seconds = RateLimiter::availableIn($rateLimitKey);
             return response()->json([
                 'error' => "Too many login attempts. Please try again in {$seconds} seconds.",

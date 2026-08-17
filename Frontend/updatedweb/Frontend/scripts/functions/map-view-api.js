@@ -106,7 +106,7 @@ function _runMapView() {
         lng: muni.longitude,
         attraction_count: muni.attraction_count
     }));
-
+//hardcoded profiles
     const municipalityProfiles = {
         'San Juan': {
             description: 'San Juan is the surfing capital of the Northern Philippines and one of the most visited tourism hubs in La Union.',

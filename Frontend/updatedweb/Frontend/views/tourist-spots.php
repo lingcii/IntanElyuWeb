@@ -27,15 +27,15 @@ ob_start();
     <div class="lupto-kpi-grid" style="grid-template-columns: repeat(5, 1fr);">
         <div class="lupto-kpi-card" data-kpi="total-spots">
             <div class="lupto-kpi-info">
-                <h4>Total Tourist Spots</h4>
+                <h4>Total Tourist Sites</h4>
                 <span class="lupto-kpi-value"><i class="fas fa-spinner fa-spin" style="font-size:16px;color:#9CA3AF;"></i></span>
-                <span class="lupto-kpi-trend trend-neutral" id="kpi-trend-total"><i class="fas fa-layer-group"></i> All spots</span>
+                <span class="lupto-kpi-trend trend-neutral" id="kpi-trend-total"><i class="fas fa-layer-group"></i> All sites</span>
             </div>
             <div class="lupto-kpi-icon bg-blue"><i class="fas fa-map-location-dot"></i></div>
         </div>
         <div class="lupto-kpi-card" data-kpi="approved-spots">
             <div class="lupto-kpi-info">
-                <h4>Total Approved Tourist Spots</h4>
+                <h4>Total Approved Tourist Sites</h4>
                 <span class="lupto-kpi-value"><i class="fas fa-spinner fa-spin" style="font-size:16px;color:#9CA3AF;"></i></span>
                 <span class="lupto-kpi-trend trend-up" id="kpi-trend-approved"><i class="fas fa-check"></i> Approved</span>
             </div>
@@ -43,7 +43,7 @@ ob_start();
         </div>
         <div class="lupto-kpi-card" data-kpi="pending-spots">
             <div class="lupto-kpi-info">
-                <h4>Total Pending Tourist Spots</h4>
+                <h4>Total Pending Tourist Sites</h4>
                 <span class="lupto-kpi-value"><i class="fas fa-spinner fa-spin" style="font-size:16px;color:#9CA3AF;"></i></span>
                 <span class="lupto-kpi-trend trend-neutral" id="kpi-trend-pending"><i class="fas fa-clock"></i> Pending</span>
             </div>
@@ -51,7 +51,7 @@ ob_start();
         </div>
         <div class="lupto-kpi-card" data-kpi="declined-spots">
             <div class="lupto-kpi-info">
-                <h4>Total Declined Tourist Spots</h4>
+                <h4>Total Declined Tourist Sites</h4>
                 <span class="lupto-kpi-value"><i class="fas fa-spinner fa-spin" style="font-size:16px;color:#9CA3AF;"></i></span>
                 <span class="lupto-kpi-trend trend-down" id="kpi-trend-declined"><i class="fas fa-times"></i> Rejected</span>
             </div>
@@ -101,7 +101,7 @@ ob_start();
                         <button class="sidebar-back-btn hidden" id="sidebarBackBtn" aria-label="Go back">
                             <i class="fas fa-arrow-left"></i>
                         </button>
-                        <h3 id="sidebarTitle">Tourist Spots</h3>
+                        <h3 id="sidebarTitle">Tourist Sites</h3>
                     </div>
                     <button class="sidebar-close-btn" id="sidebarCloseBtn" aria-label="Close sidebar">
                         <i class="fas fa-times"></i>
@@ -121,11 +121,11 @@ ob_start();
             <div style="width: 56px; height: 56px; background: linear-gradient(135deg, #10B981, #059669); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 12px; box-shadow: 0 4px 14px rgba(16,185,129,0.35);">
                 <i class="fas fa-check" style="color: white; font-size: 24px;"></i>
             </div>
-            <h3 style="margin: 0; font-size: 18px; font-weight: 700; color: #065F46;">Approve Tourist Spot</h3>
+            <h3 style="margin: 0; font-size: 18px; font-weight: 700; color: #065F46;">Approve Tourist Sites</h3>
         </div>
         <div style="padding: 20px 28px 28px 28px;">
             <p style="text-align: center; color: #4B5563; margin: 0 0 24px 0; font-size: 14px; line-height: 1.6;">
-                Are you sure you want to approve this tourist spot? It will be made visible to tourists.
+                Are you sure you want to approve this tourist sites? 
             </p>
             <input type="hidden" id="approveSpotId" value="">
             <div style="display: flex; gap: 12px;">
@@ -135,7 +135,7 @@ ob_start();
                 <button class="btn btn-primary" id="confirmApproveBtn" style="flex: 1; justify-content: center; background: linear-gradient(135deg, #10B981, #059669); border-color: #10B981;">
                     <i class="fas fa-check" id="approveBtnIcon" style="margin-right: 6px;"></i>
                     <i class="fas fa-circle-notch fa-spin" id="approveBtnSpinner" style="display:none; margin-right:6px;"></i>
-                    <span id="approveBtnLabel">Yes, Approve</span>
+                    <span id="approveBtnLabel">Yes</span>
                 </button>
             </div>
         </div>
@@ -219,15 +219,8 @@ ob_start();
                 <option value="EMERGING">EMERGING</option>
             </select>
         </div>
-        <div class="filter-field">
-            <label class="filter-label"><i class="fas fa-sort"></i> Sort By</label>
-            <select id="sortSpots" class="filter-select">
-                <option value="">Default (Pending First)</option>
-                <option value="points_desc">Highest Points</option>
-                <option value="points_asc">Lowest Points</option>
-            </select>
-        </div>
-        <span class="filter-count"><span id="spotCount">0</span> tourist spot(s)</span>
+     
+        <span class="filter-count"><span id="spotCount">0</span> tourist site(s)</span>
         <div class="view-toggle">
             <button class="active" id="viewCards" title="Card View"><i class="fas fa-th"></i></button>
             <button id="viewTable" title="Table View"><i class="fas fa-list"></i></button>
@@ -256,7 +249,7 @@ ob_start();
             <div class="sfm-header-left">
                 <div class="sfm-header-icon"><i class="fas fa-map-marked-alt"></i></div>
                 <div>
-                    <h2 id="formModalTitle">Add New Tourist Site</h2>
+                    <h2 id="formModalTitle">Add New Sites</h2>
                     <p class="sfm-header-sub">Fill in the details below to register a tourist site</p>
                 </div>
             </div>
@@ -430,7 +423,7 @@ ob_start();
 
                 <div class="sfm-section">
                     <div class="sfm-section-label">
-                        <i class="fas fa-align-left"></i> Spot Details
+                        <i class="fas fa-align-left"></i> Sites Details
                     </div>
 
                     <div class="sfm-field">
@@ -527,7 +520,7 @@ ob_start();
                             <input type="checkbox" id="spotIsMaintenance">
                             <span class="sfm-maintenance-icon"><i class="fas fa-tools"></i></span>
                             <span class="sfm-maintenance-text">Under Maintenance</span>
-                            <span class="sfm-maintenance-hint">Hides this spot from tourist view</span>
+                            <span class="sfm-maintenance-hint">Hides this site </span>
                         </label>
                     </div>
 
@@ -549,7 +542,7 @@ ob_start();
                     <button type="submit" class="sfm-btn-save" id="saveSpotBtn">
                         <i class="fas fa-check-circle" id="saveSpotIcon"></i>
                         <i class="fas fa-circle-notch fa-spin" id="saveSpotSpinner" style="display:none;"></i>
-                        <span id="saveSpotLabel">Save Spot</span>
+                        <span id="saveSpotLabel">Save Site</span>
                     </button>
                 </div>
             </form>
@@ -561,7 +554,7 @@ ob_start();
 <div class="cards-grid" id="cardsView">
     <div style="text-align:center;padding:40px;color:#9CA3AF;grid-column:1/-1;">
         <i class="fas fa-spinner fa-spin" style="font-size:24px;"></i>
-        <p style="margin-top:12px;">Loading tourist spots...</p>
+        <p style="margin-top:12px;">Loading tourist sites...</p>
     </div>
 </div>
 
@@ -570,8 +563,8 @@ ob_start();
     <table class="data-table">
         <thead>
             <tr>
-                <th>Spot ID</th>
-                <th>Spot Name</th>
+                <th>Site ID</th>
+                <th>Site Name</th>
                 <th>Municipality</th>
                 <th>Category</th>
                 <th>Classification</th>
@@ -593,7 +586,7 @@ ob_start();
             <div style="width: 56px; height: 56px; background: #2563EB; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 12px;">
                 <i class="fas fa-save" style="color: white; font-size: 22px;"></i>
             </div>
-            <h3 style="margin: 0; font-size: 18px; font-weight: 700; color: #1E3A8A;">Save Tourist Spot</h3>
+            <h3 style="margin: 0; font-size: 18px; font-weight: 700; color: #1E3A8A;">Save Tourist Sites</h3>
         </div>
         <div style="padding: 20px 28px 28px 28px;">
             <p style="text-align: center; color: #4B5563; margin: 0 0 24px 0; font-size: 14px;">Are you sure you want to save this?</p>
@@ -604,7 +597,7 @@ ob_start();
                 <button class="btn btn-primary" id="saveConfirmBtn" data-action="confirm-save-spot" style="flex: 1; justify-content: center;">
                     <i class="fas fa-check" id="confirmBtnIcon" style="margin-right: 6px;"></i>
                     <i class="fas fa-circle-notch fa-spin" id="confirmBtnSpinner" style="display:none; margin-right:6px;"></i>
-                    <span id="confirmBtnLabel">Yes, Save</span>
+                    <span id="confirmBtnLabel">Yes</span>
                 </button>
             </div>
         </div>
@@ -629,7 +622,7 @@ ob_start();
         </div>
         <div style="padding: 18px 20px 20px 20px;">
             <p style="color: #64748B; margin: 0 0 14px 0; font-size: 12px; line-height: 1.45;">
-                Configure the default point values assigned to each tourist spot classification. These values will be used automatically whenever a classification is selected.
+                Configure the default point values assigned to each tourist sites classification. These values will be used automatically whenever a classification is selected.
             </p>
             <form id="customizePointsForm" onsubmit="return false;">
                 <table style="width: 100%; border-collapse: collapse; margin-bottom: 16px;">

@@ -30,12 +30,12 @@ use Illuminate\Support\Facades\Route;
 //  Auth (public)
 // ─────────────────────────────────────────────────────────────────────────────
 Route::prefix('auth')->group(function () {
-    // Fix #3: Rate limiting — 5 login attempts per minute per IP (brute-force protection)
-    Route::post('/login',    [LoginController::class, 'login'])->middleware('throttle:5,1');
-    // 10 registrations per minute per IP
-    Route::post('/register', [RegisterController::class, 'register'])->middleware('throttle:10,1');
-    // Logout is light — no throttle needed but still limit to prevent DoS
-    Route::post('/logout',   [LogoutController::class, 'logout'])->middleware('throttle:20,1');
+    // Rate limiting — 60 login attempts per minute per IP
+    Route::post('/login',    [LoginController::class, 'login'])->middleware('throttle:60,1');
+    // 30 registrations per minute per IP
+    Route::post('/register', [RegisterController::class, 'register'])->middleware('throttle:30,1');
+    // Logout is light — limit to prevent DoS
+    Route::post('/logout',   [LogoutController::class, 'logout'])->middleware('throttle:60,1');
     Route::get('/check',     [SessionController::class, 'check']);
 });
 

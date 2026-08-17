@@ -364,11 +364,6 @@ ob_start();
                         </div>
 
                         <div class="vch-form-group span-2">
-                            <label for="formImage">Voucher Image URL (Optional)</label>
-                            <input type="text" id="formImage" class="vch-input" placeholder="https://example.com/images/voucher.jpg">
-                        </div>
-
-                        <div class="vch-form-group span-2">
                             <label for="formDescription">Description & Terms and Conditions (Optional)</label>
                             <textarea id="formDescription" class="vch-textarea" rows="2" placeholder="Provide details, rules, or restrictions for tourists..."></textarea>
                         </div>

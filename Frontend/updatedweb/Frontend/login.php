@@ -65,7 +65,7 @@ if (isset($_SESSION['user_id'])) {
                     </div>
                     
                     <h1 class="left-title" id="leftTitleText">
-                        Tourist Spots <br><span class="highlight">Management</span> <br>System
+                        Tourist Sites <br><span class="highlight">Management</span> <br>System
                     </h1>
                     
                     <p class="left-subtitle">San Fernando City, La Union</p>
@@ -87,7 +87,7 @@ if (isset($_SESSION['user_id'])) {
                             </div>
                             <div class="stat-details">
                                 <div class="stat-number">42+</div>
-                                <div class="stat-label">Tourist Spots</div>
+                                <div class="stat-label">Tourist Sites</div>
                             </div>
                         </div>
                         <div class="stat-card">

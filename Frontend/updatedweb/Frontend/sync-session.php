@@ -3,15 +3,6 @@
  * sync-session.php
  *
  * Syncs the Laravel API login result into the PHP frontend session.
- *
- * Security: uses the PHP session's own CSRF token (set by login.php) to
- * verify the request is legitimate. This works correctly because login.php
- * and sync-session.php share the same PHP session (same server/port).
- *
- * NOTE: The previous _pending_sync_token approach was removed because it
- * stored the token in the Laravel session (port 8000) which is a completely
- * separate PHP session from the frontend (port 8080/XAMPP). They cannot share
- * session data. The CSRF token approach is correct and reliable.
  */
 session_start();
 

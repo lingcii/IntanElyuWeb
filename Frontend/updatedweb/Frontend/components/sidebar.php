@@ -23,6 +23,7 @@ function mtoSections()
         ],
         'SETTINGS & PRIVACY' => [
             ['href' => 'settings.php', 'icon' => 'fa-cog', 'label' => 'System Settings'],
+            ['href' => 'user-manual.php', 'icon' => 'fa-book-open', 'label' => 'User Manual'],
         ],
     ];
 }
@@ -54,6 +55,7 @@ $sidebarConfig = [
             ],
             'SETTINGS & PRIVACY' => [
                 ['href' => 'settings.php', 'icon' => 'fa-cog', 'label' => 'System Settings'],
+                ['href' => 'user-manual.php', 'icon' => 'fa-book-open', 'label' => 'User Manual'],
             ],
         ],
     ],
@@ -81,6 +83,7 @@ $sidebarConfig = [
             ],
             'SETTINGS & PRIVACY' => [
                 ['href' => 'settings.php', 'icon' => 'fa-cog', 'label' => 'System Settings'],
+                ['href' => 'user-manual.php', 'icon' => 'fa-book-open', 'label' => 'User Manual'],
             ],
         ],
     ],

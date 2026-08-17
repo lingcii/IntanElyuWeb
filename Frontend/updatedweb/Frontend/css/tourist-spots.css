@@ -1953,10 +1953,17 @@ label.sfm-upload-area {
 /* ── Leaflet Map in modal */
 .sfm-map-container {
     position: relative;
-    height: 240px;
+    height: 380px;
+    min-height: 380px;
     border-radius: 12px;
     overflow: hidden;
     border: 2px solid #e2e8f0;
+}
+@media (max-width: 640px) {
+    .sfm-map-container {
+        height: 280px;
+        min-height: 280px;
+    }
 }
 .sfm-map-container #modalMap {
     height: 100% !important;
