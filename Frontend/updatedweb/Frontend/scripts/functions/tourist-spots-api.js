@@ -1339,12 +1339,27 @@ window.openSpotModal = async function openSpotModal(spotId) {
                     ` : ''}
 
                     <div class="spot-details-grid">
+                        <!-- Row 1: Category | Points -->
                         <div class="spot-detail-card">
                             <div class="detail-label">Category</div>
                             <div class="category-badges">
                                 ${(spot.category || 'Other').split(',').map(c => c.trim()).filter(Boolean).map(c =>
             `<span class="cat-pill">${escapeHtml(c)}</span>`
         ).join('')}
+                            </div>
+                        </div>
+                        <div class="spot-detail-card points-card">
+                            <div class="detail-label points-label">⭐ Points</div>
+                            <div class="points-val">${(spot.points && parseInt(spot.points) > 0) ? parseInt(spot.points) : getDefaultPointsForStatus(spot.classification_status)} Points</div>
+                        </div>
+
+                        <!-- Row 2: Private Vehicle | Public Vehicle -->
+                        <div class="spot-detail-card">
+                            <div class="detail-label"><i class="fas fa-car" style="color:#7C3AED;margin-right:4px;"></i> Private Vehicle</div>
+                            <div class="category-badges">
+                                ${privateVts.length > 0 
+                                    ? privateVts.map(vt => formatVtBadge(vt)).join('') 
+                                    : '<span style="font-size:13px;color:#9CA3AF;">None</span>'}
                             </div>
                         </div>
                         <div class="spot-detail-card">
@@ -1355,22 +1370,8 @@ window.openSpotModal = async function openSpotModal(spotId) {
                                     : '<span style="font-size:13px;color:#9CA3AF;">None</span>'}
                             </div>
                         </div>
-                        <div class="spot-detail-card">
-                            <div class="detail-label"><i class="fas fa-car" style="color:#7C3AED;margin-right:4px;"></i> Private Vehicle</div>
-                            <div class="category-badges">
-                                ${privateVts.length > 0 
-                                    ? privateVts.map(vt => formatVtBadge(vt)).join('') 
-                                    : '<span style="font-size:13px;color:#9CA3AF;">None</span>'}
-                            </div>
-                        </div>
-                        <div class="spot-detail-card">
-                            <div class="detail-label">Fees</div>
-                            <div class="detail-val">${formatFeesDisplay(spot)}</div>
-                        </div>
-                        <div class="spot-detail-card points-card">
-                            <div class="detail-label points-label">⭐ Points</div>
-                            <div class="points-val">${(spot.points && parseInt(spot.points) > 0) ? parseInt(spot.points) : getDefaultPointsForStatus(spot.classification_status)} Points</div>
-                        </div>
+
+                        <!-- Row 3: Opening Time | Closing Time -->
                         <div class="spot-detail-card">
                             <div class="detail-label">Opening Time</div>
                             <div class="detail-val">${formatTime(spot.opening_time)}</div>
@@ -1379,22 +1380,28 @@ window.openSpotModal = async function openSpotModal(spotId) {
                             <div class="detail-label">Closing Time</div>
                             <div class="detail-val">${formatTime(spot.closing_time)}</div>
                         </div>
-                        ${spot.latitude ? `
-                            <div class="spot-detail-card">
-                                <div class="detail-label">Latitude</div>
-                                <div class="detail-val"><i class="fas fa-map-pin"></i> ${parseFloat(spot.latitude).toFixed(6)}</div>
-                            </div>
-                        ` : ''}
-                        ${spot.longitude ? `
-                            <div class="spot-detail-card">
-                                <div class="detail-label">Longitude</div>
-                                <div class="detail-val"><i class="fas fa-map-pin"></i> ${parseFloat(spot.longitude).toFixed(6)}</div>
-                            </div>
-                        ` : ''}
+
+                        <!-- Row 4: Latitude | Longitude -->
+                        <div class="spot-detail-card">
+                            <div class="detail-label">Latitude</div>
+                            <div class="detail-val">${spot.latitude ? `<i class="fas fa-map-pin"></i> ${parseFloat(spot.latitude).toFixed(6)}` : '<span style="color:#9CA3AF;font-size:13px;">N/A</span>'}</div>
+                        </div>
+                        <div class="spot-detail-card">
+                            <div class="detail-label">Longitude</div>
+                            <div class="detail-val">${spot.longitude ? `<i class="fas fa-map-pin"></i> ${parseFloat(spot.longitude).toFixed(6)}` : '<span style="color:#9CA3AF;font-size:13px;">N/A</span>'}</div>
+                        </div>
+
+                        <!-- Row 5: Fees | Submitted -->
+                        <div class="spot-detail-card">
+                            <div class="detail-label">Fees</div>
+                            <div class="detail-val">${formatFeesDisplay(spot)}</div>
+                        </div>
                         <div class="spot-detail-card">
                             <div class="detail-label">Submitted</div>
                             <div class="detail-val">${formattedDate}</div>
                         </div>
+
+                        <!-- Full-width: Added Tourist Spot By -->
                         ${spot.created_by || spot.creator ? `
                             <div class="spot-detail-card added-by-card">
                                 <div class="detail-label added-by-label"><i class="fas fa-user-plus"></i> Added Tourist Spot By</div>
@@ -1404,6 +1411,8 @@ window.openSpotModal = async function openSpotModal(spotId) {
                                 </div>
                             </div>
                         ` : ''}
+
+                        <!-- Full-width: Approved By / Approved At (conditional) -->
                         ${spot.status === 'approved' && (spot.approver || spot.approved_by) ? `
                             <div class="spot-detail-card approved-by-card">
                                 <div class="detail-label approved-by-label"><i class="fas fa-user-check"></i> Approved By</div>

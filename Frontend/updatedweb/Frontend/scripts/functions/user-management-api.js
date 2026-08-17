@@ -145,13 +145,42 @@ function toggleUmDropdown(event, userId) {
     closeAllUmDropdowns();
 
     if (dropdown && !isShowing) {
+        const btn = event.currentTarget;
+        const btnRect = btn.getBoundingClientRect();
+        const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+
+        // Use fixed positioning to escape any overflow:auto parent
+        dropdown.style.position = 'fixed';
+        dropdown.style.right = 'auto';
+        dropdown.style.top = 'auto';
+        dropdown.style.bottom = 'auto';
         dropdown.style.display = 'block';
+
+        // Measure dropdown height after display:block
+        const dropdownHeight = dropdown.offsetHeight;
+        const spaceBelow = viewportHeight - btnRect.bottom;
+
+        // Align right edge of dropdown to right edge of button
+        const rightEdge = window.innerWidth - btnRect.right;
+        dropdown.style.right = rightEdge + 'px';
+
+        if (spaceBelow >= dropdownHeight + 8) {
+            // Enough room below — open downward
+            dropdown.style.top = (btnRect.bottom + 4) + 'px';
+        } else {
+            // Not enough room below — open upward
+            dropdown.style.top = (btnRect.top - dropdownHeight - 4) + 'px';
+        }
     }
 }
 
 function closeAllUmDropdowns() {
     document.querySelectorAll('.um-dropdown-menu').forEach(el => {
         el.style.display = 'none';
+        el.style.position = '';
+        el.style.top = '';
+        el.style.bottom = '';
+        el.style.right = '';
     });
 }
 
@@ -293,7 +322,7 @@ function renderUserRow(u) {
                 <button class="um-action-btn um-dropdown-toggle" style="padding:4px 8px;" onclick="toggleUmDropdown(event, ${u.id})">
                     <i class="fas fa-ellipsis-v"></i>
                 </button>
-                <div class="um-dropdown-menu" id="um-dropdown-${u.id}" style="display:none; position:absolute; right:0; top:100%; margin-top:4px; background:white; border:1px solid #e0e0e0; border-radius:8px; box-shadow:0 4px 20px rgba(0,0,0,0.15); min-width:160px; z-index:999; padding:4px 0;">
+                <div class="um-dropdown-menu" id="um-dropdown-${u.id}" style="display:none; position:fixed; background:white; border:1px solid #e0e0e0; border-radius:8px; box-shadow:0 4px 20px rgba(0,0,0,0.15); min-width:160px; z-index:99999; padding:4px 0;">
                     <button class="um-dropdown-item" style="width:100%; text-align:left; padding:8px 16px; border:none; background:none; cursor:pointer; display:flex; align-items:center; gap:8px; color:var(--text-secondary);"
                         onmouseover="this.style.background='#f5f5f5'" onmouseout="this.style.background='transparent'"
                         onclick="openEditModal(${u.id}); closeAllUmDropdowns();">
