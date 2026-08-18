@@ -1362,6 +1362,42 @@ window.openSpotModal = async function openSpotModal(spotId) {
             return `<span class="cat-pill" style="background:${bg};color:${fg};font-weight:600;font-size:12px;padding:3px 10px;border-radius:20px;display:inline-block;margin:2px;">${escapeHtml(name)}</span>`;
         }
 
+        // Extract service centers
+        let spotScs = [];
+        if (Array.isArray(spot.service_centers)) {
+            spotScs = spot.service_centers;
+        } else if (Array.isArray(spot.serviceCenters)) {
+            spotScs = spot.serviceCenters;
+        } else if (spot.service_center_ids) {
+            const ids = Array.isArray(spot.service_center_ids)
+                ? spot.service_center_ids.map(Number)
+                : String(spot.service_center_ids).split(',').map(s => parseInt(s.trim())).filter(Boolean);
+            if (window.allServiceCenters && window.allServiceCenters.length) {
+                spotScs = window.allServiceCenters.filter(sc => ids.includes(parseInt(sc.id)));
+            }
+        }
+        spotScs = spotScs.map(item => {
+            if (typeof item === 'object' && item !== null) return item;
+            if (window.allServiceCenters) return window.allServiceCenters.find(sc => sc.id == item);
+            return null;
+        }).filter(Boolean);
+
+        function formatScBadge(sc) {
+            const name = sc.name || 'Service Center';
+            const type = sc.display_type || (sc.type === 'Other' && sc.custom_type ? sc.custom_type : sc.type) || '';
+            return `<span class="sc-chip" style="background:#DBEAFE;color:#1e40af;font-weight:600;font-size:12px;padding:3px 10px;border-radius:20px;display:inline-flex;align-items:center;gap:5px;margin:2px;" title="${escapeHtml(type ? type + (sc.address ? ' - ' + sc.address : '') : name)}"><i class="fas fa-building" style="font-size:10px;"></i>${escapeHtml(name)}</span>`;
+        }
+
+        function formatTimeDisplay(spot) {
+            const open = spot.opening_time ? formatTime(spot.opening_time) : null;
+            const close = spot.closing_time ? formatTime(spot.closing_time) : null;
+            if (!open && !close) return '<span style="font-size:13px;color:#9CA3AF;">N/A</span>';
+            let parts = [];
+            if (open) parts.push('Opening Time: ' + open);
+            if (close) parts.push('Closing Time: ' + close);
+            return parts.map(p => '<span style="display:block;font-size:13px;font-weight:600;color:#1E293B;">' + p + '</span>').join('');
+        }
+
         document.getElementById('modalBody').innerHTML = `
             <div class="spot-modal-split-container">
                 <!-- Left Panel (50%): Details -->
@@ -1398,7 +1434,21 @@ window.openSpotModal = async function openSpotModal(spotId) {
                             <div class="points-val">${(spot.points && parseInt(spot.points) > 0) ? parseInt(spot.points) : getDefaultPointsForStatus(spot.classification_status)} Points</div>
                         </div>
 
-                        <!-- Row 2: Private Vehicle | Public Vehicle -->
+                        <!-- Row 2: Service Center | Time -->
+                        <div class="spot-detail-card">
+                            <div class="detail-label"><i class="fas fa-building" style="color:#1E3A8A;margin-right:4px;"></i> Service Center</div>
+                            <div class="category-badges">
+                                ${spotScs.length > 0 
+                                    ? spotScs.map(sc => formatScBadge(sc)).join('') 
+                                    : '<span style="font-size:13px;color:#9CA3AF;">None</span>'}
+                            </div>
+                        </div>
+                        <div class="spot-detail-card">
+                            <div class="detail-label"><i class="fas fa-clock" style="color:#6B7280;margin-right:4px;"></i> Time</div>
+                            <div class="detail-val">${formatTimeDisplay(spot)}</div>
+                        </div>
+
+                        <!-- Row 3: Private Vehicle | Public Vehicle -->
                         <div class="spot-detail-card">
                             <div class="detail-label"><i class="fas fa-car" style="color:#7C3AED;margin-right:4px;"></i> Private Vehicle</div>
                             <div class="category-badges">
@@ -1414,16 +1464,6 @@ window.openSpotModal = async function openSpotModal(spotId) {
                                     ? publicVts.map(vt => formatVtBadge(vt)).join('') 
                                     : '<span style="font-size:13px;color:#9CA3AF;">None</span>'}
                             </div>
-                        </div>
-
-                        <!-- Row 3: Opening Time | Closing Time -->
-                        <div class="spot-detail-card">
-                            <div class="detail-label">Opening Time</div>
-                            <div class="detail-val">${formatTime(spot.opening_time)}</div>
-                        </div>
-                        <div class="spot-detail-card">
-                            <div class="detail-label">Closing Time</div>
-                            <div class="detail-val">${formatTime(spot.closing_time)}</div>
                         </div>
 
                         <!-- Row 4: Latitude | Longitude -->
