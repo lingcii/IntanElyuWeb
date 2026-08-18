@@ -22,6 +22,8 @@ class TouristSpot extends Model
         'environmental_fee',
         'fee_types',
         'description',
+        'route_guide',
+        'tour_guide_notice',
         'photo_url',
         'latitude',
         'longitude',
@@ -110,6 +112,11 @@ class TouristSpot extends Model
     public function vehicleTypes()
     {
         return $this->belongsToMany(VehicleType::class, 'tourist_spot_vehicle_type', 'tourist_spot_id', 'vehicle_type_id');
+    }
+
+    public function serviceCenters()
+    {
+        return $this->belongsToMany(ServiceCenter::class, 'tourist_spot_service_center', 'tourist_spot_id', 'service_center_id');
     }
 
     public static function getDefaultPointsForClassification(?string $classification): int

@@ -179,6 +179,37 @@
             window.L.DomUtil.isPatched = true;
         }
 
+        if (window.L.Map && window.L.Map.prototype && !window.L.Map.prototype._isPatched) {
+            const origGetMapPanePos = window.L.Map.prototype._getMapPanePos;
+            if (typeof origGetMapPanePos === 'function') {
+                window.L.Map.prototype._getMapPanePos = function () {
+                    if (!this._mapPane) {
+                        const PointClass = window.L.Point || function (x, y) { this.x = x || 0; this.y = y || 0; };
+                        return new PointClass(0, 0);
+                    }
+                    try {
+                        return origGetMapPanePos.call(this) || (new (window.L.Point || function(x,y){this.x=x||0;this.y=y||0;})(0, 0));
+                    } catch (err) {
+                        const PointClass = window.L.Point || function (x, y) { this.x = x || 0; this.y = y || 0; };
+                        return new PointClass(0, 0);
+                    }
+                };
+            }
+
+            const origZoomTransitionEnd = window.L.Map.prototype._onZoomTransitionEnd;
+            if (typeof origZoomTransitionEnd === 'function') {
+                window.L.Map.prototype._onZoomTransitionEnd = function () {
+                    if (!this._mapPane || !this._mapPane.parentNode || !this._container) {
+                        return;
+                    }
+                    try {
+                        origZoomTransitionEnd.call(this);
+                    } catch (err) {}
+                };
+            }
+            window.L.Map.prototype._isPatched = true;
+        }
+
         if (window.L.map && !window.L.map.isPatched) {
             const originalLMap = window.L.map;
             window.L.map = function (id, options) {

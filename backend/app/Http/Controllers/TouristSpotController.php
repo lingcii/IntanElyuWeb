@@ -7,6 +7,7 @@ use App\Models\TouristSpot;
 use App\Models\TouristSpotAudit;
 use App\Models\TouristSpotImage;
 use App\Models\User;
+use App\Models\ServiceCenter;
 use App\Models\VehicleType;
 use App\Enums\ActivityAction;
 use App\Services\ActivityLogService;
@@ -85,10 +86,10 @@ class TouristSpotController extends Controller
 
         $spots = Cache::remember($cacheKey, 300, function () use ($role, $municipalityId) {
             $query = TouristSpot::select([
-                'id', 'name', 'municipality_id', 'barangay', 'category', 'description', 'entrance_fee', 'environmental_fee', 'fee_types',
+                'id', 'name', 'municipality_id', 'barangay', 'category', 'description', 'route_guide', 'tour_guide_notice', 'entrance_fee', 'environmental_fee', 'fee_types',
                 'status', 'photo_url', 'latitude', 'longitude', 'opening_time',
                 'closing_time', 'is_maintenance', 'classification_status', 'rejection_reason', 'visits', 'rating', 'points', 'approved_by', 'approved_at', 'created_by', 'creator_role', 'created_at'
-            ])->with(['municipality:id,name', 'images', 'approver:id,name', 'creator:id,name', 'vehicleTypes']);
+            ])->with(['municipality:id,name', 'images', 'approver:id,name', 'creator:id,name', 'vehicleTypes', 'serviceCenters']);
 
             if (in_array($role, User::$MUNICIPAL_ROLES) && $municipalityId) {
                 $query->where('municipality_id', $municipalityId);
@@ -119,7 +120,7 @@ class TouristSpotController extends Controller
         $role           = $request->session()->get('user_role');
         $municipalityId = (int) $request->session()->get('user_municipality_id', 0);
 
-        $query = TouristSpot::with(['municipality:id,name', 'images', 'approver:id,name', 'creator:id,name', 'vehicleTypes'])->where('id', $id);
+        $query = TouristSpot::with(['municipality:id,name', 'images', 'approver:id,name', 'creator:id,name', 'vehicleTypes', 'serviceCenters'])->where('id', $id);
 
         if (in_array($role, User::$MUNICIPAL_ROLES) && $municipalityId) {
             $query->where('municipality_id', $municipalityId);
@@ -263,6 +264,8 @@ class TouristSpotController extends Controller
             'environmental_fee'     => (float) ($request->input('environmental_fee') ?? 0),
             'fee_types'             => $request->input('fee_types') ?: [],
             'description'           => $request->input('description') ?: '',
+            'route_guide'           => $request->input('route_guide') ?: null,
+            'tour_guide_notice'     => $request->input('tour_guide_notice') ?: null,
             'latitude'              => $request->input('latitude') ? (float) $request->input('latitude') : null,
             'longitude'             => $request->input('longitude') ? (float) $request->input('longitude') : null,
             'opening_time'          => $request->input('opening_time') ?: null,
@@ -359,6 +362,8 @@ class TouristSpotController extends Controller
             'barangay'              => 'nullable|string|max:255',
             'category'              => 'required|string',
             'description'           => 'required|string',
+            'route_guide'           => 'nullable|string',
+            'tour_guide_notice'     => 'nullable|string',
             'classification_status' => 'required|string',
             'municipality_id'       => 'sometimes|integer',
             'entrance_fee'          => 'nullable|numeric',
@@ -374,6 +379,8 @@ class TouristSpotController extends Controller
             'points'                => 'required|integer|min:0',
             'vehicle_type_ids'      => 'nullable|array',
             'vehicle_type_ids.*'    => 'integer|exists:vehicle_types,id',
+            'service_center_ids'    => 'nullable|array',
+            'service_center_ids.*'  => 'integer|exists:service_centers,id',
         ];
 
         $feeTypes = $request->input('fee_types', []);
@@ -457,6 +464,8 @@ class TouristSpotController extends Controller
                 'environmental_fee'     => $data['environmental_fee'] ?? 0,
                 'fee_types'             => $data['fee_types'] ?? [],
                 'description'           => $data['description'],
+                'route_guide'           => $data['route_guide'] ?? null,
+                'tour_guide_notice'     => $data['tour_guide_notice'] ?? null,
                 'photo_url'             => $photoUrl,
                 'latitude'              => $data['latitude']  ?? 0,
                 'longitude'             => $data['longitude'] ?? 0,
@@ -488,6 +497,9 @@ class TouristSpotController extends Controller
             $this->syncImages($spot->id, $data['images'] ?? []);
             if (array_key_exists('vehicle_type_ids', $data)) {
                 $spot->vehicleTypes()->sync($data['vehicle_type_ids'] ?? []);
+            }
+            if (array_key_exists('service_center_ids', $data)) {
+                $spot->serviceCenters()->sync($data['service_center_ids'] ?? []);
             }
 
             // Clean up any remaining draft entries for this user/municipality so drafts are strictly separate
@@ -564,7 +576,7 @@ class TouristSpotController extends Controller
             'success' => true,
             'message' => 'Tourist spot created successfully.',
             'id' => $spot->id,
-            'spot' => $spot->fresh(['municipality', 'images', 'vehicleTypes'])?->toArray()
+            'spot' => $spot->fresh(['municipality', 'images', 'vehicleTypes', 'serviceCenters'])?->toArray()
         ], 201);
     }
 
@@ -594,6 +606,8 @@ class TouristSpotController extends Controller
             'barangay'              => 'nullable|string|max:255',
             'category'              => 'required|string',
             'description'           => 'required|string',
+            'route_guide'           => 'nullable|string',
+            'tour_guide_notice'     => 'nullable|string',
             'classification_status' => 'required|string',
             'entrance_fee'          => 'nullable|numeric',
             'environmental_fee'     => 'nullable|numeric',
@@ -606,8 +620,10 @@ class TouristSpotController extends Controller
             'is_maintenance'        => 'nullable|boolean',
             'images'                => 'nullable|array',
             'points'                => 'required|integer|min:0',
-            'vehicle_type_ids'      => 'nullable|array',
-            'vehicle_type_ids.*'    => 'integer|exists:vehicle_types,id',
+            'vehicle_type_ids'         => 'nullable|array',
+            'vehicle_type_ids.*'        => 'integer|exists:vehicle_types,id',
+            'service_center_ids'        => 'nullable|array',
+            'service_center_ids.*'      => 'integer|exists:service_centers,id',
         ];
 
         $feeTypes = $request->input('fee_types', []);
@@ -671,6 +687,8 @@ class TouristSpotController extends Controller
                 'environmental_fee'     => $data['environmental_fee'] ?? 0,
                 'fee_types'             => $data['fee_types'] ?? [],
                 'description'           => $data['description'],
+                'route_guide'           => $data['route_guide'] ?? null,
+                'tour_guide_notice'     => $data['tour_guide_notice'] ?? null,
                 'photo_url'             => $photoUrl,
                 'latitude'              => $data['latitude']  ?? 0,
                 'longitude'             => $data['longitude'] ?? 0,
@@ -701,6 +719,9 @@ class TouristSpotController extends Controller
             $this->syncImages($spot->id, $data['images'] ?? []);
             if (array_key_exists('vehicle_type_ids', $data)) {
                 $spot->vehicleTypes()->sync($data['vehicle_type_ids'] ?? []);
+            }
+            if (array_key_exists('service_center_ids', $data)) {
+                $spot->serviceCenters()->sync($data['service_center_ids'] ?? []);
             }
             $this->auditLog($spot->id, (int) $request->session()->get('user_id'), 'updated', ['old' => $old, 'new' => $data], $request);
 

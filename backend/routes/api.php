@@ -22,6 +22,7 @@ use App\Http\Controllers\Admin\FeedbackManagementController;
 use App\Http\Controllers\FeedbackController;
 use App\Http\Controllers\BackupController;
 use App\Http\Controllers\ClassificationPointController;
+use App\Http\Controllers\ServiceCenterController;
 use App\Http\Controllers\VoucherController;
 
 use Illuminate\Support\Facades\Route;
@@ -82,6 +83,12 @@ Route::middleware('auth.session')->group(function () {
 
     // Classification Points (shared read)
     Route::get('/classification-points', [ClassificationPointController::class, 'index']);
+
+    // Service Centers (shared read — filtered by role in controller)
+    Route::get('/service-centers', [ServiceCenterController::class, 'index']);
+    Route::get('/service-centers/{id}', [ServiceCenterController::class, 'show']);
+    Route::post('/service-centers', [ServiceCenterController::class, 'store']);
+    Route::put('/service-centers/{id}', [ServiceCenterController::class, 'update']);
 
     // ─────────────────────────────────────────────────────────────────────────
     //  PITCO (picto role)

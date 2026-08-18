@@ -140,6 +140,8 @@
         saveDraft: saveDraftPayload,
         deleteDraft: deleteDraftApi,
 
+        getCachedDraft: () => _cachedDraft,
+        isDraftFetched: () => _draftFetched,
         getActiveDraftId: () => _activeDraftId,
         setActiveDraftId: (id) => { _activeDraftId = id; },
         

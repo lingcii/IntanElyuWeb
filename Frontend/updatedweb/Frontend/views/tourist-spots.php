@@ -500,6 +500,35 @@ ob_start();
                         <input type="hidden" id="vehicleTypeIds" value="">
                     </div>
 
+                    <!-- ── Service Center Field ───────────────────────────────── -->
+                    <div class="sfm-field" id="serviceCenterField">
+                        <label class="sfm-label">
+                            Service Center
+                        </label>
+                        <div class="sfm-sc-dropdown-wrap" style="position:relative; width:100%;">
+                            <div id="serviceCenterBtn" class="sfm-select" style="cursor:pointer;user-select:none;display:flex;align-items:center;justify-content:space-between;gap:6px;min-height:38px;padding:6px 12px;border:1px solid #E5E7EB;border-radius:8px;background:#fff;" onclick="window.toggleServiceCenterDropdown(event)" tabindex="0">
+                                <div id="serviceCenterChips" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;width:100%;">
+                                    <span id="serviceCenterLabel" style="color:#9CA3AF;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Select service centers...</span>
+                                </div>
+                                <i class="fas fa-chevron-down" style="font-size:12px;color:#9CA3AF;transition:transform .2s;flex-shrink:0;" id="serviceCenterChevron"></i>
+                            </div>
+                            <div id="serviceCenterDropdown" style="display:none;position:absolute;top:100%;left:0;z-index:9999;background:#fff;border:1px solid #E5E7EB;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.12);padding:8px 0;width:100%;max-height:280px;overflow-y:auto;margin-top:4px;">
+                                <div style="padding:6px 14px 4px;font-size:11px;color:#64748B;font-weight:700;text-transform:uppercase;letter-spacing:.5px;background:#F8FAFC;border-bottom:1px solid #F1F5F9;">
+                                    <i class="fas fa-building" style="margin-right:4px;color:#1E3A8A;"></i> Available Service Centers
+                                </div>
+                                <div id="serviceCenterOptions"></div>
+                                <div style="border-top:1px solid #F1F5F9;margin-top:4px;padding-top:4px;">
+                                    <div id="scAddNewAction" onclick="window.openAddServiceCenterModal()" style="display:flex;align-items:center;gap:10px;padding:9px 14px;cursor:pointer;font-size:13px;font-weight:600;color:#1E3A8A;transition:background .15s;" onmouseenter="this.style.background='#EFF6FF'" onmouseleave="this.style.background='transparent'">
+                                        <i class="fas fa-plus-circle" style="font-size:14px;"></i>
+                                        <span>+ Add New Service Center</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <input type="hidden" id="serviceCenterIds" value="">
+                    </div>
+                    <!-- ── /Service Center Field ─────────────────────────────── -->
+
                     <div class="sfm-two-col">
                         <div class="sfm-field">
                             <label class="sfm-label" for="spotOpeningTime">
@@ -532,6 +561,36 @@ ob_start();
                                   maxlength="1000" required
                                   placeholder="Describe this tourist spot — its highlights, what makes it unique, activities available…"></textarea>
                         <div class="sfm-char-count"><span id="descCharCount">0</span>/1000</div>
+                    </div>
+                </div>
+
+                <div class="sfm-section">
+                    <div class="sfm-section-label">
+                        <i class="fas fa-route"></i> Route Guide
+                    </div>
+                    <div class="sfm-field" style="margin-bottom: 0;">
+                        <label class="sfm-label" for="spotRouteGuide">
+                            Directions & Route Instructions
+                        </label>
+                        <textarea id="spotRouteGuide" class="sfm-textarea" rows="3"
+                                  maxlength="1000"
+                                  placeholder="e.g., From the town proper of San Fernando, take a local tricycle heading to the barangay. Ask the driver to drop you off at Carlatan."></textarea>
+                        <div class="sfm-char-count"><span id="routeGuideCharCount">0</span>/1000</div>
+                    </div>
+                </div>
+
+                <div class="sfm-section">
+                    <div class="sfm-section-label">
+                        <i class="fas fa-info-circle"></i> Tour Guide Notice
+                    </div>
+                    <div class="sfm-field" style="margin-bottom: 0;">
+                        <label class="sfm-label" for="spotTourGuideNotice">
+                            Tour Guide Information & Restrictions
+                        </label>
+                        <textarea id="spotTourGuideNotice" class="sfm-textarea" rows="3"
+                                  maxlength="1000"
+                                  placeholder="e.g., Some destinations may require a tour guide for entry or navigation. The system only provides informational notices about this requirement; it does not offer, book, or arrange tour guide services directly."></textarea>
+                        <div class="sfm-char-count"><span id="tourGuideNoticeCharCount">0</span>/1000</div>
                     </div>
                 </div>
 
@@ -669,6 +728,111 @@ ob_start();
 </div>
 
 <!-- -- Scripts -->
+
+<!-- ── Add New Service Center Modal ─────────────────────────────────────────── -->
+<div class="modal" id="addServiceCenterModal" style="z-index:10006;">
+    <div class="modal-content" style="max-width:520px;border-radius:16px;overflow:hidden;background:#fff;box-shadow:0 20px 40px rgba(0,0,0,.18);">
+        <!-- Header -->
+        <div style="background:linear-gradient(135deg,#1E3A8A,#1e40af);padding:24px 28px 18px;color:#fff;">
+            <div style="display:flex;align-items:center;gap:12px;">
+                <div style="width:40px;height:40px;background:rgba(255,255,255,.18);border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <i class="fas fa-building" style="font-size:18px;"></i>
+                </div>
+                <div>
+                    <h3 style="margin:0;font-size:17px;font-weight:700;">Add New Service Center</h3>
+                    <p style="margin:4px 0 0;font-size:12px;opacity:.85;">Create a new service center for your municipality</p>
+                </div>
+            </div>
+            <button type="button" onclick="window.closeAddServiceCenterModal()" style="position:absolute;top:16px;right:16px;background:rgba(255,255,255,.18);border:none;border-radius:8px;width:32px;height:32px;color:#fff;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;" title="Close">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <!-- Body -->
+        <div style="padding:24px 28px 28px;max-height:70vh;overflow-y:auto;">
+            <div id="scFormError" style="display:none;background:#FEE2E2;border:1px solid #FECACA;border-radius:8px;padding:10px 14px;margin-bottom:16px;color:#DC2626;font-size:13px;"></div>
+
+            <div class="sfm-field" style="margin-bottom:14px;">
+                <label class="sfm-label">Service Center Name <span class="sfm-required">*</span></label>
+                <input type="text" id="scName" class="sfm-input" maxlength="255" placeholder="e.g., San Fernando Terminal">
+            </div>
+
+            <div class="sfm-field" style="margin-bottom:14px;">
+                <label class="sfm-label">Service Center Type <span class="sfm-required">*</span></label>
+                <select id="scType" class="sfm-select" onchange="window.onScTypeChange()">
+                    <option value="">— Select Type —</option>
+                    <option value="Transportation Terminal">Transportation Terminal</option>
+                    <option value="Parking Area">Parking Area</option>
+                    <option value="Tourist Information Center">Tourist Information Center</option>
+                    <option value="Vehicle Rental">Vehicle Rental</option>
+                    <option value="Shuttle Service">Shuttle Service</option>
+                    <option value="Transport Service">Transport Service</option>
+                    <option value="Other">Other</option>
+                </select>
+            </div>
+
+            <div class="sfm-field" id="scCustomTypeField" style="margin-bottom:14px;display:none;">
+                <label class="sfm-label">Specify Type <span class="sfm-required">*</span></label>
+                <input type="text" id="scCustomType" class="sfm-input" maxlength="100" placeholder="Describe the service center type">
+            </div>
+
+            <div class="sfm-field" style="margin-bottom:14px;">
+                <label class="sfm-label">Contact Number</label>
+                <input type="text" id="scContact" class="sfm-input" maxlength="50" placeholder="e.g., +63 912 345 6789">
+            </div>
+
+            <div class="sfm-field" style="margin-bottom:0;">
+                <label class="sfm-label">Address</label>
+                <input type="text" id="scAddress" class="sfm-input" maxlength="500" placeholder="Street, Barangay, Municipality">
+            </div>
+
+            <!-- Municipality info (auto-assigned, read-only) -->
+            <div style="margin-top:16px;padding:10px 14px;background:#EFF6FF;border-radius:8px;border:1px solid #BFDBFE;font-size:12px;color:#1e40af;display:flex;align-items:center;gap:8px;">
+                <i class="fas fa-map-marker-alt"></i>
+                <span>Municipality: <strong id="scMunicipalityDisplay"><?= htmlspecialchars($_SESSION['user_municipality_name'] ?? 'Auto-assigned') ?></strong></span>
+            </div>
+        </div>
+        <!-- Footer -->
+        <div style="padding:16px 28px;border-top:1px solid #F1F5F9;display:flex;justify-content:flex-end;gap:12px;">
+            <button type="button" onclick="window.closeAddServiceCenterModal()" class="sfm-btn-cancel" style="min-width:90px;justify-content:center;">
+                <i class="fas fa-times"></i> Cancel
+            </button>
+            <button type="button" id="scSaveBtn" onclick="window.promptSaveServiceCenter()" class="sfm-btn-save" style="min-width:130px;justify-content:center;background:linear-gradient(135deg,#1E3A8A,#1e40af);">
+                <i class="fas fa-check-circle" id="scSaveBtnIcon"></i>
+                <span id="scSaveBtnLabel">Save Service Center</span>
+            </button>
+        </div>
+    </div>
+</div>
+<!-- ── /Add New Service Center Modal ──────────────────────────────────────── -->
+
+<!-- ── Confirm Save Service Center Modal ────────────────────────────────────── -->
+<div class="modal" id="saveScConfirmModal" style="z-index:10010;" onclick="if(event.target.id === 'saveScConfirmModal') window.closeSaveScConfirmModal()">
+    <div class="modal-content" style="max-width: 400px; width: 100%; border-radius: 16px; overflow: hidden; background: #fff; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.25);">
+        <div style="background: #F8FAFC; padding: 20px 24px 16px 24px; border-bottom: 1px solid #E2E8F0; text-align: center;">
+            <div style="width: 48px; height: 48px; background: #EFF6FF; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: #1E3A8A; margin-bottom: 12px;">
+                <i class="fas fa-question-circle" style="font-size: 24px;"></i>
+            </div>
+            <h3 style="margin: 0; font-size: 17px; font-weight: 700; color: #0F172A;">Save Service Center</h3>
+        </div>
+        <div style="padding: 20px 24px 24px 24px;">
+            <p style="text-align: center; color: #4B5563; margin: 0 0 20px 0; font-size: 14px; line-height: 1.5;">
+                Are you sure you want to save this service center?
+            </p>
+            <div style="display: flex; gap: 12px;">
+                <button type="button" class="btn btn-outline" onclick="window.closeSaveScConfirmModal()" style="flex: 1; justify-content: center; height: 40px;">
+                    <i class="fas fa-times" style="margin-right: 6px;"></i> No
+                </button>
+                <button type="button" class="btn btn-primary" id="confirmSaveScBtn" onclick="window.confirmSubmitNewServiceCenter()" style="flex: 1; justify-content: center; height: 40px; background: linear-gradient(135deg,#1E3A8A,#1e40af); border-color: #1E3A8A;">
+                    <i class="fas fa-check" id="confirmScBtnIcon" style="margin-right: 6px;"></i>
+                    <i class="fas fa-circle-notch fa-spin" id="confirmScBtnSpinner" style="display:none; margin-right:6px;"></i>
+                    <span id="confirmScBtnLabel">Yes</span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- ── /Confirm Save Service Center Modal ──────────────────────────────────── -->
+
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin="" defer></script>
 <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js" defer></script>
 

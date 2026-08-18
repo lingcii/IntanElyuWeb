@@ -12,14 +12,17 @@ if (window.API_CONFIG && typeof window.API_CONFIG.getCsrfToken !== 'function') {
     };
 }
 
-// Safely patch Leaflet L.DomUtil.getPosition to prevent 'Cannot read properties of undefined (reading _leaflet_pos)'
+// Safely patch Leaflet L.DomUtil and L.Map to prevent 'Cannot read properties of undefined (reading _leaflet_pos)'
 function patchLeafletDomUtil() {
-    if (typeof window.L !== 'undefined' && window.L.DomUtil && typeof window.L.DomUtil.getPosition === 'function') {
-        if (!window.L.DomUtil._patchedPosition) {
-            const origGetPosition = window.L.DomUtil.getPosition;
+    if (typeof window.L === 'undefined') return;
+
+    if (window.L.DomUtil && !window.L.DomUtil._patchedPosition) {
+        const origGetPosition = window.L.DomUtil.getPosition;
+        if (typeof origGetPosition === 'function') {
             window.L.DomUtil.getPosition = function (el) {
                 if (!el || typeof el !== 'object') {
-                    return (window.L && window.L.Point) ? new window.L.Point(0, 0) : { x: 0, y: 0 };
+                    const PointClass = (window.L && window.L.Point) ? window.L.Point : function(x, y) { this.x = x || 0; this.y = y || 0; };
+                    return new PointClass(0, 0);
                 }
                 if (!('_leaflet_pos' in el)) {
                     try { el._leaflet_pos = (window.L && window.L.Point) ? new window.L.Point(0, 0) : { x: 0, y: 0 }; } catch (_) {}
@@ -27,11 +30,53 @@ function patchLeafletDomUtil() {
                 try {
                     return origGetPosition.call(window.L.DomUtil, el);
                 } catch (err) {
-                    return (window.L && window.L.Point) ? new window.L.Point(0, 0) : { x: 0, y: 0 };
+                    const PointClass = (window.L && window.L.Point) ? window.L.Point : function(x, y) { this.x = x || 0; this.y = y || 0; };
+                    return new PointClass(0, 0);
                 }
             };
-            window.L.DomUtil._patchedPosition = true;
         }
+
+        const origSetPosition = window.L.DomUtil.setPosition;
+        if (typeof origSetPosition === 'function') {
+            window.L.DomUtil.setPosition = function (el, point) {
+                if (!el) return;
+                try {
+                    return origSetPosition.call(window.L.DomUtil, el, point);
+                } catch (err) {}
+            };
+        }
+        window.L.DomUtil._patchedPosition = true;
+    }
+
+    if (window.L.Map && window.L.Map.prototype && !window.L.Map.prototype._patchedGetMapPanePos) {
+        const origGetMapPanePos = window.L.Map.prototype._getMapPanePos;
+        if (typeof origGetMapPanePos === 'function') {
+            window.L.Map.prototype._getMapPanePos = function () {
+                if (!this._mapPane) {
+                    const PointClass = (window.L && window.L.Point) ? window.L.Point : function(x, y) { this.x = x || 0; this.y = y || 0; };
+                    return new PointClass(0, 0);
+                }
+                try {
+                    return origGetMapPanePos.call(this) || (new ((window.L && window.L.Point) ? window.L.Point : function(x, y) { this.x = x || 0; this.y = y || 0; })(0, 0));
+                } catch (e) {
+                    const PointClass = (window.L && window.L.Point) ? window.L.Point : function(x, y) { this.x = x || 0; this.y = y || 0; };
+                    return new PointClass(0, 0);
+                }
+            };
+        }
+
+        const origZoomTransitionEnd = window.L.Map.prototype._onZoomTransitionEnd;
+        if (typeof origZoomTransitionEnd === 'function') {
+            window.L.Map.prototype._onZoomTransitionEnd = function () {
+                if (!this._mapPane || !this._mapPane.parentNode || !this._container) {
+                    return;
+                }
+                try {
+                    origZoomTransitionEnd.call(this);
+                } catch (e) {}
+            };
+        }
+        window.L.Map.prototype._patchedGetMapPanePos = true;
     }
 }
 patchLeafletDomUtil();
@@ -1429,6 +1474,24 @@ window.openSpotModal = async function openSpotModal(spotId) {
                         <div class="detail-label">Description</div>
                         <p class="description-text">${escapeHtml(spot.description) || 'No description provided.'}</p>
                     </div>
+
+                    ${spot.route_guide ? `
+                        <div class="spot-description-box" style="margin-top: 14px; border-left: 3px solid #2563EB;">
+                            <div class="detail-label" style="display:inline-flex; align-items:center; gap:6px; color:#2563EB; font-weight:700;">
+                                <i class="fas fa-route"></i> ROUTE GUIDE
+                            </div>
+                            <p class="description-text" style="white-space:pre-line; margin-top:6px;">${escapeHtml(spot.route_guide)}</p>
+                        </div>
+                    ` : ''}
+
+                    ${spot.tour_guide_notice ? `
+                        <div class="spot-description-box" style="margin-top: 14px; border-left: 3px solid #0D9488;">
+                            <div class="detail-label" style="display:inline-flex; align-items:center; gap:6px; color:#0D9488; font-weight:700;">
+                                <i class="fas fa-info-circle"></i> TOUR GUIDE NOTICE
+                            </div>
+                            <p class="description-text" style="white-space:pre-line; margin-top:6px;">${escapeHtml(spot.tour_guide_notice)}</p>
+                        </div>
+                    ` : ''}
                 </div>
 
                 <!-- Right Panel (50%): Interactive Image Gallery -->
@@ -2023,7 +2086,9 @@ async function fetchVehicleTypes() {
         window.allVehicleTypes = list;
         renderVehicleTypesOptions();
     } catch (err) {
-        console.error('Failed to fetch vehicle types:', err);
+        if (err?.name !== 'AbortError') {
+            console.error('Failed to fetch vehicle types:', err);
+        }
     }
 }
 
@@ -2362,13 +2427,16 @@ function buildCurrentFormDraftPayload() {
         longitude: lng,
         barangay: barangay,
         description: description,
+        route_guide: document.getElementById('spotRouteGuide')?.value || null,
+        tour_guide_notice: document.getElementById('spotTourGuideNotice')?.value || null,
         municipality_id: municipalityId,
         images: cleanImages,
         opening_time: openingTime,
         closing_time: closingTime,
         is_maintenance: isMaintenance,
         points: points,
-        vehicle_type_ids: getVehicleTypeIdsArray()
+        vehicle_type_ids: getVehicleTypeIdsArray(),
+        service_center_ids: (typeof getServiceCenterIdsArray === 'function') ? getServiceCenterIdsArray() : []
     };
 }
 
@@ -2413,6 +2481,18 @@ function restoreDraftData(draft) {
     if (draft.description) {
         document.getElementById('spotDescription').value = draft.description;
         document.getElementById('descCharCount').textContent = draft.description.length;
+    }
+    if (draft.route_guide) {
+        const rg = document.getElementById('spotRouteGuide');
+        if (rg) rg.value = draft.route_guide;
+        const rgc = document.getElementById('routeGuideCharCount');
+        if (rgc) rgc.textContent = draft.route_guide.length;
+    }
+    if (draft.tour_guide_notice) {
+        const tgn = document.getElementById('spotTourGuideNotice');
+        if (tgn) tgn.value = draft.tour_guide_notice;
+        const tgnc = document.getElementById('tourGuideNoticeCharCount');
+        if (tgnc) tgnc.textContent = draft.tour_guide_notice.length;
     }
 
     const activeMuniId = isMunicipalUser() && window.userMunicipalityId ? window.userMunicipalityId : draft.municipality_id;
@@ -2498,6 +2578,14 @@ function initBlankCreateForm() {
     document.getElementById('spotLongitude').value = '';
     document.getElementById('spotDescription').value = '';
     document.getElementById('descCharCount').textContent = '0';
+    const rgInit = document.getElementById('spotRouteGuide');
+    if (rgInit) rgInit.value = '';
+    const rgInitCount = document.getElementById('routeGuideCharCount');
+    if (rgInitCount) rgInitCount.textContent = '0';
+    const tgnInit = document.getElementById('spotTourGuideNotice');
+    if (tgnInit) tgnInit.value = '';
+    const tgnInitCount = document.getElementById('tourGuideNoticeCharCount');
+    if (tgnInitCount) tgnInitCount.textContent = '0';
 
     const muniGroup = document.getElementById('municipalityFieldGroup');
     const muniSelect = document.getElementById('spotMunicipality');
@@ -2553,11 +2641,20 @@ window.openCreateForm = async function () {
     if (window.userRole === 'picto') return;
     if (window.DraftManager) window.DraftManager.ensureModals();
 
-    const draft = await window.DraftManager?.fetchDraft();
+    if (!window.allServiceCenters || window.allServiceCenters.length === 0) {
+        fetchServiceCenters();
+    }
+
+    const draft = window.DraftManager?.fetchDraft
+        ? (window.DraftManager.isDraftFetched?.()
+            ? window.DraftManager.getCachedDraft()
+            : await window.DraftManager.fetchDraft(false))
+        : null;
+
     if (draft) {
         const modal = document.getElementById('draftFoundModal');
         if (modal) {
-            window.DraftManager.setPendingDraft(draft);
+            window.DraftManager?.setPendingDraft(draft);
             modal.classList.add('active');
 
             const closeBtn = document.getElementById('btnCloseDraftFoundModal');
@@ -2579,9 +2676,8 @@ window.openCreateForm = async function () {
             };
             document.getElementById('btnDeleteDraft').onclick = async () => {
                 modal.classList.remove('active');
-                await window.DraftManager.deleteDraft(draft.id);
+                await window.DraftManager?.deleteDraft(draft.id);
                 if (typeof showToast === 'function') showToast('Draft deleted successfully', 'info');
-                initBlankCreateForm();
             };
             return;
         }
@@ -2648,6 +2744,18 @@ window.editSpot = async function (spotId) {
         document.getElementById('spotLongitude').value = spot.longitude || '';
         document.getElementById('spotDescription').value = spot.description || '';
         document.getElementById('descCharCount').textContent = (spot.description || '').length;
+
+        const routeGuideVal = spot.route_guide || '';
+        const rgEdit = document.getElementById('spotRouteGuide');
+        if (rgEdit) rgEdit.value = routeGuideVal;
+        const rgEditCount = document.getElementById('routeGuideCharCount');
+        if (rgEditCount) rgEditCount.textContent = routeGuideVal.length;
+
+        const tourGuideNoticeVal = spot.tour_guide_notice || '';
+        const tgnEdit = document.getElementById('spotTourGuideNotice');
+        if (tgnEdit) tgnEdit.value = tourGuideNoticeVal;
+        const tgnEditCount = document.getElementById('tourGuideNoticeCharCount');
+        if (tgnEditCount) tgnEditCount.textContent = tourGuideNoticeVal.length;
 
         const muniGroup = document.getElementById('municipalityFieldGroup');
         const muniSelect = document.getElementById('spotMunicipality');
@@ -3025,6 +3133,8 @@ window.submitSpotForm = async function (e) {
         longitude: parseFloat(document.getElementById('spotLongitude').value) || null,
         barangay: document.getElementById('spotBarangay').value || null,
         description: document.getElementById('spotDescription').value,
+        route_guide: document.getElementById('spotRouteGuide')?.value || null,
+        tour_guide_notice: document.getElementById('spotTourGuideNotice')?.value || null,
         municipality_id: (isMunicipalUser() && window.userMunicipalityId)
             ? parseInt(window.userMunicipalityId)
             : parseInt(document.getElementById('spotMunicipality').value),
@@ -3033,7 +3143,8 @@ window.submitSpotForm = async function (e) {
         closing_time: document.getElementById('spotClosingTime').value || null,
         is_maintenance: document.getElementById('spotIsMaintenance').checked ? 1 : 0,
         points: parseInt(pointsValue),
-        vehicle_type_ids: getVehicleTypeIdsArray()
+        vehicle_type_ids: getVehicleTypeIdsArray(),
+        service_center_ids: (typeof getServiceCenterIdsArray === 'function') ? getServiceCenterIdsArray() : []
     };
 
     void 0;
@@ -3242,6 +3353,7 @@ const sortSpotsPendingFirst = (arr) => {
 export async function initializeAll(spotsData, municipalData) {
     loadCachedKpis();
     fetchVehicleTypes();
+    fetchServiceCenters();
 
     // Check window cache first for instantaneous loading
     const cacheKey = '__LUPTO_TOURIST_SPOTS_CACHE__';
@@ -3492,6 +3604,16 @@ export async function initializeAll(spotsData, municipalData) {
     document.getElementById('spotDescription')
         ?.addEventListener('input', function () {
             document.getElementById('descCharCount').textContent = this.value.length;
+        });
+
+    document.getElementById('spotRouteGuide')
+        ?.addEventListener('input', function () {
+            document.getElementById('routeGuideCharCount').textContent = this.value.length;
+        });
+
+    document.getElementById('spotTourGuideNotice')
+        ?.addEventListener('input', function () {
+            document.getElementById('tourGuideNoticeCharCount').textContent = this.value.length;
         });
 
     // Image upload
@@ -4098,3 +4220,385 @@ window.filterTouristSpotsByTab = function(tab) {
     if (typeof renderCardsGrid === 'function') renderCardsGrid(filtered);
     if (typeof renderTableRows === 'function') renderTableRows(filtered);
 };
+
+// ════════════════════════════════════════════════════════════════════════════════
+// SERVICE CENTER — Fetch, Render, Dropdown, Chips & CRUD
+// ════════════════════════════════════════════════════════════════════════════════
+
+window.allServiceCenters = [];
+
+async function fetchServiceCenters() {
+    try {
+        const baseUrl = window.API_CONFIG?.BASE_URL || ('http://' + (window.location.hostname || '127.0.0.1') + ':8000');
+        const res = await window.API_CONFIG.get(`${baseUrl}/api/service-centers`);
+        const list = (res && res.data) ? res.data : (Array.isArray(res) ? res : []);
+        window.allServiceCenters = list;
+        renderServiceCenterOptions();
+    } catch (err) {
+        if (err?.name !== 'AbortError') {
+            console.error('Failed to fetch service centers:', err);
+        }
+    }
+}
+
+function renderServiceCenterOptions() {
+    const container = document.getElementById('serviceCenterOptions');
+    if (!container) return;
+
+    const list = window.allServiceCenters || [];
+    if (list.length === 0) {
+        container.innerHTML = `<div style="padding:10px 14px;font-size:13px;color:#9CA3AF;font-style:italic;">No service centers found. Add one below.</div>`;
+        return;
+    }
+
+    container.innerHTML = list.map(sc => {
+        const displayType = sc.display_type || (sc.type === 'Other' && sc.custom_type ? sc.custom_type : sc.type);
+        return `<label style="display:flex;align-items:center;gap:10px;padding:8px 14px;cursor:pointer;transition:background .15s;font-size:14px;"
+            onmouseenter="this.style.background='#F0FDFA'" onmouseleave="this.style.background='transparent'">
+            <input type="checkbox" class="sc-chk" value="${sc.id}" data-id="${sc.id}" data-name="${escapeHtml(sc.name)}" data-type="${escapeHtml(displayType)}"
+                onchange="window.onServiceCenterChange()" style="accent-color:#1E3A8A;width:15px;height:15px;cursor:pointer;">
+            <i class="fas fa-building" style="width:18px;text-align:center;color:#1E3A8A;font-size:13px;"></i>
+            <div style="display:flex;flex-direction:column;gap:1px;">
+                <span style="font-weight:500;color:#1E293B;">${escapeHtml(sc.name)}</span>
+                <span style="font-size:11px;color:#6B7280;">${escapeHtml(displayType)}</span>
+            </div>
+        </label>`;
+    }).join('');
+}
+
+window.toggleServiceCenterDropdown = function(e) {
+    if (e) e.stopPropagation();
+    const dd = document.getElementById('serviceCenterDropdown');
+    const chevron = document.getElementById('serviceCenterChevron');
+    if (!dd) return;
+    const isVisible = dd.style.display === 'block';
+    dd.style.display = isVisible ? 'none' : 'block';
+    if (chevron) chevron.style.transform = isVisible ? 'rotate(0deg)' : 'rotate(180deg)';
+};
+
+window.onServiceCenterChange = function() {
+    const checkedChks = Array.from(document.querySelectorAll('.sc-chk:checked'));
+    const selectedIds = checkedChks.map(c => parseInt(c.value));
+    const hiddenInput = document.getElementById('serviceCenterIds');
+    if (hiddenInput) hiddenInput.value = selectedIds.join(',');
+
+    const chipsContainer = document.getElementById('serviceCenterChips');
+    if (!chipsContainer) return;
+
+    if (checkedChks.length === 0) {
+        chipsContainer.innerHTML = '<span id="serviceCenterLabel" style="color:#9CA3AF;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Select service centers...</span>';
+    } else {
+        chipsContainer.innerHTML = checkedChks.map(chk => {
+            const id = chk.value;
+            const name = chk.getAttribute('data-name');
+            return `<span class="sc-chip" style="background:#DBEAFE;color:#1e40af;font-size:12px;font-weight:600;padding:3px 9px;border-radius:12px;display:inline-flex;align-items:center;gap:5px;line-height:1.2;">
+                <i class="fas fa-building" style="font-size:10px;"></i>
+                ${escapeHtml(name)}
+                <i class="fas fa-times" style="cursor:pointer;font-size:11px;opacity:0.8;" onclick="window.removeServiceCenterTag(${id}, event)" title="Remove ${escapeHtml(name)}"></i>
+            </span>`;
+        }).join('');
+    }
+};
+
+window.removeServiceCenterTag = function(id, e) {
+    if (e) e.stopPropagation();
+    const chk = document.querySelector(`.sc-chk[value="${id}"]`);
+    if (chk) {
+        chk.checked = false;
+        window.onServiceCenterChange();
+    }
+};
+
+function getServiceCenterIdsArray() {
+    const val = document.getElementById('serviceCenterIds')?.value;
+    return val ? val.split(',').map(s => parseInt(s.trim())).filter(Boolean) : [];
+}
+
+function setServiceCentersFromData(serviceCenters) {
+    if (!window.allServiceCenters || window.allServiceCenters.length === 0) {
+        fetchServiceCenters().then(() => setServiceCentersFromData(serviceCenters));
+        return;
+    }
+    const ids = Array.isArray(serviceCenters)
+        ? serviceCenters.map(v => (typeof v === 'object' && v !== null ? v.id : parseInt(v))).filter(Boolean)
+        : (serviceCenters ? String(serviceCenters).split(',').map(s => parseInt(s.trim())).filter(Boolean) : []);
+
+    document.querySelectorAll('.sc-chk').forEach(chk => {
+        chk.checked = ids.includes(parseInt(chk.value));
+    });
+    window.onServiceCenterChange();
+}
+
+function resetServiceCenterField() {
+    document.querySelectorAll('.sc-chk').forEach(chk => chk.checked = false);
+    window.onServiceCenterChange();
+}
+
+// Close SC dropdown on outside click
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('#serviceCenterBtn') && !e.target.closest('#serviceCenterDropdown')) {
+        const dd = document.getElementById('serviceCenterDropdown');
+        const chevron = document.getElementById('serviceCenterChevron');
+        if (dd) dd.style.display = 'none';
+        if (chevron) chevron.style.transform = '';
+    }
+});
+
+// ── Add New Service Center Modal ─────────────────────────────────────────────
+
+window.onScTypeChange = function() {
+    const type = document.getElementById('scType')?.value;
+    const customField = document.getElementById('scCustomTypeField');
+    if (customField) {
+        customField.style.display = (type === 'Other') ? 'block' : 'none';
+    }
+    if (type !== 'Other') {
+        const customInput = document.getElementById('scCustomType');
+        if (customInput) customInput.value = '';
+    }
+};
+
+window.openAddServiceCenterModal = function() {
+    // Close the SC dropdown first
+    const dd = document.getElementById('serviceCenterDropdown');
+    const chevron = document.getElementById('serviceCenterChevron');
+    if (dd) dd.style.display = 'none';
+    if (chevron) chevron.style.transform = '';
+
+    // Reset the form
+    ['scName', 'scContact', 'scAddress', 'scCustomType'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+    });
+    const typeEl = document.getElementById('scType');
+    if (typeEl) typeEl.value = '';
+    const customField = document.getElementById('scCustomTypeField');
+    if (customField) customField.style.display = 'none';
+    const errEl = document.getElementById('scFormError');
+    if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
+
+    // Update municipality display
+    const muniDisplay = document.getElementById('scMunicipalityDisplay');
+    if (muniDisplay) {
+        muniDisplay.textContent = window.userMunicipalityName || 'Auto-assigned';
+    }
+
+    document.getElementById('addServiceCenterModal')?.classList.add('active');
+};
+
+window.closeAddServiceCenterModal = function() {
+    document.getElementById('addServiceCenterModal')?.classList.remove('active');
+};
+
+window.closeSaveScConfirmModal = function() {
+    document.getElementById('saveScConfirmModal')?.classList.remove('active');
+};
+
+window.promptSaveServiceCenter = function() {
+    const errEl = document.getElementById('scFormError');
+    const name = document.getElementById('scName')?.value.trim();
+    const type = document.getElementById('scType')?.value;
+    const customType = document.getElementById('scCustomType')?.value.trim();
+
+    // Validation
+    if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
+
+    if (!name) {
+        if (errEl) { errEl.textContent = 'Service Center Name is required.'; errEl.style.display = 'block'; }
+        document.getElementById('scName')?.focus();
+        return;
+    }
+    if (!type) {
+        if (errEl) { errEl.textContent = 'Service Center Type is required.'; errEl.style.display = 'block'; }
+        document.getElementById('scType')?.focus();
+        return;
+    }
+    if (type === 'Other' && !customType) {
+        if (errEl) { errEl.textContent = 'Please specify the custom service center type.'; errEl.style.display = 'block'; }
+        document.getElementById('scCustomType')?.focus();
+        return;
+    }
+
+    // Open confirm modal (user stays on form if they choose "No")
+    document.getElementById('saveScConfirmModal')?.classList.add('active');
+};
+
+window.confirmSubmitNewServiceCenter = async function() {
+    const confirmBtn = document.getElementById('confirmSaveScBtn');
+    const confirmBtnIcon = document.getElementById('confirmScBtnIcon');
+    const confirmBtnSpinner = document.getElementById('confirmScBtnSpinner');
+    const confirmBtnLabel = document.getElementById('confirmScBtnLabel');
+    const errEl = document.getElementById('scFormError');
+
+    const name = document.getElementById('scName')?.value.trim();
+    const type = document.getElementById('scType')?.value;
+    const customType = document.getElementById('scCustomType')?.value.trim();
+    const contact = document.getElementById('scContact')?.value.trim();
+    const address = document.getElementById('scAddress')?.value.trim();
+    const status = 'active';
+
+    // Set loading state on confirm button
+    if (confirmBtn) confirmBtn.disabled = true;
+    if (confirmBtnIcon) confirmBtnIcon.style.display = 'none';
+    if (confirmBtnSpinner) confirmBtnSpinner.style.display = 'inline-block';
+    if (confirmBtnLabel) confirmBtnLabel.textContent = 'Saving...';
+
+    try {
+        const baseUrl = window.API_CONFIG?.BASE_URL || ('http://' + (window.location.hostname || '127.0.0.1') + ':8000');
+        const payload = {
+            name,
+            type,
+            custom_type: type === 'Other' ? customType : null,
+            contact_number: contact || null,
+            address: address || null,
+            description: null,
+            status,
+            municipality_id: window.userMunicipalityId ? parseInt(window.userMunicipalityId) : undefined,
+        };
+
+        const res = await window.API_CONFIG.post(`${baseUrl}/api/service-centers`, payload);
+
+        if (res && res.success && res.data) {
+            const newCenter = res.data;
+
+            // Close confirmation modal
+            window.closeSaveScConfirmModal();
+
+            // Add to in-memory list
+            window.allServiceCenters = [...(window.allServiceCenters || []), newCenter];
+
+            // Re-render the dropdown options
+            renderServiceCenterOptions();
+
+            // Auto-select the newly created service center
+            setTimeout(() => {
+                const chk = document.querySelector(`.sc-chk[value="${newCenter.id}"]`);
+                if (chk) {
+                    chk.checked = true;
+                    window.onServiceCenterChange();
+                }
+            }, 50);
+
+            // Close the service center creation modal
+            window.closeAddServiceCenterModal();
+
+            showToast(`Service center "${newCenter.name}" created and selected successfully!`, 'success');
+        } else {
+            // If failed, close confirm modal and stay on the service center form modal with error message
+            window.closeSaveScConfirmModal();
+            const errMsg = res?.message || res?.error || 'Failed to create service center.';
+            if (errEl) { errEl.textContent = errMsg; errEl.style.display = 'block'; }
+        }
+    } catch (err) {
+        console.error('Error creating service center:', err);
+        window.closeSaveScConfirmModal();
+        const errMsg = err?.message || 'An error occurred. Please try again.';
+        if (errEl) { errEl.textContent = errMsg; errEl.style.display = 'block'; }
+    } finally {
+        if (confirmBtn) confirmBtn.disabled = false;
+        if (confirmBtnIcon) confirmBtnIcon.style.display = 'inline-block';
+        if (confirmBtnSpinner) confirmBtnSpinner.style.display = 'none';
+        if (confirmBtnLabel) confirmBtnLabel.textContent = 'Yes';
+    }
+};
+
+window.submitNewServiceCenter = window.promptSaveServiceCenter;
+
+// ── Integrate SC into existing form flows ─────────────────────────────────────
+
+// Patch initBlankCreateForm to also reset the SC field
+const _origInitBlankCreateForm = window.initBlankCreateForm;
+if (typeof _origInitBlankCreateForm === 'undefined') {
+    // If initBlankCreateForm is not yet window-exposed, patch after load
+    document.addEventListener('DOMContentLoaded', () => patchInitBlankCreateForm());
+} else {
+    patchInitBlankCreateForm();
+}
+
+function patchInitBlankCreateForm() {
+    // Patch the pendingSaveData construction to include service_center_ids
+    // We hook into the 'spotForm' submit to inject the IDs
+    const spotForm = document.getElementById('spotForm');
+    if (spotForm && !spotForm.dataset.scHooked) {
+        spotForm.dataset.scHooked = 'true';
+    }
+}
+
+// Patch pendingSaveData to include service_center_ids by intercepting confirmSaveSpot
+const _origConfirmSaveSpot = window.confirmSaveSpot;
+window.confirmSaveSpot = async function() {
+    // Ensure service_center_ids is in the pending save data
+    if (window.pendingSaveData) {
+        window.pendingSaveData.service_center_ids = getServiceCenterIdsArray();
+    }
+    if (typeof _origConfirmSaveSpot === 'function') {
+        return _origConfirmSaveSpot.apply(this, arguments);
+    }
+};
+
+// Patch the form submit handler (handleSpotFormSubmit) to add SC IDs before building pendingSaveData
+document.addEventListener('DOMContentLoaded', function() {
+    // Fetch service centers on page load
+    fetchServiceCenters();
+
+    // Intercept the spot form submit to inject service_center_ids into pendingSaveData
+    const originalSubmitFn = window.handleSpotFormSubmit;
+    if (typeof originalSubmitFn === 'function') {
+        window.handleSpotFormSubmit = function(e) {
+            originalSubmitFn.call(this, e);
+        };
+    }
+});
+
+
+
+// Patch editSpot to also populate SC on load
+const _origEditSpot = window.editSpot;
+if (typeof _origEditSpot === 'function') {
+    window.editSpot = async function(spotId) {
+        await fetchServiceCenters();
+        await _origEditSpot.call(this, spotId);
+        // After edit form is populated, set service centers from spot data
+        setTimeout(() => {
+            const spot = window.touristSpotsAll?.find(s => s.id == spotId);
+            if (spot) {
+                const scs = spot.service_centers || spot.serviceCenters || [];
+                if (scs.length) setServiceCentersFromData(scs);
+            }
+        }, 100);
+    };
+}
+
+// Intercept the save form data building to add service_center_ids
+// Override the pendingSaveData build by patching where it's set
+(function patchSaveDataBuilder() {
+    // After the 'spotForm' submit fires, we inject service_center_ids
+    document.addEventListener('submit', function(e) {
+        if (e.target && e.target.id === 'spotForm') {
+            // Inject into pending save data once it's built (slight delay)
+            setTimeout(() => {
+                if (window.pendingSaveData && !window.pendingSaveData.service_center_ids) {
+                    window.pendingSaveData.service_center_ids = getServiceCenterIdsArray();
+                }
+            }, 0);
+        }
+    }, true);
+})();
+
+// Reset SC field when blank create form is initialized
+const _origInitBlank = window.initBlankCreateForm;
+if (typeof _origInitBlank === 'function') {
+    window.initBlankCreateForm = function() {
+        _origInitBlank.apply(this, arguments);
+        resetServiceCenterField();
+    };
+}
+
+// Export so test environments can access
+if (typeof window !== 'undefined') {
+    window.fetchServiceCenters = fetchServiceCenters;
+    window.renderServiceCenterOptions = renderServiceCenterOptions;
+    window.setServiceCentersFromData = setServiceCentersFromData;
+    window.resetServiceCenterField = resetServiceCenterField;
+    window.getServiceCenterIdsArray = getServiceCenterIdsArray;
+}

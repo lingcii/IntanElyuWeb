@@ -251,14 +251,8 @@ const baseUrl = USE_RAILWAY
         async fetch(url, options = {}) {
             const method = (options.method || 'GET').toUpperCase();
 
-            // Write requests (POST, PUT, DELETE, PATCH) invalidate all active GET requests
+            // Write requests (POST, PUT, DELETE, PATCH) execute directly without aborting unrelated background GETs
             if (method !== 'GET' && method !== 'HEAD') {
-                for (const key of Object.keys(this.activeRequests)) {
-                    try {
-                        this.activeRequests[key].controller.abort();
-                    } catch (e) {}
-                    delete this.activeRequests[key];
-                }
                 return this._executeFetch(url, options);
             }
 
