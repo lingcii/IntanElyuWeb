@@ -13,6 +13,9 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // Trust all reverse proxies (Railway, Cloudflare, AWS load balancers) so HTTPS is properly detected
+        $middleware->trustProxies(at: '*');
+
         // Register CORS globally so error responses & preflights always include CORS headers
         // Fix #7: SecurityHeaders adds HTTP security headers to every response
         $middleware->use([
