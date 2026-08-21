@@ -345,6 +345,7 @@
             flex-direction: column;
             align-items: center;
             gap: 5px;
+            width: 100%;
         }
         .footer-msg {
             display: flex;
@@ -362,6 +363,48 @@
             font-size: 13px;
             font-weight: 700;
             color: #1D4ED8;
+            margin-bottom: 8px;
+        }
+
+        /* ── PICTO Administrator Login Pill Button ── */
+        .picto-admin-login-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 9px;
+            padding: 8px 22px;
+            background: #EEF5FF;
+            border: 1.5px solid #BFDBFE;
+            border-radius: 9999px;
+            color: #2563EB;
+            font-family: var(--font-body);
+            font-size: 13.5px;
+            font-weight: 600;
+            text-decoration: none;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(37, 99, 235, 0.08);
+            transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+            margin-top: 4px;
+        }
+        .picto-admin-login-btn i {
+            font-size: 15px;
+            color: #2563EB;
+            transition: transform 0.2s ease, color 0.2s ease;
+        }
+        .picto-admin-login-btn:hover {
+            background: #DBEAFE;
+            border-color: #93C5FD;
+            color: #1D4ED8;
+            box-shadow: 0 4px 14px rgba(37, 99, 235, 0.18);
+            transform: translateY(-1.5px);
+        }
+        .picto-admin-login-btn:hover i {
+            color: #1D4ED8;
+            transform: scale(1.08);
+        }
+        .picto-admin-login-btn:active {
+            transform: translateY(0) scale(0.98);
+            box-shadow: 0 1px 4px rgba(37, 99, 235, 0.12);
         }
 
         /* ── Responsive Styling ── */
@@ -406,6 +449,11 @@
             }
             .brand-title {
                 font-size: 22px;
+            }
+            .picto-admin-login-btn {
+                padding: 7px 18px;
+                font-size: 12.5px;
+                gap: 8px;
             }
         }
    

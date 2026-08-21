@@ -325,6 +325,12 @@ $apiBase = 'http://127.0.0.1:8000';
                     <div class="footer-org">
                         La Union Tourism Management System
                     </div>
+
+                    <!-- PICTO Administrator Login Pill Button -->
+                    <a href="../login.php?admin=1" class="picto-admin-login-btn" id="pictoAdminLoginBtn" title="PICTO Administrator Login">
+                        <i class="fas fa-user-shield"></i>
+                        <span>PICTO Administrator Login</span>
+                    </a>
                 </div>
 
             </div>
