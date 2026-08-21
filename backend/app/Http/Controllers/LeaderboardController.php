@@ -4,22 +4,69 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class LeaderboardController extends Controller
 {
+    /**
+     * Clear all leaderboard cache instances instantly across all pages, sorts, and KPIs.
+     */
+    public static function clearCache(): void
+    {
+        Cache::forget('leaderboard:top3');
+        Cache::forget('leaderboard:kpis');
+
+        // Increment cache version so all paginated/filtered cache entries are invalidated immediately
+        $version = (int) Cache::get('leaderboard:cache_version', 1) + 1;
+        Cache::forever('leaderboard:cache_version', $version);
+    }
+
+    /**
+     * Build the Common Table Expression (CTE) for the Leaderboard.
+     * 
+     * Guarantees:
+     * 1. EXACTLY ONE row per active tourist user (unique by u.id).
+     * 2. Points and completed activities from all records are properly aggregated (SUM / COALESCE).
+     * 3. Excludes inactive, deactivated, pending, deleted, or archived users.
+     * 4. Count of active tourists matches User Management 1:1.
+     */
     private function rankedCte(): string
     {
-        $hasTotalPts = \Illuminate\Support\Facades\Schema::hasColumn('user_points', 'total_points');
-        $hasPts = \Illuminate\Support\Facades\Schema::hasColumn('user_points', 'points');
-        $ptsExpr = $hasTotalPts ? 'up.total_points' : ($hasPts ? 'up.points' : '0');
+        $hasDeletedAt    = Schema::hasColumn('users', 'deleted_at');
+        $deletedAtClause = $hasDeletedAt ? ' AND u.deleted_at IS NULL' : '';
 
-        $hasCompActInUp = \Illuminate\Support\Facades\Schema::hasColumn('user_points', 'completed_activities');
-        $hasCompActInU  = \Illuminate\Support\Facades\Schema::hasColumn('users', 'completed_activities');
-        $actExpr = $hasCompActInUp ? 'up.completed_activities' : ($hasCompActInU ? 'u.completed_activities' : '0');
+        $hasUserPoints = Schema::hasTable('user_points');
 
-        $hasPtsSince = \Illuminate\Support\Facades\Schema::hasColumn('user_points', 'points_since');
-        $sinceExpr = $hasPtsSince ? 'up.points_since' : 'u.created_at';
+        if ($hasUserPoints) {
+            $hasTotalPts = Schema::hasColumn('user_points', 'total_points');
+            $hasPts      = Schema::hasColumn('user_points', 'points');
+            $ptsCol      = $hasTotalPts ? 'total_points' : ($hasPts ? 'points' : '0');
+            $hasCompAct  = Schema::hasColumn('user_points', 'completed_activities');
+            $actCol      = $hasCompAct ? 'completed_activities' : '0';
+            $sinceCol    = Schema::hasColumn('user_points', 'points_since') ? 'points_since' : 'created_at';
+
+            $ptsJoin = "
+                LEFT JOIN (
+                    SELECT
+                        user_id,
+                        SUM(COALESCE({$ptsCol}, 0))                   AS total_points,
+                        SUM(COALESCE({$actCol}, 0))                   AS completed_activities,
+                        MIN(COALESCE({$sinceCol}, NOW()))             AS points_since
+                    FROM user_points
+                    GROUP BY user_id
+                ) pts ON pts.user_id = u.id
+            ";
+            $ptsExpr   = "COALESCE(pts.total_points, u.points, 0)";
+            $actExpr   = "COALESCE(pts.completed_activities, u.completed_activities, 0)";
+            $sinceExpr = "COALESCE(pts.points_since, u.created_at)";
+        } else {
+            $ptsJoin   = "";
+            $ptsExpr   = "COALESCE(u.points, 0)";
+            $actExpr   = "COALESCE(u.completed_activities, 0)";
+            $sinceExpr = "u.created_at";
+        }
 
         return "
             WITH ranked AS (
@@ -30,27 +77,31 @@ class LeaderboardController extends Controller
                     u.avatar                                          AS avatar,
                     m.name                                            AS municipality_name,
                     u.last_activity                                   AS last_activity_date,
-                    COALESCE({$ptsExpr}, 0)                           AS total_points,
-                    COALESCE({$actExpr}, 0)                           AS completed_activities,
-                    COALESCE({$sinceExpr}, u.created_at)              AS points_since,
+                    {$ptsExpr}                                        AS total_points,
+                    {$actExpr}                                        AS completed_activities,
+                    {$sinceExpr}                                      AS points_since,
                     0                                                 AS spots_managed,
                     ROW_NUMBER() OVER (
                         ORDER BY
-                            COALESCE({$ptsExpr}, 0)                    DESC,
-                            COALESCE({$actExpr}, 0)                    DESC,
-                            COALESCE({$sinceExpr}, u.created_at)       ASC
+                            {$ptsExpr}                                DESC,
+                            {$actExpr}                                DESC,
+                            {$sinceExpr}                              ASC,
+                            u.id                                      ASC
                     ) AS user_rank
                 FROM users u
-                LEFT JOIN user_points up ON up.user_id = u.id
+                {$ptsJoin}
                 LEFT JOIN municipalities m ON m.id = u.municipality_id
-                WHERE u.role = 'tourist' AND u.status = 'active'
+                WHERE u.role = 'tourist'
+                  AND u.status = 'active'
+                  {$deletedAtClause}
             )
         ";
     }
 
     public function top3(): JsonResponse
     {
-        $rows = \Illuminate\Support\Facades\Cache::remember('leaderboard:top3', 60, function () {
+        $version = Cache::get('leaderboard:cache_version', 1);
+        $rows = Cache::remember("leaderboard:v{$version}:top3", 60, function () {
             $rows = DB::select($this->rankedCte() . 'SELECT * FROM ranked WHERE user_rank <= 3 ORDER BY user_rank ASC');
             return $this->castRows($rows);
         });
@@ -60,31 +111,56 @@ class LeaderboardController extends Controller
 
     public function kpis(): JsonResponse
     {
-        $kpis = \Illuminate\Support\Facades\Cache::remember('leaderboard:kpis', 60, function () {
-            $hasTotalPts = \Illuminate\Support\Facades\Schema::hasColumn('user_points', 'total_points');
-            $hasPts = \Illuminate\Support\Facades\Schema::hasColumn('user_points', 'points');
-            $ptsExpr = $hasTotalPts ? 'up.total_points' : ($hasPts ? 'up.points' : '0');
+        $version = Cache::get('leaderboard:cache_version', 1);
+        $kpis = Cache::remember("leaderboard:v{$version}:kpis", 60, function () {
+            $hasDeletedAt    = Schema::hasColumn('users', 'deleted_at');
+            $deletedAtClause = $hasDeletedAt ? ' AND u.deleted_at IS NULL' : '';
 
-            $hasCompActInUp = \Illuminate\Support\Facades\Schema::hasColumn('user_points', 'completed_activities');
-            $hasCompActInU  = \Illuminate\Support\Facades\Schema::hasColumn('users', 'completed_activities');
-            $actExpr = $hasCompActInUp ? 'up.completed_activities' : ($hasCompActInU ? 'u.completed_activities' : '0');
+            $hasUserPoints = Schema::hasTable('user_points');
+
+            if ($hasUserPoints) {
+                $hasTotalPts = Schema::hasColumn('user_points', 'total_points');
+                $hasPts      = Schema::hasColumn('user_points', 'points');
+                $ptsCol      = $hasTotalPts ? 'total_points' : ($hasPts ? 'points' : '0');
+                $hasCompAct  = Schema::hasColumn('user_points', 'completed_activities');
+                $actCol      = $hasCompAct ? 'completed_activities' : '0';
+
+                $ptsJoin = "
+                    LEFT JOIN (
+                        SELECT
+                            user_id,
+                            SUM(COALESCE({$ptsCol}, 0))               AS total_points,
+                            SUM(COALESCE({$actCol}, 0))               AS completed_activities
+                        FROM user_points
+                        GROUP BY user_id
+                    ) pts ON pts.user_id = u.id
+                ";
+                $ptsExpr = "COALESCE(pts.total_points, u.points, 0)";
+                $actExpr = "COALESCE(pts.completed_activities, u.completed_activities, 0)";
+            } else {
+                $ptsJoin = "";
+                $ptsExpr = "COALESCE(u.points, 0)";
+                $actExpr = "COALESCE(u.completed_activities, 0)";
+            }
 
             $kpi = DB::selectOne("
                 SELECT
-                    COUNT(u.id)                               AS total_users,
-                    COALESCE(SUM({$ptsExpr}), 0)              AS grand_points,
-                    COALESCE(SUM({$actExpr}), 0)              AS total_activities,
-                    COALESCE(MAX({$ptsExpr}), 0)              AS highest_points
+                    COUNT(u.id)                                                AS total_users,
+                    COALESCE(SUM({$ptsExpr}), 0)                               AS grand_points,
+                    COALESCE(SUM({$actExpr}), 0)                               AS total_activities,
+                    COALESCE(MAX({$ptsExpr}), 0)                               AS highest_points
                 FROM users u
-                LEFT JOIN user_points up ON up.user_id = u.id
-                WHERE u.role = 'tourist' AND u.status = 'active'
+                {$ptsJoin}
+                WHERE u.role = 'tourist'
+                  AND u.status = 'active'
+                  {$deletedAtClause}
             ");
 
             return [
-                'total_users'      => (int) $kpi->total_users,
-                'grand_points'     => (int) $kpi->grand_points,
-                'total_activities' => (int) $kpi->total_activities,
-                'highest_points'   => (int) $kpi->highest_points,
+                'total_users'      => (int) ($kpi->total_users ?? 0),
+                'grand_points'     => (int) ($kpi->grand_points ?? 0),
+                'total_activities' => (int) ($kpi->total_activities ?? 0),
+                'highest_points'   => (int) ($kpi->highest_points ?? 0),
             ];
         });
 
@@ -93,15 +169,15 @@ class LeaderboardController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $search  = $request->get('search', '');
+        $search  = trim((string) $request->get('search', ''));
         $sortBy  = $request->get('sort', 'points_desc');
         $show    = $request->get('show', '100');
 
         $orderMap = [
-            'points_desc'     => 'total_points DESC, completed_activities DESC, points_since ASC',
-            'points_asc'      => 'total_points ASC, completed_activities ASC, points_since DESC',
-            'activities_desc' => 'completed_activities DESC, total_points DESC, points_since ASC',
-            'name_asc'        => 'full_name ASC',
+            'points_desc'     => 'total_points DESC, completed_activities DESC, points_since ASC, user_id ASC',
+            'points_asc'      => 'total_points ASC, completed_activities ASC, points_since DESC, user_id ASC',
+            'activities_desc' => 'completed_activities DESC, total_points DESC, points_since ASC, user_id ASC',
+            'name_asc'        => 'full_name ASC, user_id ASC',
         ];
         $orderSql = $orderMap[$sortBy] ?? $orderMap['points_desc'];
 
@@ -115,16 +191,16 @@ class LeaderboardController extends Controller
         $whereClause = '';
         $params      = [];
 
-        if ($request->filled('search')) {
-            $search = $request->get('search');
+        if ($search !== '') {
             $castType = DB::getDriverName() === 'pgsql' ? 'VARCHAR' : 'CHAR';
             $whereClause = "WHERE full_name LIKE ? OR CAST(user_id AS {$castType}) LIKE ?";
             $params      = ["%{$search}%", "%{$search}%"];
         }
 
-        $cacheKey = "leaderboard:index:{$search}:{$sortBy}:{$show}:{$offset}";
+        $version = Cache::get('leaderboard:cache_version', 1);
+        $cacheKey = "leaderboard:v{$version}:index:{$search}:{$sortBy}:{$show}:{$offset}";
 
-        $cachedData = \Illuminate\Support\Facades\Cache::remember($cacheKey, 60, function () use ($whereClause, $params, $orderSql, $limit, $offset, $show) {
+        $cachedData = Cache::remember($cacheKey, 60, function () use ($whereClause, $params, $orderSql, $limit, $offset, $show) {
             $total = DB::selectOne($this->rankedCte() . "SELECT COUNT(*) as cnt FROM ranked {$whereClause}", $params)->cnt;
 
             $sql = $this->rankedCte() . "SELECT * FROM ranked {$whereClause} ORDER BY {$orderSql}";

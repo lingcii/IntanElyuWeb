@@ -15,6 +15,17 @@ class UserPoint extends Model
         'description',
     ];
 
+    protected static function booted(): void
+    {
+        static::saved(function () {
+            \App\Http\Controllers\LeaderboardController::clearCache();
+        });
+
+        static::deleted(function () {
+            \App\Http\Controllers\LeaderboardController::clearCache();
+        });
+    }
+
     public function user()
     {
         return $this->belongsTo(User::class);

@@ -840,12 +840,21 @@
             }
         });
 
+        // Invalidate frontend Leaderboard cache so stale rankings are never shown
+        if (window.__LB_LUPTO_CACHE__) {
+            window.__LB_LUPTO_CACHE__ = { data: null, timestamp: 0, kpis: null, total: 0 };
+        }
+
         if (typeof window.softRefreshDashboard === 'function') {
             window.softRefreshDashboard();
         }
 
         if (typeof window.refreshTable === 'function') {
             window.refreshTable();
+        }
+
+        if (typeof window.refreshLeaderboard === 'function') {
+            window.refreshLeaderboard();
         }
     };
 

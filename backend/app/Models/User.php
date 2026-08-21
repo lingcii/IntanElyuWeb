@@ -40,6 +40,17 @@ class User extends Authenticatable
         'is_default_password' => 'boolean',
     ];
 
+    protected static function booted(): void
+    {
+        static::saved(function ($user) {
+            \App\Http\Controllers\LeaderboardController::clearCache();
+        });
+
+        static::deleted(function ($user) {
+            \App\Http\Controllers\LeaderboardController::clearCache();
+        });
+    }
+
     /** Valid roles in the system */
     public static array $ALL_ROLES = [
         'picto', 'lupto', 'municipal', 'tourist',

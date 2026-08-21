@@ -235,9 +235,7 @@ class UserController extends Controller
             $request
         );
 
-        Cache::forget('users:role_stats');
-        Cache::forget('users:stats');
-        Cache::forget('activity_stats');
+        $this->clearUserAndLeaderboardCache();
 
         // ── Send welcome email ────────────────────────────────────────────────
         $emailSent  = false;
@@ -317,9 +315,7 @@ class UserController extends Controller
             $request
         );
 
-        Cache::forget('users:role_stats');
-        Cache::forget('users:stats');
-        Cache::forget('activity_stats');
+        $this->clearUserAndLeaderboardCache();
 
         return response()->json(['success' => true, 'user' => $user, 'message' => 'User updated successfully.']);
     }
@@ -350,9 +346,7 @@ class UserController extends Controller
             $request
         );
 
-        Cache::forget('users:role_stats');
-        Cache::forget('users:stats');
-        Cache::forget('activity_stats');
+        $this->clearUserAndLeaderboardCache();
 
         try {
             NotificationService::notify(
@@ -442,9 +436,7 @@ class UserController extends Controller
             $request
         );
 
-        Cache::forget('users:role_stats');
-        Cache::forget('users:stats');
-        Cache::forget('activity_stats');
+        $this->clearUserAndLeaderboardCache();
 
         return response()->json(['success' => true, 'message' => 'User deleted successfully.']);
     }
@@ -476,9 +468,7 @@ class UserController extends Controller
             $request
         );
 
-        Cache::forget('users:role_stats');
-        Cache::forget('users:stats');
-        Cache::forget('activity_stats');
+        $this->clearUserAndLeaderboardCache();
 
         return response()->json(['success' => true, 'message' => 'User archived successfully.']);
     }
@@ -505,9 +495,7 @@ class UserController extends Controller
             $request
         );
 
-        Cache::forget('users:role_stats');
-        Cache::forget('users:stats');
-        Cache::forget('activity_stats');
+        $this->clearUserAndLeaderboardCache();
 
         return response()->json(['success' => true, 'message' => 'User restored successfully.']);
     }
@@ -515,6 +503,19 @@ class UserController extends Controller
     // ──────────────────────────────────────────────────────────────────────────
     //  Helpers
     // ──────────────────────────────────────────────────────────────────────────
+
+    private function clearUserAndLeaderboardCache(): void
+    {
+        Cache::forget('users:stats:all');
+        Cache::forget('users:stats:lupto');
+        Cache::forget('users:role_stats:all');
+        Cache::forget('users:role_stats:lupto');
+        Cache::forget('users:role_stats');
+        Cache::forget('users:stats');
+        Cache::forget('activity_stats');
+
+        LeaderboardController::clearCache();
+    }
 
     private function writeAuditLog(Request $request, string $action, int $targetId, string $details): void
     {

@@ -23,8 +23,8 @@ $extraHeadContent = ob_get_clean();
 
 ob_start();
 ?>
-  <!-- Summary Cards -->
-    <div class="lupto-kpi-grid" style="grid-template-columns: repeat(5, 1fr);">
+    <!-- Summary Cards -->
+    <div class="lupto-kpi-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
         <div class="lupto-kpi-card" data-kpi="total-spots">
             <div class="lupto-kpi-info">
                 <h4>Total Tourist Sites</h4>
@@ -56,6 +56,14 @@ ob_start();
                 <span class="lupto-kpi-trend trend-down" id="kpi-trend-declined"><i class="fas fa-times"></i> Rejected</span>
             </div>
             <div class="lupto-kpi-icon bg-red" style="background: linear-gradient(135deg, #FEE2E2, #FECACA); color: #DC2626;"><i class="fas fa-circle-xmark"></i></div>
+        </div>
+        <div class="lupto-kpi-card" data-kpi="emerging-spots">
+            <div class="lupto-kpi-info">
+                <h4>Total Emerging Tourist Sites</h4>
+                <span class="lupto-kpi-value"><i class="fas fa-spinner fa-spin" style="font-size:16px;color:#9CA3AF;"></i></span>
+                <span class="lupto-kpi-trend trend-up" id="kpi-trend-emerging" style="color: #7C3AED; background: #F3E8FF;"><i class="fas fa-seedling"></i> Emerging</span>
+            </div>
+            <div class="lupto-kpi-icon" style="background: linear-gradient(135deg, #EDE9FE, #DDD6FE); color: #7C3AED;"><i class="fas fa-seedling"></i></div>
         </div>
         <div class="lupto-kpi-card" data-kpi="most-visited-category">
             <div class="lupto-kpi-info">

@@ -12,6 +12,7 @@
 
     // Expose immediately for state restoration and event handlers to avoid race conditions
     window.refreshLeaderboard = refreshLeaderboard;
+    window.softRefreshLeaderboard = refreshLeaderboard;
     window.refreshAll = refreshLeaderboard;
     window.debouncedSearch = debouncedSearch;
     window.applyFilters = applyFilters;
@@ -85,14 +86,22 @@
         if (_intervalId) { clearInterval(_intervalId); _intervalId = null; }
     }
 
-    async function refreshLeaderboard() {
+    async function refreshLeaderboard(bypassCache = true) {
         window.refreshLeaderboard = refreshLeaderboard;
+        window.softRefreshLeaderboard = refreshLeaderboard;
         const icon = document.getElementById('refreshIcon');
         if (icon) icon.classList.add('fa-spin');
         _currentPage = 1;
 
+        if (bypassCache) {
+            _dirty = true;
+            if (window.__LB_LUPTO_CACHE__) {
+                window.__LB_LUPTO_CACHE__ = { data: null, timestamp: 0, kpis: null, total: 0 };
+            }
+        }
+
         const cache = window.__LB_LUPTO_CACHE__;
-        const canUseCache = !_dirty && cache.data && cache.timestamp && (Date.now() - cache.timestamp < CACHE_TTL);
+        const canUseCache = !bypassCache && !_dirty && cache.data && cache.timestamp && (Date.now() - cache.timestamp < CACHE_TTL);
 
         if (canUseCache) {
             if (cache.kpis) {

@@ -844,6 +844,9 @@ function confirmArchiveUser(id, name) {
         try {
             await apiFetch('archive_user', { id }, 'PATCH');
             await loadUsers();
+            if (typeof window.notifyUserChanged === 'function') {
+                window.notifyUserChanged();
+            }
             showToast('success', 'User archived successfully.');
         } catch (err) {
             showToast('error', err.message);
@@ -865,6 +868,9 @@ function confirmRestoreUser(id, name) {
         try {
             await apiFetch('restore_user', { id }, 'PATCH');
             await loadUsers();
+            if (typeof window.notifyUserChanged === 'function') {
+                window.notifyUserChanged();
+            }
             showToast('success', 'User restored successfully.');
         } catch (err) {
             showToast('error', err.message);
@@ -893,6 +899,9 @@ function confirmDeleteUser(id, name) {
                 setTimeout(() => { row.remove(); _totalRows--; updateTableCount(document.querySelectorAll('tr[data-user-id]').length, _totalRows); }, 300);
             }
             await loadUsers();
+            if (typeof window.notifyUserChanged === 'function') {
+                window.notifyUserChanged();
+            }
             showToast('success', 'User deleted permanently.');
         } catch (err) {
             showToast('error', err.message);

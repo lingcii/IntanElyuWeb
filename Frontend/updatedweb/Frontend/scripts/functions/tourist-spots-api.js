@@ -3737,10 +3737,25 @@ function populateMuniDropdowns(municipalData) {
 
 function updateKpiCards(spotsData, municipalData) {
     const container = document.getElementById('spa-tab-tourist-spots.php') || document;
-    const approved = spotsData.filter(s => (s.status || '') === 'approved' || (s.status || '') === 'EXIST' || (s.status || '') === 'EXISTING').length;
+    const approved = spotsData.filter(s => {
+        const st = (s.status || '').toLowerCase();
+        return st === 'approved' || st === 'exist' || st === 'existing';
+    }).length;
     const total = approved;
-    const pending = spotsData.filter(s => (s.status || '') === 'pending').length;
-    const declined = spotsData.filter(s => (s.status || '') === 'rejected').length;
+    const pending = spotsData.filter(s => (s.status || '').toLowerCase() === 'pending').length;
+    const declined = spotsData.filter(s => {
+        const st = (s.status || '').toLowerCase();
+        return st === 'rejected' || st === 'declined';
+    }).length;
+
+    // Emerging + Approved only (Pending, Declined, Rejected, Draft must NEVER be counted)
+    const emerging = spotsData.filter(s => {
+        const st = (s.status || '').toLowerCase();
+        const isApproved = st === 'approved' || st === 'exist' || st === 'existing';
+        const rawClass = (s.classification_status || s.classification || '').toUpperCase();
+        const isEmerging = rawClass === 'EMERGE' || rawClass === 'EMERGING';
+        return isApproved && isEmerging;
+    }).length;
 
     // Compute most visited category
     const catCounts = {};
@@ -3758,12 +3773,14 @@ function updateKpiCards(spotsData, municipalData) {
     const elApproved = container.querySelector('[data-kpi="approved-spots"] .lupto-kpi-value');
     const elPending = container.querySelector('[data-kpi="pending-spots"] .lupto-kpi-value');
     const elDeclined = container.querySelector('[data-kpi="declined-spots"] .lupto-kpi-value');
+    const elEmerging = container.querySelector('[data-kpi="emerging-spots"] .lupto-kpi-value');
     const elCategory = container.querySelector('[data-kpi="most-visited-category"] .lupto-kpi-value');
 
     if (elTotal) { window.animateKpiValue(elTotal, total); elTotal.style.color = ''; }
     if (elApproved) { window.animateKpiValue(elApproved, approved); elApproved.style.color = ''; }
     if (elPending) { window.animateKpiValue(elPending, pending); elPending.style.color = ''; }
     if (elDeclined) { window.animateKpiValue(elDeclined, declined); elDeclined.style.color = ''; }
+    if (elEmerging) { window.animateKpiValue(elEmerging, emerging); elEmerging.style.color = ''; }
     if (elCategory) { window.animateKpiValue(elCategory, topCategory); elCategory.style.color = ''; }
 
     // Update trend subtexts with real-time counts
@@ -3771,17 +3788,19 @@ function updateKpiCards(spotsData, municipalData) {
     const trendApproved = container.querySelector('#kpi-trend-approved');
     const trendPending = container.querySelector('#kpi-trend-pending');
     const trendDeclined = container.querySelector('#kpi-trend-declined');
+    const trendEmerging = container.querySelector('#kpi-trend-emerging');
     const trendCategory = container.querySelector('#kpi-trend-category');
     if (trendTotal) trendTotal.innerHTML = '<i class="fas fa-layer-group"></i> Approved spots';
     if (trendApproved) trendApproved.innerHTML = '<i class="fas fa-check"></i> ' + approved + ' approved';
     if (trendPending) trendPending.innerHTML = '<i class="fas fa-clock"></i> ' + pending + ' pending';
     if (trendDeclined) trendDeclined.innerHTML = '<i class="fas fa-times"></i> ' + declined + ' rejected';
+    if (trendEmerging) trendEmerging.innerHTML = '<i class="fas fa-seedling"></i> ' + emerging + ' emerging';
     if (trendCategory) trendCategory.innerHTML = '<i class="fas fa-crown"></i> ' + topCatCount + ' spots';
 
     const spotCount = container.querySelector('#spotCount');
     if (spotCount) spotCount.textContent = total;
 
-    try { sessionStorage.setItem('ts_kpis_lupto', JSON.stringify({ total, approved, pending, declined, topCategory, topCatCount })); } catch (e) { }
+    try { sessionStorage.setItem('ts_kpis_lupto', JSON.stringify({ total, approved, pending, declined, emerging, topCategory, topCatCount })); } catch (e) { }
 }
 
 function loadCachedKpis() {
