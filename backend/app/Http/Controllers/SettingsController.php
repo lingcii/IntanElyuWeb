@@ -9,6 +9,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Carbon;
 
 class SettingsController extends Controller
 {
@@ -96,6 +97,93 @@ class SettingsController extends Controller
             'success'          => true,
             'message'          => 'Password updated.',
             'first_time_reset' => $wasDefault ? true : false,
+        ]);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  Maintenance Mode (PICTO-only)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * GET /api/pitco/settings/maintenance
+     * GET /api/system/maintenance-status  (public)
+     */
+    public function getMaintenanceStatus(Request $request): JsonResponse
+    {
+        $data = Cache::get('maintenance_mode');
+
+        if (!$data) {
+            return response()->json([
+                'success'     => true,
+                'maintenance' => false,
+            ]);
+        }
+
+        return response()->json([
+            'success'      => true,
+            'maintenance'  => true,
+            'activated_at' => $data['activated_at'] ?? null,
+            'activated_by' => $data['activated_by'] ?? null,
+        ]);
+    }
+
+    /**
+     * POST /api/pitco/settings/maintenance/activate
+     */
+    public function activateMaintenance(Request $request): JsonResponse
+    {
+        $userRole = $request->session()->get('user_role');
+        if (!in_array($userRole, ['picto', 'pitco'])) {
+            return response()->json(['error' => 'Forbidden.'], 403);
+        }
+
+        Cache::forever('maintenance_mode', [
+            'active'       => true,
+            'activated_at' => Carbon::now()->toISOString(),
+            'activated_by' => $request->session()->get('user_name', 'Unknown'),
+        ]);
+        Cache::forget('activity_stats');
+
+        ActivityLogService::log(
+            ActivityAction::MAINTENANCE_ACTIVATED,
+            'Settings',
+            'Maintenance mode activated by "' . $request->session()->get('user_name') . '"',
+            null,
+            ['status' => 'maintenance_active'],
+            $request
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Maintenance mode activated. LUPTO and Municipal users are now restricted.',
+        ]);
+    }
+
+    /**
+     * POST /api/pitco/settings/maintenance/deactivate
+     */
+    public function deactivateMaintenance(Request $request): JsonResponse
+    {
+        $userRole = $request->session()->get('user_role');
+        if (!in_array($userRole, ['picto', 'pitco'])) {
+            return response()->json(['error' => 'Forbidden.'], 403);
+        }
+
+        Cache::forget('maintenance_mode');
+        Cache::forget('activity_stats');
+
+        ActivityLogService::log(
+            ActivityAction::MAINTENANCE_DEACTIVATED,
+            'Settings',
+            'Maintenance mode deactivated by "' . $request->session()->get('user_name') . '"',
+            null,
+            ['status' => 'system_active'],
+            $request
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Maintenance mode deactivated. System access restored for all users.',
         ]);
     }
 }

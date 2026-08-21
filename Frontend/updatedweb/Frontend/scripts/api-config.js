@@ -242,6 +242,18 @@ const baseUrl = USE_RAILWAY
                     window.location.href = loginRedirect;
                     return new Promise(() => { }); // Halt further Javascript processing
                 }
+
+                if (response.status === 503 || (data && data.maintenance)) {
+                    // System under maintenance — redirect to maintenance screen
+                    let maintenanceRedirect = 'views/maintenance.php';
+                    const path = window.location.pathname;
+                    if (path.includes('/views/')) {
+                        maintenanceRedirect = 'maintenance.php';
+                    }
+                    window.location.href = maintenanceRedirect;
+                    return new Promise(() => { }); // Halt further Javascript processing
+                }
+
                 throw new Error(data.error || data.message || `HTTP ${response.status}`);
             }
 

@@ -38,6 +38,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const topBack = document.getElementById('topBackToLogin');
     const brandLogo = document.getElementById('brandLogoSquare');
     const sentEmailPlaceholder = document.getElementById('sentEmailPlaceholder');
+    const leftQuoteBox = document.getElementById('leftQuoteBox');
 
     // ----------------------------------------------------
     // State Manager
@@ -61,11 +62,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (stateName === 'login') {
             loginWrapper.classList.add('login-mode');
             
-            statsContainer.style.display = 'flex';
-            recoveryContainer.style.display = 'none';
+            if (statsContainer) statsContainer.style.display = 'flex';
+            if (recoveryContainer) recoveryContainer.style.display = 'none';
+            if (leftQuoteBox) leftQuoteBox.style.display = 'flex';
             
             leftPortalBadge.textContent = 'OFFICIAL PORTAL';
-            leftTitleText.innerHTML = 'Tourist Spots <br><span class="highlight">Management</span> <br>System';
+            leftTitleText.innerHTML = 'Tourism <br><span class="highlight">Management</span> <br>System';
             
             topBack.style.visibility = 'hidden';
             
@@ -75,11 +77,17 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             
             document.getElementById('loginSection').classList.add('active');
+
+            // Resume background slider autoplay
+            if (window.bgSliderController) {
+                window.bgSliderController.start();
+            }
         } else if (stateName === 'recovery-1') {
             loginWrapper.classList.add('recovery-step-1');
             
-            statsContainer.style.display = 'none';
-            recoveryContainer.style.display = 'block';
+            if (statsContainer) statsContainer.style.display = 'none';
+            if (recoveryContainer) recoveryContainer.style.display = 'block';
+            if (leftQuoteBox) leftQuoteBox.style.display = 'none';
             
             leftPortalBadge.textContent = 'SECURE RESET';
             leftTitleText.innerHTML = 'Account <span class="highlight">Recovery</span>';
@@ -99,11 +107,17 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             
             document.getElementById('recoveryStep1Section').classList.add('active');
+
+            // Pause background slider in recovery mode
+            if (window.bgSliderController) {
+                window.bgSliderController.pause();
+            }
         } else if (stateName === 'recovery-2') {
             loginWrapper.classList.add('recovery-step-2');
             
-            statsContainer.style.display = 'none';
-            recoveryContainer.style.display = 'block';
+            if (statsContainer) statsContainer.style.display = 'none';
+            if (recoveryContainer) recoveryContainer.style.display = 'block';
+            if (leftQuoteBox) leftQuoteBox.style.display = 'none';
             
             leftPortalBadge.textContent = 'EMAIL SENT';
             leftTitleText.innerHTML = 'Check Your <span class="highlight">Inbox</span>';
@@ -124,8 +138,169 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             
             document.getElementById('recoveryStep2Section').classList.add('active');
+
+            // Pause background slider in recovery mode
+            if (window.bgSliderController) {
+                window.bgSliderController.pause();
+            }
         }
     }
+
+    // ----------------------------------------------------
+    // DYNAMIC BACKGROUND SLIDER CONTROLLER
+    // (Pure Horizontal Slide Animation - 2s Interval)
+    // ----------------------------------------------------
+    function initBackgroundSlider() {
+        const slides = Array.from(document.querySelectorAll('.bg-slide'));
+        const dots = Array.from(document.querySelectorAll('.dots-indicator .dot'));
+        const infoPanel = document.getElementById('infoPanel');
+
+        if (slides.length === 0) return null;
+
+        let currentIndex = 0;
+        let isTransitioning = false;
+        let autoplayTimer = null;
+        const SLIDE_INTERVAL = 6000; // 6 seconds per slide for smooth hero presentation
+        const TRANSITION_DURATION = 650; // Smooth 0.65s slide transition
+
+        // Initialize state on slides
+        slides.forEach((slide, idx) => {
+            slide.style.transition = '';
+            if (idx === 0) {
+                slide.classList.add('active');
+                slide.classList.remove('slide-in-right', 'slide-in-left', 'slide-out-left', 'slide-out-right');
+            } else {
+                slide.classList.remove('active', 'slide-in-right', 'slide-in-left', 'slide-out-left', 'slide-out-right');
+            }
+        });
+
+        dots.forEach((dot, idx) => {
+            dot.classList.toggle('active', idx === 0);
+        });
+
+        function goToSlide(targetIndex, direction = 'next') {
+            if (slides.length <= 1) return;
+            if (targetIndex === currentIndex || isTransitioning) return;
+
+            const isForward = direction === 'next' || (direction !== 'prev' && targetIndex > currentIndex);
+            const currentSlide = slides[currentIndex];
+            const nextSlide = slides[targetIndex];
+
+            if (!currentSlide || !nextSlide) return;
+
+            isTransitioning = true;
+
+            // Prepare next slide position off-screen before starting animation (no animation yet)
+            nextSlide.style.transition = 'none';
+            nextSlide.classList.remove('slide-out-left', 'slide-out-right', 'active');
+            nextSlide.classList.add(isForward ? 'slide-in-right' : 'slide-in-left');
+
+            // Force reflow to register initial position
+            void nextSlide.offsetWidth;
+
+            // Enable transitions and slide both slides simultaneously
+            nextSlide.style.transition = '';
+            currentSlide.style.transition = '';
+
+            currentSlide.classList.remove('active', 'slide-in-right', 'slide-in-left');
+            currentSlide.classList.add(isForward ? 'slide-out-left' : 'slide-out-right');
+
+            nextSlide.classList.remove('slide-in-right', 'slide-in-left');
+            nextSlide.classList.add('active');
+
+            // Update dot indicators
+            dots.forEach((dot, idx) => {
+                dot.classList.toggle('active', idx === targetIndex);
+            });
+
+            currentIndex = targetIndex;
+
+            setTimeout(() => {
+                // Reset outgoing slide offscreen without jump
+                currentSlide.style.transition = 'none';
+                currentSlide.classList.remove('slide-out-left', 'slide-out-right', 'active');
+                void currentSlide.offsetWidth;
+                currentSlide.style.transition = '';
+                isTransitioning = false;
+            }, TRANSITION_DURATION);
+        }
+
+        function nextSlide() {
+            const nextIdx = (currentIndex + 1) % slides.length;
+            goToSlide(nextIdx, 'next');
+        }
+
+        function prevSlide() {
+            const prevIdx = (currentIndex - 1 + slides.length) % slides.length;
+            goToSlide(prevIdx, 'prev');
+        }
+
+        function startAutoplay() {
+            if (slides.length <= 1) return;
+            stopAutoplay();
+            autoplayTimer = setInterval(nextSlide, SLIDE_INTERVAL);
+        }
+
+        function stopAutoplay() {
+            if (autoplayTimer) {
+                clearInterval(autoplayTimer);
+                autoplayTimer = null;
+            }
+        }
+
+        // Attach dot click listeners
+        dots.forEach((dot, idx) => {
+            dot.addEventListener('click', (e) => {
+                e.preventDefault();
+                if (idx === currentIndex) return;
+                const dir = idx > currentIndex ? 'next' : 'prev';
+                goToSlide(idx, dir);
+                startAutoplay(); // Reset interval countdown on manual interaction
+            });
+        });
+
+        // Pause on hover over info panel
+        if (infoPanel) {
+            infoPanel.addEventListener('mouseenter', stopAutoplay);
+            infoPanel.addEventListener('mouseleave', () => {
+                if (loginWrapper && loginWrapper.classList.contains('login-mode')) {
+                    startAutoplay();
+                }
+            });
+        }
+
+        // Keyboard navigation (Left / Right arrow keys)
+        document.addEventListener('keydown', (e) => {
+            if (e.target && ['input', 'textarea', 'select'].includes(e.target.tagName.toLowerCase())) {
+                return; // Do not intercept while user is typing in forms
+            }
+            if (loginWrapper && !loginWrapper.classList.contains('login-mode')) {
+                return; // Only active in login mode
+            }
+
+            if (e.key === 'ArrowRight') {
+                nextSlide();
+                startAutoplay();
+            } else if (e.key === 'ArrowLeft') {
+                prevSlide();
+                startAutoplay();
+            }
+        });
+
+        // Start autoplay initially
+        startAutoplay();
+
+        return {
+            start: startAutoplay,
+            pause: stopAutoplay,
+            next: nextSlide,
+            prev: prevSlide,
+            goTo: goToSlide
+        };
+    }
+
+    // Initialize the background slideshow controller
+    window.bgSliderController = initBackgroundSlider();
 
     // ----------------------------------------------------
     // Event Listeners for State Toggling
@@ -204,6 +379,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 }).then(async res => {
                     if (!res.ok) {
                         const errData = await res.json().catch(() => ({}));
+                        if (res.status === 503 || errData.maintenance) {
+                            // System is in Maintenance Mode — redirect immediately to maintenance screen
+                            window.location.href = 'views/maintenance.php';
+                            return new Promise(() => { });
+                        }
                         throw new Error(errData.error || errData.message || `HTTP ${res.status}`);
                     }
                     return res.json();
@@ -395,5 +575,30 @@ document.addEventListener('DOMContentLoaded', () => {
             recoveryErrorMessage.style.display = 'block';
         }
     }
+
+    // ── Check if Maintenance Mode is active on login page load ────────────────
+    (function checkMaintenanceOnLogin() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const isAdmin = urlParams.has('admin') || urlParams.has('bypass');
+        if (isAdmin) return; // Allow admin sign-in page to remain open for PICTO
+
+        const apiBase = (window.API_CONFIG && window.API_CONFIG.BASE_URL) || 'http://127.0.0.1:8000';
+        function check() {
+            fetch(apiBase + '/api/system/maintenance-status', {
+                credentials: 'include',
+                cache: 'no-store'
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data && data.maintenance) {
+                    // Instantly redirect to the full maintenance screen (Image 2)
+                    window.location.href = 'views/maintenance.php';
+                }
+            })
+            .catch(() => {});
+        }
+        check();
+        setInterval(check, 3000); // Live poll while on login page
+    })();
 });
 

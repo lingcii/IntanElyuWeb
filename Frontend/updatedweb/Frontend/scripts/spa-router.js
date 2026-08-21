@@ -508,6 +508,10 @@
             }
         })
             .then(response => {
+                if (response.status === 503) {
+                    window.location.href = 'maintenance.php';
+                    return new Promise(() => { });
+                }
                 if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                 return response.text();
             })

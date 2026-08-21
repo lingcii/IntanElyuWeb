@@ -37,4 +37,7 @@ class ActivityAction
     public const BACKUP_CREATED   = 'Database Backup Created';
     public const BACKUP_RESTORED  = 'Database Restored';
     public const BACKUP_DELETED   = 'Backup Deleted';
+
+    public const MAINTENANCE_ACTIVATED   = 'Maintenance Mode Activated';
+    public const MAINTENANCE_DEACTIVATED = 'Maintenance Mode Deactivated';
 }

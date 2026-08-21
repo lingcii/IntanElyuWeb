@@ -1,106 +1,226 @@
-/* CSS Redesign for Tourist Spots Management System Login & Account Recovery */
-* {
+/* ============================================================
+   INTAN ELYU — TOURIST SITES MANAGEMENT SYSTEM
+   Official Login Portal · San Fernando City, La Union
+   Reference Image 1 Pixel-Accurate Implementation
+   ============================================================ */
+
+/* ── Design Tokens ────────────────────────────────────────────── */
+:root {
+    --navy:        #061A33;
+    --navy-deep:   #040F1F;
+    --royal-blue:  #1455D9;
+    --royal-hover: #1044B0;
+    --bright-blue: #2563EB;
+    --sky-blue:    #60A5FA;
+    --gold:        #F5B400;
+    --gold-bright: #FFB900;
+    --white:       #FFFFFF;
+    --soft-bg:     #F7F9FC;
+    --input-bg:    #EEF2F7;
+    --slate-100:   #F1F5F9;
+    --slate-200:   #E2E8F0;
+    --slate-400:   #94A3B8;
+    --slate-500:   #64748B;
+    --slate-700:   #334155;
+    --slate-800:   #1E293B;
+    --slate-900:   #0F172A;
+    --font-main:   'Poppins', 'Outfit', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --font-heading:'Outfit', 'Poppins', sans-serif;
+}
+
+/* ── Reset & Base ────────────────────────────────────────────── */
+*, *::before, *::after {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
-    font-family: 'Outfit', sans-serif;
+}
+
+body, input, button, select, textarea, p, h1, h2, h3, h4, h5, h6, span, a, label, div {
+    font-family: var(--font-main);
 }
 
 body.login-page-body {
-    background: #f1f5f9;
+    background: #061A33;
     min-height: 100vh;
     display: flex;
     overflow-x: hidden;
+    color: var(--slate-900);
 }
 
-/* Split-screen wrapper */
+/* ── Split-screen Main Wrapper ───────────────────────────────── */
 .login-wrapper {
     display: flex;
     width: 100vw;
     min-height: 100vh;
-}
-
-/* LEFT PANEL (Cover photo & Stats/Progress) */
-.info-panel {
     position: relative;
-    width: 50%;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    padding: 50px 60px;
-    color: #ffffff;
     overflow: hidden;
+    background: #061A33;
 }
 
-/* Background image fade transitions */
-.info-panel::before {
-    content: '';
+/* ── Fullscreen / Left Panel Background Slideshow (Hero Tourism Photo) ── */
+.bg-slider-container {
     position: absolute;
     top: 0;
     left: 0;
-    right: 0;
-    bottom: 0;
-    background-image: url('../../images/login_bg_spots.png');
-    background-size: cover;
-    background-position: center;
-    opacity: 1;
-    transition: opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+    width: 58%; /* Covers the full left hero panel and tucks seamlessly under the curve */
+    height: 100%;
     z-index: 0;
+    overflow: hidden;
+    opacity: 1;
+    transition: opacity 0.6s ease;
 }
 
-.login-wrapper:not(.login-mode) .info-panel::before {
+.login-wrapper:not(.login-mode) .bg-slider-container {
     opacity: 0;
+    pointer-events: none;
 }
 
-.info-panel::after {
-    content: '';
+.bg-slide {
     position: absolute;
     top: 0;
     left: 0;
-    right: 0;
-    bottom: 0;
-    background-image: url('../../images/login_bg_recovery.png');
+    width: 100%;
+    height: 100%;
     background-size: cover;
-    background-position: center;
+    background-position: center center;
+    background-repeat: no-repeat;
+    transform: translateX(100%);
+    transition: transform 0.65s cubic-bezier(0.25, 1, 0.5, 1);
+    will-change: transform;
+    pointer-events: none;
+    z-index: 1;
+}
+
+.bg-slide.active {
+    transform: translateX(0);
+    z-index: 2;
+}
+
+.bg-slide.slide-out-left {
+    transform: translateX(-100%);
+    z-index: 2;
+}
+
+.bg-slide.slide-in-right {
+    transform: translateX(100%);
+    z-index: 3;
+}
+
+.bg-slide.slide-out-right {
+    transform: translateX(100%);
+    z-index: 2;
+}
+
+.bg-slide.slide-in-left {
+    transform: translateX(-100%);
+    z-index: 3;
+}
+
+/* Recovery Background Slide */
+.recovery-bg-slide {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 58%;
+    height: 100%;
+    background-size: cover;
+    background-position: center center;
     opacity: 0;
     transition: opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1);
     z-index: 0;
+    pointer-events: none;
 }
 
-.login-wrapper:not(.login-mode) .info-panel::after {
+.login-wrapper:not(.login-mode) .recovery-bg-slide {
     opacity: 1;
 }
 
-/* Colored Gradient Overlays */
+/* ── Atmospheric Dark Navy Gradient Overlay ──────────────────── */
 .info-overlay {
     position: absolute;
     top: 0;
     left: 0;
-    right: 0;
-    bottom: 0;
-    background: linear-gradient(135deg, rgba(15, 32, 67, 0.88) 0%, rgba(30, 58, 138, 0.92) 100%);
+    width: 58%;
+    height: 100%;
+    /* Gradient: darker over the text on the left, clear and bright over the right side of the photo */
+    background: linear-gradient(
+        90deg,
+        rgba(6, 26, 51, 0.88) 0%,
+        rgba(6, 26, 51, 0.72) 30%,
+        rgba(6, 26, 51, 0.28) 60%,
+        rgba(6, 26, 51, 0.08) 82%,
+        rgba(6, 26, 51, 0.00) 100%
+    );
     z-index: 1;
     transition: background 0.8s ease;
+    pointer-events: none;
 }
 
 .login-wrapper.recovery-step-1 .info-overlay,
 .login-wrapper.recovery-step-2 .info-overlay {
-    background: linear-gradient(135deg, rgba(15, 23, 42, 0.90) 0%, rgba(30, 58, 138, 0.88) 100%);
+    background: linear-gradient(
+        90deg,
+        rgba(6, 26, 51, 0.88) 0%,
+        rgba(6, 26, 51, 0.72) 30%,
+        rgba(6, 26, 51, 0.28) 60%,
+        rgba(6, 26, 51, 0.08) 82%,
+        rgba(6, 26, 51, 0.00) 100%
+    );
+}
+
+/* ══════════════════════════════════════════════════════════════
+   FLOWING S-SHAPED CURVED WHITE PANEL (Gold + Blue + White)
+   ══════════════════════════════════════════════════════════════ */
+.curved-bg-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 2;
+    pointer-events: none;
+}
+
+.curved-bg-layer svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+/* ── LEFT PANEL (Dark Hero Scenery, Branding & Stats) ────────── */
+.info-panel {
+    position: relative;
+    width: 53%;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    padding: 44px 54px 34px;
+    color: var(--white);
+    overflow: hidden;
+    z-index: 3;
+    justify-content: space-between;
+}
+
+.login-wrapper.recovery-step-1 .info-panel,
+.login-wrapper.recovery-step-2 .info-panel {
+    color: var(--white);
 }
 
 .info-content {
     position: relative;
-    z-index: 2;
+    z-index: 4;
     display: flex;
     flex-direction: column;
     height: 100%;
     width: 100%;
     flex-grow: 1;
+    justify-content: space-between;
 }
 
-/* Portal Logo Header (Top Left) */
+/* ── Portal Official Header (Top Left) ───────────────────────── */
 .left-header {
-    margin-bottom: 60px;
+    margin-bottom: 20px;
+    animation: fadeInLeft 0.8s ease both;
 }
 
 .header-logo-container {
@@ -110,17 +230,26 @@ body.login-page-body {
 }
 
 .header-logo-icon {
-    width: 38px;
-    height: 38px;
+    width: 44px;
+    height: 44px;
     border-radius: 50%;
-    background: rgba(255, 255, 255, 0.12);
-    border: 1.5px solid #f59e0b;
+    background: #FFFFFF;
+    border: 2px solid var(--gold);
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #f59e0b;
-    font-size: 16px;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 4px 16px rgba(245, 180, 0, 0.35);
+    flex-shrink: 0;
+    overflow: hidden;
+    padding: 3px;
+}
+
+.header-seal-img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    border-radius: 50%;
+    display: block;
 }
 
 .header-logo-text {
@@ -129,180 +258,311 @@ body.login-page-body {
 }
 
 .portal-badge {
-    font-size: 10px;
+    font-size: 11.5px;
     font-weight: 800;
-    letter-spacing: 0.8px;
-    color: #ffffff;
+    letter-spacing: 1.5px;
+    color: var(--white);
     line-height: 1.2;
+    text-transform: uppercase;
+    font-family: var(--font-heading);
 }
 
 .portal-dept {
-    font-size: 11px;
-    font-weight: 600;
-    color: #f59e0b;
-    line-height: 1.2;
+    font-size: 12px;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.82);
+    line-height: 1.3;
 }
 
-/* Center Main Header info */
+/* ── Center Main Hero Content ────────────────────────────────── */
 .info-main {
     margin-top: auto;
     margin-bottom: auto;
+    padding: 10px 0;
+    animation: fadeInLeft 1s 0.2s ease both;
 }
 
+/* 5 Gold Dots + Gold Pill Indicator (above title) */
+.dots-pill-indicator {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 18px;
+}
+
+.dots-pill-indicator .gold-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--gold);
+    display: inline-block;
+}
+
+.dots-pill-indicator .gold-pill {
+    width: 32px;
+    height: 6px;
+    border-radius: 4px;
+    background: var(--gold);
+    display: inline-block;
+    margin-left: 2px;
+    box-shadow: 0 0 10px rgba(245, 180, 0, 0.4);
+}
+
+/* Hero Title — White with Gold Highlight ("Management" & "Recovery") */
+.left-title {
+    font-size: 52px;
+    font-weight: 800;
+    line-height: 1.10;
+    color: var(--white);
+    margin-bottom: 18px;
+    letter-spacing: -0.5px;
+    font-family: var(--font-heading);
+}
+
+.login-wrapper.recovery-step-1 .left-title,
+.login-wrapper.recovery-step-2 .left-title {
+    color: var(--white);
+}
+
+.left-title .highlight,
+.login-wrapper.recovery-step-1 .left-title .highlight,
+.login-wrapper.recovery-step-2 .left-title .highlight {
+    color: var(--gold);
+}
+
+/* Location Subtitle */
+.left-subtitle {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--white);
+    letter-spacing: 0.2px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.left-subtitle .location-icon {
+    color: var(--gold);
+    font-size: 16px;
+}
+
+/* Slides Dots (Slideshow controls) */
 .dots-indicator {
     display: flex;
-    gap: 5px;
-    margin-bottom: 25px;
+    align-items: center;
+    gap: 7px;
+    margin-bottom: 22px;
+    flex-wrap: wrap;
+    max-width: 90%;
+    z-index: 5;
 }
 
 .dots-indicator .dot {
-    width: 5px;
-    height: 5px;
+    border: none;
+    outline: none;
+    cursor: pointer;
+    padding: 0;
+    margin: 0;
+    width: 7px;
+    height: 7px;
     border-radius: 50%;
-    background: rgba(245, 158, 11, 0.35);
-    transition: all 0.3s ease;
+    background: rgba(255, 255, 255, 0.35);
+    transition: width 0.4s cubic-bezier(0.34, 1.56, 0.64, 1),
+                border-radius 0.4s ease,
+                background-color 0.3s ease,
+                box-shadow 0.3s ease,
+                transform 0.2s ease;
+}
+
+.dots-indicator .dot:hover {
+    background: rgba(245, 180, 0, 0.6);
+    transform: scale(1.2);
 }
 
 .dots-indicator .dot.active {
-    width: 16px;
-    border-radius: 10px;
-    background: #f59e0b;
+    width: 24px;
+    border-radius: 12px;
+    background: var(--gold);
+    box-shadow: 0 0 10px rgba(245, 180, 0, 0.5);
+    transform: scale(1);
+    cursor: default;
 }
 
-.left-title {
-    font-size: 40px;
-    font-weight: 800;
-    line-height: 1.15;
-    color: #ffffff;
-    margin-bottom: 12px;
+/* Hide slideshow dots in recovery mode */
+.login-wrapper.recovery-step-1 .dots-indicator,
+.login-wrapper.recovery-step-2 .dots-indicator {
+    display: none;
 }
 
-.left-title .highlight {
-    color: #f59e0b;
-}
-
-.left-subtitle {
-    font-size: 16px;
-    font-weight: 500;
-    color: rgba(255, 255, 255, 0.9);
-    letter-spacing: 0.3px;
-    margin-bottom: 30px;
-}
-
+/* ── Tourism Quote (Clean text with Gold quotation marks) ────── */
 .left-quote {
     display: flex;
-    gap: 14px;
-    margin-top: 15px;
-    max-width: 440px;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 24px;
+    max-width: 480px;
+    animation: fadeInUp 1s 0.3s ease both;
 }
 
-.quote-bar {
-    width: 3px;
-    background: #f59e0b;
-    border-radius: 2px;
+.quote-mark-start,
+.quote-mark-end {
+    color: var(--gold);
+    font-size: 20px;
+    line-height: 1;
     flex-shrink: 0;
+}
+
+.quote-mark-start {
+    margin-top: 2px;
+}
+
+.quote-mark-end {
+    align-self: flex-end;
+    margin-bottom: 2px;
 }
 
 .quote-text {
     font-size: 14px;
     font-style: italic;
     font-weight: 400;
-    line-height: 1.5;
-    color: rgba(255, 255, 255, 0.85);
+    line-height: 1.55;
+    color: rgba(255, 255, 255, 0.95);
+    margin: 0;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
-/* Stats Container (horizontal cards) */
+/* ── Statistics Cards (Dark Translucent Glass) ───────────────── */
+.dynamic-left-info {
+    position: relative;
+    width: 100%;
+}
+
 .stats-container {
     display: flex;
-    gap: 12px;
-    margin-top: 40px;
+    gap: 14px;
+    margin-top: 6px;
     width: 100%;
+    max-width: 490px;
+    animation: fadeInUp 1s 0.4s ease both;
 }
 
 .stat-card {
     flex: 1;
-    background: rgba(255, 255, 255, 0.08);
-    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: rgba(6, 26, 51, 0.52);
+    border: 1px solid rgba(255, 255, 255, 0.16);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
-    border-radius: 14px;
+    border-radius: 16px;
     padding: 16px 12px;
     display: flex;
     flex-direction: column;
     align-items: center;
     text-align: center;
-    transition: transform 0.3s ease, background 0.3s ease;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.20);
+    transition: transform 0.3s ease, background 0.3s ease, box-shadow 0.3s ease;
 }
 
 .stat-card:hover {
     transform: translateY(-3px);
-    background: rgba(255, 255, 255, 0.12);
+    background: rgba(6, 26, 51, 0.70);
+    border-color: rgba(245, 180, 0, 0.35);
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.30);
 }
 
 .stat-icon-wrapper {
-    color: #f59e0b;
-    font-size: 16px;
-    margin-bottom: 6px;
-}
-
-.stat-number {
-    font-size: 16px;
-    font-weight: 800;
-    color: #ffffff;
-    line-height: 1.2;
-}
-
-.stat-label {
-    font-size: 10px;
-    font-weight: 600;
-    color: rgba(255, 255, 255, 0.7);
-    margin-top: 2px;
-}
-
-/* Recovery steps layout */
-.recovery-left-info {
-    margin-top: 40px;
-    width: 100%;
-}
-
-.recovery-info-card {
-    background: rgba(255, 255, 255, 0.08);
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border-radius: 14px;
-    padding: 16px 20px;
-    display: flex;
-    align-items: center;
-    gap: 15px;
-    margin-bottom: 30px;
-}
-
-.recovery-info-icon {
-    width: 38px;
-    height: 38px;
+    width: 40px;
+    height: 40px;
     border-radius: 50%;
-    background: rgba(245, 158, 11, 0.15);
-    border: 1px solid #f59e0b;
+    border: 1.5px solid rgba(245, 180, 0, 0.45);
+    background: rgba(245, 180, 0, 0.12);
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #f59e0b;
-    font-size: 15px;
+    color: var(--gold);
+    font-size: 16px;
+    margin-bottom: 8px;
+    transition: all 0.3s ease;
+}
+
+.stat-card:hover .stat-icon-wrapper {
+    background: rgba(245, 180, 0, 0.22);
+    border-color: var(--gold);
+    transform: scale(1.06);
+}
+
+.stat-number {
+    font-size: 20px;
+    font-weight: 800;
+    color: var(--white);
+    line-height: 1.2;
+    font-family: var(--font-heading);
+}
+
+.stat-label {
+    font-size: 11px;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.72);
+    margin-top: 2px;
+    white-space: nowrap;
+}
+
+/* ── Recovery Steps Layout (Dark Translucent Glass matching Login) ─ */
+.recovery-left-info {
+    margin-top: 10px;
+    width: 100%;
+    max-width: 490px;
+    animation: fadeInUp 0.8s ease both;
+}
+
+.recovery-info-card {
+    background: rgba(6, 26, 51, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-radius: 16px;
+    padding: 18px 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 22px;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.20);
+    transition: transform 0.3s ease;
+}
+
+.recovery-info-card:hover {
+    transform: translateY(-2px);
+    background: rgba(6, 26, 51, 0.70);
+    border-color: rgba(245, 180, 0, 0.35);
+}
+
+.recovery-info-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    background: rgba(245, 180, 0, 0.14);
+    border: 1.5px solid var(--gold);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--gold);
+    font-size: 17px;
     flex-shrink: 0;
+    box-shadow: 0 4px 16px rgba(245, 180, 0, 0.25);
 }
 
 .recovery-info-text h3 {
-    font-size: 13px;
+    font-size: 14px;
     font-weight: 700;
-    color: #ffffff;
-    margin-bottom: 2px;
+    color: var(--white);
+    margin-bottom: 4px;
+    font-family: var(--font-heading);
 }
 
 .recovery-info-text p {
-    font-size: 11px;
-    color: rgba(255, 255, 255, 0.75);
-    line-height: 1.4;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.82);
+    line-height: 1.45;
 }
 
 .steps-progress-bar {
@@ -322,115 +582,201 @@ body.login-page-body {
 }
 
 .step-circle {
-    width: 28px;
-    height: 28px;
+    width: 32px;
+    height: 32px;
     border-radius: 50%;
-    background: rgba(255, 255, 255, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    color: rgba(255, 255, 255, 0.5);
+    background: rgba(255, 255, 255, 0.12);
+    border: 1.5px solid rgba(255, 255, 255, 0.25);
+    color: rgba(255, 255, 255, 0.8);
     display: flex;
     align-items: center;
     justify-content: center;
     font-weight: 700;
-    font-size: 12px;
+    font-size: 12.5px;
     transition: all 0.3s ease;
 }
 
 .step-item.active .step-circle {
-    background: #f59e0b;
-    border-color: #f59e0b;
-    color: #1e293b;
-    box-shadow: 0 0 12px rgba(245, 158, 11, 0.45);
+    background: var(--royal-blue);
+    border-color: var(--royal-blue);
+    color: var(--white);
+    box-shadow: 0 0 14px rgba(20, 85, 217, 0.65);
 }
 
 .step-label {
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 600;
-    color: rgba(255, 255, 255, 0.5);
+    color: rgba(255, 255, 255, 0.65);
     transition: all 0.3s ease;
     white-space: nowrap;
 }
 
 .step-item.active .step-label {
-    color: #f59e0b;
+    color: var(--white);
 }
 
 .step-connector {
     flex-grow: 1;
-    height: 1.5px;
-    background: rgba(255, 255, 255, 0.15);
-    margin-bottom: 18px;
-    /* lines up with center of step-circle */
+    height: 2px;
+    background: rgba(255, 255, 255, 0.2);
+    margin-bottom: 20px;
     transition: all 0.3s ease;
 }
 
 .step-connector.active {
-    background: #f59e0b;
+    background: var(--royal-blue);
+    box-shadow: 0 0 8px rgba(20, 85, 217, 0.5);
 }
 
+/* ── Left Footer ─────────────────────────────────────────────── */
 .left-footer {
-    margin-top: auto;
-    font-size: 11px;
-    color: rgba(255, 255, 255, 0.5);
+    margin-top: 24px;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.55);
     font-weight: 500;
+    animation: fadeInUp 1s 0.6s ease both;
 }
 
-/* RIGHT PANEL (Forms & Details) */
+/* ── RIGHT PANEL (Forms, Submits, Actions) ───────────────────── */
 .form-panel {
-    width: 50%;
+    width: 47%;
     min-height: 100vh;
-    background-color: #f8fafc;
     display: flex;
     flex-direction: column;
-    justify-content: space-between;
+    justify-content: center;
     align-items: center;
-    padding: 40px 60px;
+    padding: 30px 48px;
     overflow-y: auto;
+    position: relative;
+    z-index: 3;
+    background: transparent;
 }
 
-/* Top Navigation Section */
+/* Right Panel Decorative Watermark (Lighthouse, Palm tree, Birds, Waves) */
+.right-decorative-bg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 0;
+    overflow: hidden;
+    opacity: 0.45;
+    transition: opacity 0.4s ease;
+}
+
+.right-decorative-bg svg {
+    width: 100%;
+    height: 100%;
+}
+
+/* ── Explore La Union Pill Button (Top Right) ────────────────── */
+.explore-btn {
+    position: absolute;
+    top: 26px;
+    right: 36px;
+    z-index: 20;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 20px;
+    background: var(--white);
+    border: 1px solid var(--slate-200);
+    border-radius: 50px;
+    color: var(--royal-blue);
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 4px 16px rgba(6, 26, 51, 0.08);
+    transition: all 0.25s ease;
+    text-decoration: none;
+}
+
+.explore-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 22px rgba(20, 85, 217, 0.18);
+    border-color: rgba(20, 85, 217, 0.3);
+    color: var(--royal-hover);
+}
+
+.explore-btn .sun-icon {
+    font-size: 15px;
+    color: var(--gold);
+}
+
+/* ── Top Navigation Back Link ────────────────────────────────── */
 .back-to-login-top {
     width: 100%;
     max-width: 420px;
     text-align: left;
-    height: 30px;
+    height: 34px;
+    margin-bottom: 12px;
+    position: relative;
+    z-index: 10;
 }
 
 .btn-back-link {
-    color: #475569;
+    color: var(--slate-700);
     font-size: 13px;
-    font-weight: 600;
+    font-weight: 700;
     text-decoration: none;
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    transition: color 0.2s ease;
+    padding: 7px 16px;
+    background: rgba(255, 255, 255, 0.92);
+    border: 1px solid var(--slate-200);
+    border-radius: 50px;
+    box-shadow: 0 4px 14px rgba(6, 26, 51, 0.06);
+    transition: all 0.25s ease;
+    backdrop-filter: blur(8px);
 }
 
 .btn-back-link:hover {
-    color: #1d4ed8;
+    color: var(--royal-blue);
+    background: var(--white);
+    border-color: rgba(20, 85, 217, 0.35);
+    transform: translateX(-3px);
+    box-shadow: 0 6px 18px rgba(20, 85, 217, 0.15);
 }
 
-/* Logo and Title Header (Now Inside the Card) */
+/* ── Form Card Container ─────────────────────────────────────── */
+.form-card-container {
+    background: var(--white);
+    border-radius: 24px;
+    box-shadow:
+        0 20px 60px rgba(6, 26, 51, 0.08),
+        0 2px 12px rgba(6, 26, 51, 0.03);
+    width: 100%;
+    max-width: 420px;
+    padding: 36px 34px 28px;
+    margin-bottom: 0;
+    border: 1px solid rgba(226, 232, 240, 0.6);
+    position: relative;
+    z-index: 5;
+    animation: fadeInUp 0.8s 0.15s ease both;
+}
+
+/* ── Card Brand Header ───────────────────────────────────────── */
 .card-brand-header {
     text-align: center;
-    padding-bottom: 20px;
-    margin-bottom: 25px;
-    border-bottom: 1px solid #f1f5f9;
+    padding-bottom: 8px;
+    position: relative;
 }
 
 .brand-logo-image-wrapper {
-    width: 80px;
-    height: 80px;
-    margin: 0 auto 12px;
+    width: 64px;
+    height: 64px;
+    margin: 0 auto 10px;
     display: flex;
     align-items: center;
     justify-content: center;
     border-radius: 50%;
     overflow: hidden;
-    border: 1.5px solid #e2e8f0;
-    background: #f8fafc;
-    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.05);
+    border: 2px solid #EFF6FF;
+    background: var(--white);
+    box-shadow: 0 4px 16px rgba(20, 85, 217, 0.12);
 }
 
 .brand-logo-img {
@@ -440,43 +786,42 @@ body.login-page-body {
 }
 
 .brand-title {
-    font-size: 22px;
+    font-size: 20px;
     font-weight: 800;
-    color: #0f172a;
+    color: var(--navy);
     line-height: 1.2;
+    letter-spacing: 0.5px;
+    font-family: var(--font-heading);
 }
 
 .brand-subtitle {
     font-size: 12px;
-    font-weight: 700;
-    color: #64748b;
+    font-weight: 500;
+    color: var(--slate-500);
     line-height: 1.35;
-    margin-top: 4px;
+    margin-top: 3px;
 }
 
 .brand-location {
-    font-size: 11px;
-    font-weight: 600;
-    color: #94a3b8;
+    font-size: 11.5px;
+    font-weight: 700;
+    color: var(--royal-blue);
     margin-top: 2px;
 }
 
-/* Form Container Card */
-.form-card-container {
-    background: #ffffff;
-    border-radius: 20px;
-    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(15, 23, 42, 0.02);
-    width: 100%;
-    max-width: 420px;
-    padding: 32px 30px;
-    margin-bottom: 30px;
-    border: 1px solid #f1f5f9;
+.brand-accent-line {
+    width: 28px;
+    height: 3px;
+    background: var(--gold);
+    border-radius: 2px;
+    margin: 12px auto 0;
 }
 
+/* ── Form Section Containers ─────────────────────────────────── */
 .form-section-container {
     display: none;
     opacity: 0;
-    transform: translateY(10px);
+    transform: translateY(8px);
     transition: opacity 0.4s ease, transform 0.4s ease;
 }
 
@@ -486,35 +831,39 @@ body.login-page-body {
     transform: translateY(0);
 }
 
+/* ── Section Header ──────────────────────────────────────────── */
 .section-header {
-    margin-bottom: 25px;
+    margin-top: 14px;
+    margin-bottom: 18px;
 }
 
 .section-header h3 {
-    font-size: 20px;
+    font-size: 22px;
     font-weight: 800;
-    color: #0f172a;
-    margin-bottom: 6px;
+    color: var(--slate-900);
+    margin-bottom: 4px;
+    font-family: var(--font-heading);
 }
 
 .section-header p {
-    font-size: 13px;
-    color: #64748b;
-    line-height: 1.45;
+    font-size: 12.5px;
+    color: var(--slate-500);
+    line-height: 1.4;
+    font-weight: 400;
 }
 
-/* Forms general */
+/* ── Form Input Fields ───────────────────────────────────────── */
 .form-input-group {
-    margin-bottom: 20px;
+    margin-bottom: 16px;
     display: flex;
     flex-direction: column;
 }
 
 .form-input-group label {
-    font-size: 13px;
-    font-weight: 700;
-    color: #0f172a;
-    margin-bottom: 7px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--slate-800);
+    margin-bottom: 6px;
 }
 
 .input-with-icon {
@@ -524,157 +873,147 @@ body.login-page-body {
 
 .input-with-icon i:first-child {
     position: absolute;
-    left: 16px;
+    left: 15px;
     top: 50%;
     transform: translateY(-50%);
-    color: #94a3b8;
-    font-size: 15px;
+    color: var(--slate-400);
+    font-size: 14.5px;
     pointer-events: none;
 }
 
 .input-with-icon input {
     width: 100%;
-    padding: 13px 16px 13px 44px;
-    background: #f8fafc;
-    border: 1px solid #e2e8f0;
+    height: 48px;
+    padding: 0 16px 0 42px;
+    background: var(--input-bg);
+    border: 1.5px solid var(--slate-200);
     border-radius: 12px;
     font-size: 13px;
     font-weight: 500;
-    color: #0f172a;
+    color: var(--slate-900);
     outline: none;
     transition: all 0.25s ease;
 }
 
 .input-with-icon input::placeholder {
-    color: #94a3b8;
+    color: var(--slate-400);
+    font-weight: 400;
 }
 
 .input-with-icon input:focus {
-    background: #ffffff;
-    border-color: #1d4ed8;
-    box-shadow: 0 0 0 3.5px rgba(29, 78, 216, 0.08);
+    background: var(--white);
+    border-color: var(--royal-blue);
+    box-shadow: 0 0 0 4px rgba(20, 85, 217, 0.08);
 }
 
 .input-hint-info {
-    font-size: 10px;
-    color: #64748b;
+    font-size: 11px;
+    color: var(--slate-500);
     font-weight: 500;
-    margin-top: 6px;
+    margin-top: 5px;
     display: flex;
     align-items: center;
     gap: 5px;
 }
 
 .input-hint-info i {
-    color: #0ea5e9;
+    color: var(--royal-blue);
 }
 
-
-/* ── Password field wrapper (dedicated, clean implementation) ─────────────── */
+/* ── Password Field ──────────────────────────────────── */
 .password-field-wrapper {
     position: relative;
     display: flex;
     align-items: center;
 }
 
-/* Left lock icon */
 .password-field-wrapper .pw-left-icon {
     position: absolute;
-    left: 16px;
+    left: 15px;
     top: 50%;
     transform: translateY(-50%);
-    color: #94a3b8;
-    font-size: 15px;
+    color: var(--slate-400);
+    font-size: 14.5px;
     pointer-events: none;
     z-index: 1;
 }
 
-/* The input itself */
 .password-field-wrapper input[type="password"],
 .password-field-wrapper input[type="text"] {
     width: 100%;
-    padding: 13px 48px 13px 44px;  /* left room for lock icon, right room for eye */
-    background: #f8fafc;
-    border: 1px solid #e2e8f0;
+    height: 48px;
+    padding: 0 46px 0 42px;
+    background: var(--input-bg);
+    border: 1.5px solid var(--slate-200);
     border-radius: 12px;
     font-size: 13px;
     font-weight: 500;
-    color: #0f172a;
+    color: var(--slate-900);
     outline: none;
     transition: all 0.25s ease;
     box-sizing: border-box;
 }
 
 .password-field-wrapper input::placeholder {
-    color: #94a3b8;
+    color: var(--slate-400);
+    font-weight: 400;
+    letter-spacing: 1px;
 }
 
 .password-field-wrapper input:focus {
-    background: #ffffff;
-    border-color: #1d4ed8;
-    box-shadow: 0 0 0 3.5px rgba(29, 78, 216, 0.08);
+    background: var(--white);
+    border-color: var(--royal-blue);
+    box-shadow: 0 0 0 4px rgba(20, 85, 217, 0.08);
 }
 
-/* Suppress browser-native password reveal buttons (Edge, IE, Chrome) */
 .password-field-wrapper input[type="password"]::-ms-reveal,
 .password-field-wrapper input[type="password"]::-ms-clear {
     display: none !important;
 }
-.password-field-wrapper input::-webkit-credentials-auto-fill-button,
-.password-field-wrapper input::-webkit-textfield-decoration-container {
-    display: none !important;
-}
 
-/* Eye toggle button - sits inside the input on the right */
 .pw-toggle-btn {
     position: absolute;
-    right: 14px;
+    right: 12px;
     top: 50%;
     transform: translateY(-50%);
-    width: 28px;
-    height: 28px;
+    width: 32px;
+    height: 32px;
     display: flex;
     align-items: center;
     justify-content: center;
     background: transparent;
     border: none;
-    border-radius: 6px;
-    color: #94a3b8;
+    border-radius: 8px;
+    color: var(--slate-400);
     font-size: 15px;
     cursor: pointer;
     outline: none;
     transition: color 0.2s ease, background 0.2s ease;
     z-index: 2;
-    flex-shrink: 0;
 }
 
 .pw-toggle-btn:hover {
-    color: #1d4ed8;
-    background: rgba(29, 78, 216, 0.08);
+    color: var(--royal-blue);
+    background: rgba(20, 85, 217, 0.06);
 }
 
-.pw-toggle-btn:focus-visible {
-    outline: 2px solid #1d4ed8;
-    outline-offset: 2px;
-}
-
-/* Actions Row (Checkbox + Link) */
+/* ── Form Actions Row (Remember Me + Forgot Password) ────────── */
 .form-actions-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 24px;
+    margin-bottom: 20px;
 }
 
-/* Custom Checkbox */
 .custom-checkbox {
     display: inline-flex;
     align-items: center;
+    gap: 8px;
     cursor: pointer;
     user-select: none;
 }
 
-.custom-checkbox input {
+.custom-checkbox input[type="checkbox"] {
     position: absolute;
     opacity: 0;
     cursor: pointer;
@@ -682,114 +1021,69 @@ body.login-page-body {
     width: 0;
 }
 
-.checkmark {
-    position: relative;
-    height: 16px;
-    width: 16px;
-    background-color: #ffffff;
-    border: 1.5px solid #cbd5e1;
+.custom-checkbox .checkmark {
+    width: 17px;
+    height: 17px;
     border-radius: 4px;
-    transition: all 0.2s ease;
-    margin-right: 8px;
+    border: 1.5px solid #CBD5E1;
+    background: var(--white);
     display: flex;
     align-items: center;
     justify-content: center;
+    color: var(--white);
+    font-size: 10px;
+    transition: all 0.2s ease;
 }
 
-.custom-checkbox:hover input~.checkmark {
-    border-color: #94a3b8;
-}
-
-.custom-checkbox input:checked~.checkmark {
-    background-color: #0f172a;
-    border-color: #0f172a;
-}
-
-.checkmark::after {
-    content: "";
-    position: absolute;
-    display: none;
-}
-
-.custom-checkbox input:checked~.checkmark::after {
-    display: block;
-}
-
-.custom-checkbox .checkmark::after {
-    width: 4px;
-    height: 8px;
-    border: solid white;
-    border-width: 0 2px 2px 0;
-    transform: rotate(45deg);
-    margin-bottom: 2px;
+.custom-checkbox input[type="checkbox"]:checked ~ .checkmark {
+    background: var(--royal-blue);
+    border-color: var(--royal-blue);
 }
 
 .custom-checkbox .label-text {
-    font-size: 12px;
-    font-weight: 600;
-    color: #475569;
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--slate-800);
 }
 
-/* Link Forgot */
 .forgot-password-link {
-    font-size: 12px;
-    font-weight: 700;
-    color: #0284c7;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--royal-blue);
     text-decoration: none;
-    transition: color 0.2s;
+    transition: color 0.2s ease;
 }
 
 .forgot-password-link:hover {
-    color: #0369a1;
+    color: var(--royal-hover);
+    text-decoration: underline;
 }
 
-/* Alerts and errors inside card */
-.alert {
-    padding: 12px 16px;
-    border-radius: 10px;
-    font-size: 12px;
-    font-weight: 600;
-    margin-bottom: 20px;
-    line-height: 1.4;
-}
-
-.alert-error {
-    background: #fef2f2;
-    color: #991b1b;
-    border: 1px solid #fee2e2;
-}
-
-.alert-success {
-    background: #f0fdf4;
-    color: #166534;
-    border: 1px solid #bbf7d0;
-}
-
-/* Buttons styling */
+/* ── Primary Royal Blue Sign-In Button ───────────────────────── */
 .btn-primary-gradient {
     width: 100%;
-    padding: 13px;
-    background: linear-gradient(90deg, #3b82f6 0%, #1d4ed8 50%, #1e3a8a 100%);
-    background-size: 200% auto;
-    color: #ffffff;
+    height: 50px;
+    padding: 0 20px;
+    background: linear-gradient(135deg, var(--royal-blue) 0%, var(--royal-hover) 100%);
+    color: var(--white);
     border: none;
     border-radius: 12px;
-    font-size: 14px;
+    font-size: 14.5px;
     font-weight: 700;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 8px;
-    box-shadow: 0 4px 14px rgba(29, 78, 216, 0.25);
-    transition: all 0.3s ease;
+    gap: 9px;
+    box-shadow: 0 6px 20px rgba(20, 85, 217, 0.32);
+    transition: all 0.25s ease;
     outline: none;
 }
 
 .btn-primary-gradient:hover {
-    background-position: right center;
-    box-shadow: 0 6px 18px rgba(29, 78, 216, 0.35);
-    transform: translateY(-1.5px);
+    box-shadow: 0 8px 26px rgba(20, 85, 217, 0.42);
+    transform: translateY(-2px);
+    background: linear-gradient(135deg, var(--royal-hover) 0%, #0D3590 100%);
 }
 
 .btn-primary-gradient:active {
@@ -797,21 +1091,65 @@ body.login-page-body {
 }
 
 .btn-primary-gradient:disabled {
-    background: #cbd5e1;
+    background: #CBD5E1;
     box-shadow: none;
     cursor: not-allowed;
     transform: none;
 }
 
-/* Outline back login / Resend buttons */
+/* ── Under-Button Account Admin Note ─────────────────────────── */
+.bottom-admin-note {
+    font-size: 12px;
+    color: var(--slate-500);
+    text-align: center;
+    line-height: 1.5;
+    margin-top: 18px;
+    font-weight: 500;
+}
+
+.bottom-admin-note a {
+    color: var(--royal-blue);
+    font-weight: 700;
+    text-decoration: none;
+    transition: color 0.2s ease;
+}
+
+.bottom-admin-note a:hover {
+    color: var(--royal-hover);
+    text-decoration: underline;
+}
+
+/* ── Alerts ───────────────────────────────────────────────────── */
+.alert {
+    padding: 11px 15px;
+    border-radius: 10px;
+    font-size: 12.5px;
+    font-weight: 600;
+    margin-bottom: 18px;
+    line-height: 1.4;
+}
+
+.alert-error {
+    background: #FEF2F2;
+    color: #991B1B;
+    border: 1px solid #FEE2E2;
+}
+
+.alert-success {
+    background: #F0FDF4;
+    color: #166534;
+    border: 1px solid #BBF7D0;
+}
+
+/* ── Outline Buttons (Recovery) ──────────────────────────────── */
 .btn-outline {
     width: 100%;
-    padding: 11px;
-    background: #ffffff;
-    border: 1.5px solid #0ea5e9;
+    padding: 12px;
+    background: var(--white);
+    border: 1.5px solid var(--royal-blue);
     border-radius: 12px;
-    color: #0ea5e9;
-    font-size: 13px;
+    color: var(--royal-blue);
+    font-size: 13.5px;
     font-weight: 700;
     cursor: pointer;
     display: flex;
@@ -823,31 +1161,27 @@ body.login-page-body {
 }
 
 .btn-outline:hover {
-    background: rgba(14, 165, 233, 0.05);
-    border-color: #0284c7;
-    color: #0284c7;
-}
-
-.btn-outline:active {
-    transform: scale(0.99);
+    background: rgba(20, 85, 217, 0.04);
+    border-color: var(--royal-hover);
+    color: var(--royal-hover);
 }
 
 .divider-or {
     display: flex;
     align-items: center;
     text-align: center;
-    color: #94a3b8;
-    font-size: 10px;
+    color: var(--slate-400);
+    font-size: 11px;
     font-weight: 700;
     letter-spacing: 0.5px;
-    margin: 18px 0;
+    margin: 16px 0;
 }
 
 .divider-or::before,
 .divider-or::after {
     content: '';
     flex: 1;
-    border-bottom: 1px solid #f1f5f9;
+    border-bottom: 1px solid var(--slate-100);
 }
 
 .divider-or:not(:empty)::before {
@@ -858,36 +1192,36 @@ body.login-page-body {
     margin-left: 12px;
 }
 
-/* STEP 2 SPECIFIC: Check Your Inbox tags & lines */
+/* ── Recovery Step 2 Styling ─────────────────────────────────── */
 .email-success-badge-container {
     display: flex;
     justify-content: center;
-    margin-bottom: 20px;
+    margin-bottom: 18px;
 }
 
 .email-success-badge {
-    width: 64px;
-    height: 64px;
+    width: 58px;
+    height: 58px;
     border-radius: 50%;
-    background: #1d4ed8;
-    color: #ffffff;
+    background: var(--royal-blue);
+    color: var(--white);
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 28px;
-    box-shadow: 0 6px 18px rgba(29, 78, 216, 0.2);
+    font-size: 24px;
+    box-shadow: 0 6px 20px rgba(20, 85, 217, 0.28);
 }
 
 .info-blocks-row {
     display: flex;
     gap: 12px;
-    margin-bottom: 22px;
+    margin-bottom: 20px;
 }
 
 .info-tag-block {
     flex: 1;
-    background: #f8fafc;
-    border: 1px solid #e2e8f0;
+    background: var(--soft-bg);
+    border: 1px solid var(--slate-200);
     border-radius: 12px;
     padding: 10px;
     display: flex;
@@ -899,8 +1233,8 @@ body.login-page-body {
     width: 28px;
     height: 28px;
     border-radius: 8px;
-    background: rgba(14, 165, 233, 0.08);
-    color: #0ea5e9;
+    background: rgba(20, 85, 217, 0.08);
+    color: var(--royal-blue);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -914,9 +1248,9 @@ body.login-page-body {
 }
 
 .tag-title {
-    font-size: 8px;
+    font-size: 8.5px;
     font-weight: 800;
-    color: #64748b;
+    color: var(--slate-500);
     letter-spacing: 0.3px;
     line-height: 1.1;
 }
@@ -924,18 +1258,18 @@ body.login-page-body {
 .tag-val {
     font-size: 11px;
     font-weight: 700;
-    color: #1e293b;
+    color: var(--slate-800);
     line-height: 1.2;
 }
 
 .progress-line-container {
-    margin-bottom: 22px;
+    margin-bottom: 20px;
     text-align: center;
 }
 
 .progress-line-fill {
     height: 4px;
-    background: linear-gradient(90deg, #3b82f6 0%, #1e3a8a 100%);
+    background: linear-gradient(90deg, var(--royal-blue) 0%, var(--royal-hover) 100%);
     border-radius: 2px;
     width: 100%;
     margin-bottom: 6px;
@@ -943,7 +1277,7 @@ body.login-page-body {
 
 .progress-line-label {
     font-size: 10px;
-    color: #64748b;
+    color: var(--slate-500);
     font-weight: 600;
 }
 
@@ -952,14 +1286,14 @@ body.login-page-body {
 }
 
 .btn-resend-email {
-    border-color: #cbd5e1;
+    border-color: #CBD5E1;
     color: #475569;
 }
 
 .btn-resend-email:hover {
-    background: #f1f5f9;
-    border-color: #94a3b8;
-    color: #1e293b;
+    background: var(--slate-100);
+    border-color: var(--slate-400);
+    color: var(--slate-800);
 }
 
 .support-footer {
@@ -968,13 +1302,13 @@ body.login-page-body {
     justify-content: center;
     gap: 6px;
     font-size: 11px;
-    color: #64748b;
-    margin-top: 25px;
+    color: var(--slate-500);
+    margin-top: 22px;
     font-weight: 500;
 }
 
 .support-footer a {
-    color: #0ea5e9;
+    color: var(--royal-blue);
     text-decoration: none;
     font-weight: 700;
 }
@@ -985,11 +1319,12 @@ body.login-page-body {
 
 .right-footer {
     font-size: 11px;
-    color: #94a3b8;
+    color: var(--slate-400);
     font-weight: 500;
+    display: none;
 }
 
-/* Modals */
+/* ── Modals ───────────────────────────────────────────────────── */
 .modal {
     display: none !important;
     position: fixed !important;
@@ -997,9 +1332,9 @@ body.login-page-body {
     left: 0 !important;
     width: 100% !important;
     height: 100% !important;
-    background: rgba(15, 23, 42, 0.4) !important;
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
+    background: rgba(6, 26, 51, 0.55) !important;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
     justify-content: center !important;
     align-items: center !important;
     z-index: 99999 !important;
@@ -1014,87 +1349,50 @@ body.login-page-body {
 }
 
 .modal-content {
-    background: #ffffff !important;
-    padding: 35px 30px !important;
-    border-radius: 20px !important;
+    background: var(--white) !important;
+    padding: 36px 32px !important;
+    border-radius: 24px !important;
     text-align: center !important;
-    max-width: 340px !important;
+    max-width: 360px !important;
     width: 90% !important;
-    box-shadow: 0 20px 50px rgba(15, 23, 42, 0.15) !important;
+    box-shadow: 0 24px 60px rgba(6, 26, 51, 0.25) !important;
     animation: slideUp 0.4s ease;
-    border: 1px solid #f1f5f9;
+    border: 1px solid var(--slate-100);
 }
 
 .modal-icon {
-    font-size: 64px;
-    color: #1d4ed8;
+    font-size: 56px;
+    color: var(--royal-blue);
     margin-bottom: 16px;
     animation: scaleIn 0.5s ease;
 }
 
 .modal-content h2 {
-    color: #0f172a;
+    color: var(--slate-900);
     font-size: 20px;
     font-weight: 800;
     margin-bottom: 8px;
+    font-family: var(--font-heading);
 }
 
 .modal-content p {
-    color: #64748b;
+    color: var(--slate-500);
     font-size: 13px;
     line-height: 1.45;
 }
 
-@keyframes fadeIn {
-    from {
-        opacity: 0;
-    }
-
-    to {
-        opacity: 1;
-    }
-}
-
-@keyframes slideUp {
-    from {
-        opacity: 0;
-        transform: translateY(20px);
-    }
-
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-@keyframes scaleIn {
-    0% {
-        opacity: 0;
-        transform: scale(0.6);
-    }
-
-    50% {
-        transform: scale(1.08);
-    }
-
-    100% {
-        opacity: 1;
-        transform: scale(1);
-    }
-}
-
 .modal-icon.error {
-    color: #ef4444;
+    color: #EF4444;
 }
 
 .btn-close {
-    margin-top: 20px;
-    padding: 11px 20px;
-    background: #ef4444;
+    margin-top: 18px;
+    padding: 12px 20px;
+    background: #EF4444;
     color: white;
     border: none;
-    border-radius: 10px;
-    font-size: 13px;
+    border-radius: 12px;
+    font-size: 14px;
     font-weight: 700;
     cursor: pointer;
     transition: all 0.2s ease;
@@ -1102,48 +1400,239 @@ body.login-page-body {
 }
 
 .btn-close:hover {
-    background: #dc2626;
-    box-shadow: 0 4px 10px rgba(239, 68, 68, 0.2);
+    background: #DC2626;
+    box-shadow: 0 4px 14px rgba(239, 68, 68, 0.25);
 }
 
-/* RESPONSIVE BREAKPOINTS */
+/* ── Keyframes Animations ────────────────────────────────────── */
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes slideUp {
+    from { opacity: 0; transform: translateY(24px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scaleIn {
+    0% { opacity: 0; transform: scale(0.6); }
+    50% { transform: scale(1.08); }
+    100% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(24px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeInLeft {
+    from { opacity: 0; transform: translateX(-24px); }
+    to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes fadeInRight {
+    from { opacity: 0; transform: translateX(24px); }
+    to { opacity: 1; transform: translateX(0); }
+}
+
+/* Stat cards sequential fade-in */
+.stat-card:nth-child(1) { animation: fadeInUp 0.6s 0.3s ease both; }
+.stat-card:nth-child(2) { animation: fadeInUp 0.6s 0.45s ease both; }
+.stat-card:nth-child(3) { animation: fadeInUp 0.6s 0.6s ease both; }
+
+/* ── RESPONSIVE BREAKPOINTS ──────────────────────────────────── */
+
+/* Large Laptop (1440px) */
+@media (max-width: 1440px) {
+    .info-panel {
+        padding: 38px 46px 30px;
+    }
+    .left-title {
+        font-size: 46px;
+    }
+    .form-card-container {
+        max-width: 400px;
+        padding: 32px 30px 26px;
+    }
+}
+
+/* Standard Laptop (1280px) */
+@media (max-width: 1280px) {
+    .info-panel {
+        width: 52%;
+        padding: 32px 36px 26px;
+    }
+    .form-panel {
+        width: 48%;
+        padding: 25px 30px;
+    }
+    .left-title {
+        font-size: 40px;
+    }
+    .stats-container {
+        gap: 10px;
+    }
+    .stat-number {
+        font-size: 18px;
+    }
+    .stat-label {
+        font-size: 10.5px;
+    }
+}
+
+/* Tablet (1024px) */
+@media (max-width: 1024px) {
+    .info-panel {
+        width: 50%;
+        padding: 26px 24px 22px;
+    }
+    .form-panel {
+        width: 50%;
+        padding: 20px 20px;
+    }
+    .left-title {
+        font-size: 34px;
+    }
+    .form-card-container {
+        max-width: 370px;
+        padding: 26px 22px 20px;
+    }
+    .explore-btn {
+        top: 18px;
+        right: 20px;
+        padding: 7px 14px;
+        font-size: 11.5px;
+    }
+}
+
+/* Mobile & Stacked Layout (<900px) */
 @media (max-width: 900px) {
     body.login-page-body {
         flex-direction: column;
+        background: #F7F9FC;
     }
 
     .login-wrapper {
         flex-direction: column;
+        background: #F7F9FC;
+    }
+
+    .curved-bg-layer {
+        display: none;
+    }
+
+    .bg-slider-container,
+    .recovery-bg-slide,
+    .info-overlay {
+        width: 100%;
     }
 
     .info-panel {
         width: 100%;
         min-height: auto;
         height: auto;
-        padding: 40px 30px;
+        padding: 35px 25px 30px;
+        background: #061A33;
     }
 
     .left-header {
-        margin-bottom: 30px;
+        margin-bottom: 20px;
     }
 
     .left-title {
-        font-size: 32px;
+        font-size: 34px;
     }
 
     .stats-container,
     .recovery-left-info {
-        margin-top: 25px;
+        margin-top: 20px;
+    }
+
+    .stat-card {
+        padding: 14px 10px;
     }
 
     .form-panel {
         width: 100%;
         min-height: auto;
         flex-grow: 1;
-        padding: 40px 20px;
+        padding: 30px 20px 40px;
+        background: #F7F9FC;
     }
 
     .form-card-container {
-        padding: 24px 20px;
+        padding: 28px 22px;
+        max-width: 100%;
+        border-radius: 22px;
+    }
+
+    .explore-btn {
+        top: 14px;
+        right: 14px;
+        padding: 7px 14px;
+        font-size: 11px;
+    }
+
+    .right-decorative-bg {
+        display: none;
+    }
+
+    .section-header h3 {
+        font-size: 20px;
+    }
+}
+
+/* Small Mobile (<480px) */
+@media (max-width: 480px) {
+    .info-panel {
+        padding: 28px 18px 22px;
+    }
+
+    .left-title {
+        font-size: 28px;
+    }
+
+    .left-subtitle {
+        font-size: 14px;
+    }
+
+    .quote-text {
+        font-size: 12.5px;
+    }
+
+    .stats-container {
+        gap: 8px;
+    }
+
+    .stat-icon-wrapper {
+        width: 34px;
+        height: 34px;
+        font-size: 13px;
+    }
+
+    .stat-number {
+        font-size: 16px;
+    }
+
+    .stat-label {
+        font-size: 10px;
+    }
+
+    .form-panel {
+        padding: 20px 14px 30px;
+    }
+
+    .form-card-container {
+        padding: 22px 16px;
+    }
+
+    .brand-logo-image-wrapper {
+        width: 58px;
+        height: 58px;
+    }
+
+    .brand-title {
+        font-size: 18px;
     }
 }

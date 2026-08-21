@@ -234,5 +234,30 @@ if (str_starts_with($entryFileDir, $frontendRootPath)) {
         })();
     </script>
 <?php endif; ?>
+
+<?php if ($userRole !== 'picto' && $userRole !== 'pitco'): ?>
+    <!-- ── Real-Time Maintenance Mode Interceptor (Non-PICTO) ───────────── -->
+    <script>
+    (function() {
+        var _apiBase = (window.API_CONFIG && window.API_CONFIG.BASE_URL) || 'http://127.0.0.1:8000';
+        function checkMaintenanceHeartbeat() {
+            fetch(_apiBase + '/api/system/maintenance-status', {
+                credentials: 'include',
+                cache: 'no-store'
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data && data.maintenance) {
+                    // Instantly redirect open tabs to maintenance page
+                    window.location.href = '<?= $basePath ?>views/maintenance.php';
+                }
+            })
+            .catch(function() {});
+        }
+        // Check every 4 seconds for instant real-time transition
+        setInterval(checkMaintenanceHeartbeat, 4000);
+    })();
+    </script>
+<?php endif; ?>
 </body>
 </html>

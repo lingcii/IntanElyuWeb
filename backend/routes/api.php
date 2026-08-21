@@ -40,6 +40,11 @@ Route::prefix('auth')->group(function () {
     Route::get('/check',     [SessionController::class, 'check']);
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+//  Public system status (no auth required — for maintenance polling)
+// ─────────────────────────────────────────────────────────────────────────────
+Route::get('/system/maintenance-status', [SettingsController::class, 'getMaintenanceStatus']);
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Public image serving (no auth required — served to <img> tags in HTML)
@@ -176,6 +181,10 @@ Route::middleware('auth.session')->group(function () {
             Route::get('/profile', [SettingsController::class, 'profile']);
             Route::put('/profile', [SettingsController::class, 'updateProfile']);
             Route::put('/password', [SettingsController::class, 'updatePassword']);
+            // Maintenance Mode (PICTO-only)
+            Route::get('/maintenance', [SettingsController::class, 'getMaintenanceStatus']);
+            Route::post('/maintenance/activate', [SettingsController::class, 'activateMaintenance']);
+            Route::post('/maintenance/deactivate', [SettingsController::class, 'deactivateMaintenance']);
             // Backup
             Route::get('/backup/list', [BackupController::class, 'list']);
             Route::get('/backup/stats', [BackupController::class, 'stats']);

@@ -1,0 +1,411 @@
+
+        *, *::before, *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        :root {
+            --navy-dark:    #072A66;
+            --navy-mid:     #0C48A8;
+            --royal-blue:   #155DE0;
+            --bright-blue:  #2563EB;
+            --light-blue:   #60A5FA;
+            --pale-blue:    #EFF6FF;
+            --gold:         #F5B400;
+            --gold-light:   #FEF3C7;
+            --gold-dark:    #B45309;
+            --slate-800:    #1E293B;
+            --slate-600:    #475569;
+            --slate-500:    #64748B;
+            --slate-400:    #94A3B8;
+            --slate-200:    #E2E8F0;
+            --white:        #FFFFFF;
+            --font-display: 'Outfit', 'Poppins', sans-serif;
+            --font-body:    'Inter', system-ui, -apple-system, sans-serif;
+        }
+
+        html, body {
+            height: 100%;
+            width: 100%;
+            font-family: var(--font-body);
+            background: #FFFFFF;
+            color: var(--slate-800);
+            overflow-x: hidden;
+        }
+
+        /* ── Full Screen Split Layout ── */
+        .maintenance-layout {
+            display: flex;
+            min-height: 100vh;
+            width: 100vw;
+            position: relative;
+            background: #FFFFFF;
+            overflow: hidden;
+        }
+
+        /* ── Left Hero Side (Blue) ── */
+        .left-panel {
+            flex: 1.1;
+            position: relative;
+            background: linear-gradient(145deg, #072B68 0%, #0B4AB0 45%, #145EE0 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 60px 40px 80px;
+            z-index: 2;
+            overflow: hidden;
+        }
+
+        /* Subtle Nautical Watermark Background on Left */
+        .left-watermark {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            z-index: 1;
+            opacity: 0.12;
+        }
+
+        /* ── Flowing Curved Divider Layer ── */
+        .curved-divider {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 3;
+            pointer-events: none;
+        }
+        .curved-divider svg {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        /* ── Floating White Maintenance Card ── */
+        .maintenance-card {
+            background: #FFFFFF;
+            border-radius: 28px;
+            padding: 44px 38px 36px;
+            max-width: 440px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 24px 64px rgba(4, 21, 56, 0.28), 0 4px 16px rgba(0, 0, 0, 0.08);
+            position: relative;
+            z-index: 10;
+            animation: cardEntrance 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+        }
+
+        @keyframes cardEntrance {
+            from {
+                opacity: 0;
+                transform: translateY(30px) scale(0.96);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        /* 3D Vector Graphic Container */
+        .card-graphic {
+            width: 100%;
+            max-width: 260px;
+            height: 140px;
+            margin: 0 auto 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+        .card-graphic svg {
+            width: 100%;
+            height: 100%;
+            overflow: visible;
+        }
+
+        /* Pulsing gear micro-animation */
+        .anim-float {
+            animation: gentleFloat 4s ease-in-out infinite;
+        }
+        @keyframes gentleFloat {
+            0%, 100% { transform: translateY(0); }
+            50%      { transform: translateY(-4px); }
+        }
+
+        /* Status Badge Pill */
+        .status-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: #FEF3C7;
+            color: #B45309;
+            border: 1px solid #FDE68A;
+            border-radius: 999px;
+            padding: 6px 18px;
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: 0.8px;
+            text-transform: uppercase;
+            margin-bottom: 18px;
+        }
+        .pill-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #F59E0B;
+            box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.25);
+            animation: dotBlink 1.5s ease-in-out infinite;
+        }
+        @keyframes dotBlink {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50%      { opacity: 0.4; transform: scale(0.85); }
+        }
+
+        /* Card Typography */
+        .card-title {
+            font-family: var(--font-display);
+            font-size: 26px;
+            font-weight: 800;
+            color: #0C3C82;
+            margin-bottom: 12px;
+            line-height: 1.25;
+            letter-spacing: -0.2px;
+        }
+        .card-desc {
+            font-size: 13.5px;
+            color: var(--slate-500);
+            line-height: 1.65;
+            max-width: 330px;
+            margin: 0 auto 28px;
+        }
+
+        /* Card Polling Status */
+        .card-poll {
+            border-top: 1px solid #F1F5F9;
+            padding-top: 20px;
+        }
+        .poll-status-row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 9px;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--slate-600);
+            margin-bottom: 6px;
+        }
+        .poll-spinner {
+            width: 14px;
+            height: 14px;
+            border: 2px solid #CBD5E1;
+            border-top-color: var(--bright-blue);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .countdown-text {
+            font-size: 11.5px;
+            color: var(--slate-400);
+            font-weight: 500;
+        }
+        .countdown-text strong {
+            color: var(--slate-600);
+            font-weight: 700;
+        }
+
+        /* ── Right Panel (White Branding Area) ── */
+        .right-panel {
+            flex: 0.9;
+            position: relative;
+            background: #FFFFFF;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 60px 40px 60px;
+            z-index: 4;
+        }
+
+        /* Tropical Line Watermark on Right */
+        .right-watermark {
+            position: absolute;
+            right: 0;
+            top: 0;
+            bottom: 0;
+            width: 320px;
+            pointer-events: none;
+            z-index: 1;
+            opacity: 0.22;
+        }
+        .right-watermark svg {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        /* Right Content Container */
+        .right-content {
+            max-width: 420px;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            position: relative;
+            z-index: 5;
+        }
+
+        /* Logo */
+        .brand-logo {
+            width: 76px;
+            height: 76px;
+            object-fit: contain;
+            margin-bottom: 14px;
+            filter: drop-shadow(0 6px 16px rgba(11, 61, 145, 0.12));
+        }
+
+        /* Branding Text */
+        .brand-title {
+            font-family: var(--font-display);
+            font-size: 25px;
+            font-weight: 800;
+            color: #08295E;
+            letter-spacing: 0.8px;
+            margin-bottom: 4px;
+            text-transform: uppercase;
+        }
+        .brand-subtitle {
+            font-size: 14px;
+            font-weight: 600;
+            color: #334155;
+            margin-bottom: 3px;
+        }
+        .brand-location {
+            font-size: 13.5px;
+            font-weight: 700;
+            color: #1D4ED8;
+            margin-bottom: 16px;
+        }
+        .brand-gold-bar {
+            width: 32px;
+            height: 3.5px;
+            background: #F5B400;
+            border-radius: 3px;
+            margin-bottom: 30px;
+        }
+
+        /* Session Safe Info Box */
+        .session-info-card {
+            background: #FFFFFF;
+            border: 1.5px solid #E2E8F0;
+            border-radius: 16px;
+            padding: 22px 24px;
+            text-align: left;
+            display: flex;
+            align-items: flex-start;
+            gap: 16px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+            margin-bottom: 32px;
+            width: 100%;
+        }
+        .session-info-icon {
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            background: #2563EB;
+            color: #FFFFFF;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 15px;
+            font-weight: 700;
+            flex-shrink: 0;
+            box-shadow: 0 4px 10px rgba(37, 99, 235, 0.25);
+        }
+        .session-info-text h3 {
+            font-family: var(--font-display);
+            font-size: 14.5px;
+            font-weight: 700;
+            color: #0F172A;
+            margin-bottom: 5px;
+        }
+        .session-info-text p {
+            font-size: 12.5px;
+            color: var(--slate-500);
+            line-height: 1.55;
+            margin: 0;
+        }
+
+        /* Footer */
+        .right-footer {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
+        }
+        .footer-msg {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            font-size: 12.5px;
+            color: var(--slate-500);
+            font-weight: 500;
+        }
+        .footer-msg i {
+            color: #2563EB;
+            font-size: 13px;
+        }
+        .footer-org {
+            font-size: 13px;
+            font-weight: 700;
+            color: #1D4ED8;
+        }
+
+        /* ── Responsive Styling ── */
+        @media (max-width: 1024px) {
+            .maintenance-layout {
+                flex-direction: column;
+                height: auto;
+                min-height: 100vh;
+            }
+            .left-panel {
+                padding: 60px 24px 80px;
+                flex: none;
+                width: 100%;
+            }
+            .curved-divider {
+                display: none;
+            }
+            .right-panel {
+                padding: 50px 24px 60px;
+                flex: none;
+                width: 100%;
+                background: #F8FAFC;
+            }
+            .right-watermark {
+                display: none;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .maintenance-card {
+                padding: 32px 22px 28px;
+                border-radius: 20px;
+            }
+            .card-title {
+                font-size: 22px;
+            }
+            .card-desc {
+                font-size: 12.5px;
+            }
+            .session-info-card {
+                padding: 18px;
+            }
+            .brand-title {
+                font-size: 22px;
+            }
+        }
+   

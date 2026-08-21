@@ -23,6 +23,7 @@ $settingsScriptPath = '../scripts/functions/settings-api.js';
 $extraHeadContent = '
     <script>window.userRole = "' . htmlspecialchars($userRole ?? 'lupto') . '";</script>
     <script>window.isFirstLogin = ' . ($isFirstLogin ? 'true' : 'false') . ';</script>
+    <script>window.isPicto = ' . ($userRole === 'picto' ? 'true' : 'false') . ';</script>
     <script src="../scripts/api-config.js"></script>
     <link rel="stylesheet" href="../css/settings.css">
     <script src="' . $settingsScriptPath . '" defer></script>
@@ -31,6 +32,39 @@ $extraHeadContent = '
 ob_start();
 ?>
     <h2 class="section-title">System Settings</h2>
+
+    <?php if ($userRole === 'picto'): ?>
+    <!-- ── Maintenance Mode Active Banner (PICTO-only, shown only when active) ── -->
+    <div id="maintenanceActiveBanner" style="display:none;
+        background:linear-gradient(135deg,#eff6ff,#dbeafe);
+        border:2px solid #3b82f6;
+        border-radius:12px;
+        padding:16px 22px;
+        margin-bottom:18px;
+        align-items:center;
+        gap:14px;
+        box-shadow:0 4px 16px rgba(30,58,138,0.15);
+    ">
+        <div style="width:40px;height:40px;background:#1e3a8a;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <i class="fas fa-tools" style="color:#fff;font-size:16px;"></i>
+        </div>
+        <div style="flex:1;">
+            <strong style="color:#1e3a8a;font-size:14px;"><i class="fas fa-shield-alt" style="color:#2563eb;margin-right:4px;"></i> Maintenance Mode is ACTIVE</strong>
+            <p style="margin:2px 0 0;color:#1e40af;font-size:12px;">
+                LUPTO and Municipal users are currently restricted. Activated by <span id="maintenanceActivatedBy" style="font-weight:700;">—</span>
+                at <span id="maintenanceActivatedAt" style="font-weight:700;">—</span>.
+            </p>
+        </div>
+        <button onclick="window.maintenanceMode.showDeactivateModal()" style="
+            background:#dc2626;color:#fff;border:none;border-radius:8px;
+            padding:8px 18px;font-size:13px;font-weight:700;cursor:pointer;
+            display:flex;align-items:center;gap:7px;flex-shrink:0;
+            transition:background .2s;
+        " onmouseover="this.style.background='#b91c1c'" onmouseout="this.style.background='#dc2626'">
+            <i class="fas fa-power-off"></i> Close Maintenance
+        </button>
+    </div>
+    <?php endif; ?>
 
     <?php if ($isFirstLogin): ?>
     <!-- ── First-Login Mandatory Banner ─────────────────────────────────── -->
@@ -133,6 +167,63 @@ ob_start();
                 </button>
             </div>
         </div>
+
+        <!-- Backup Settings — Full Width -->
+        <?php if ($userRole === 'picto'): ?>
+        <!-- ── Maintenance Mode Card (PICTO-only) ─────────────────────────── -->
+        <div class="card maintenance-mode-card" id="maintenanceModeCard" style="grid-column:1/-1;">
+            <div class="card-header" style="background:#f8fafc;border-bottom:1px solid #e2e8f0;padding:16px 24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+                <h3 class="card-title" style="font-size:15px;font-weight:700;color:#1e3a8a;margin:0;display:flex;align-items:center;gap:8px;">
+                    <i class="fas fa-tools" style="color:#2563eb;"></i> Maintenance Mode
+                </h3>
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <span id="maintenanceStatusBadge" class="maintenance-status-badge maintenance-status-active">
+                        <span class="maintenance-badge-dot"></span>
+                        <span id="maintenanceStatusText">Loading...</span>
+                    </span>
+                    <span style="font-size:12px;color:#1e3a8a;background:#eff6ff;padding:4px 12px;border-radius:20px;font-weight:600;border:1px solid #bfdbfe;">
+                        <i class="fas fa-lock" style="color:#2563eb;margin-right:4px;"></i>PICTO Only
+                    </span>
+                </div>
+            </div>
+            <div class="card-body" style="padding:24px;">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">
+                    <!-- Left: description -->
+                    <div>
+                        <h4 style="font-size:14px;font-weight:700;color:#1e293b;margin:0 0 10px;">System-Wide Maintenance Control</h4>
+                        <p style="font-size:13px;color:#64748b;line-height:1.7;margin:0 0 14px;">
+                            Activating maintenance mode will <strong>temporarily restrict access</strong> for
+                            all <strong>LUPTO and Municipal</strong> users across the entire system —
+                            including dashboards, modules, CRUD functions, reports, and maps.
+                        </p>
+                        <ul style="font-size:12px;color:#64748b;padding-left:18px;line-height:2;margin:0;">
+                            <li>User sessions are preserved (no forced logout)</li>
+                            <li>PICTO retains full system access</li>
+                            <li>Blocked users see a professional maintenance screen</li>
+                            <li>State persists even after browser refresh</li>
+                        </ul>
+                    </div>
+                    <!-- Right: action -->
+                    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;background:#f8fafc;border-radius:14px;border:1px solid #e2e8f0;padding:24px;">
+                        <div id="maintenanceActionIcon" style="width:64px;height:64px;border-radius:50%;background:#eff6ff;display:flex;align-items:center;justify-content:center;">
+                            <i id="maintenanceActionIconI" class="fas fa-check-circle" style="font-size:28px;color:#16a34a;"></i>
+                        </div>
+                        <div style="text-align:center;">
+                            <p id="maintenanceActionLabel" style="font-size:13px;font-weight:700;color:#1e293b;margin:0 0 4px;">System Active</p>
+                            <p id="maintenanceActionSub" style="font-size:11px;color:#64748b;margin:0;">All users have normal access</p>
+                        </div>
+                        <button id="maintenancePrimaryBtn" class="btn-gov btn-maintenance-activate"
+                            onclick="window.maintenanceMode.showActivateModal()"
+                            style="width:100%;justify-content:center;font-size:14px;padding:11px 20px;">
+                            <i class="fas fa-tools"></i>
+                            <span id="maintenanceBtnText">Activate Maintenance Mode</span>
+                        </button>
+                        <p id="maintenanceLastUpdated" style="font-size:11px;color:#94a3b8;margin:0;text-align:center;"></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <?php endif; ?>
 
         <!-- Backup Settings — Full Width -->
         <div class="card" id="backupSettingsCard" style="grid-column:1/-1;">

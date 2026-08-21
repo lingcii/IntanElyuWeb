@@ -73,6 +73,19 @@ class LoginController extends Controller
             }
         }
 
+        // ── Maintenance Mode Check ──────────────────────────────────────────
+        // When maintenance mode is active, only PICTO/PITCO accounts are permitted.
+        // LUPTO, Municipal, and Tourist users are blocked immediately.
+        $isMaintenance = \Illuminate\Support\Facades\Cache::has('maintenance_mode');
+        if ($isMaintenance && !in_array($user->role, ['picto', 'pitco'])) {
+            $maintenanceData = \Illuminate\Support\Facades\Cache::get('maintenance_mode');
+            return response()->json([
+                'error'        => 'The system is currently under maintenance. Please try again later.',
+                'maintenance'  => true,
+                'activated_at' => $maintenanceData['activated_at'] ?? null,
+            ], 503);
+        }
+
         // Clear failed-attempt counter on successful login
         RateLimiter::clear($rateLimitKey);
 

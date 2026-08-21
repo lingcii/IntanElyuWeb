@@ -464,3 +464,258 @@ if (window.isFirstLogin) {
     });
 }
 
+
+// ── Maintenance Mode Module (PICTO-only) ───────────────────────────────────
+(function () {
+    if (!window.isPicto) return; // Only runs for PICTO
+
+    function getApiBase() {
+        return (window.API_CONFIG?.BASE_URL || ('http://' + (window.location.hostname || '127.0.0.1') + ':8000'));
+    }
+
+    function showToast(msg, type) {
+        let t = document.getElementById('maintenanceToast');
+        if (!t) {
+            t = document.createElement('div');
+            t.id = 'maintenanceToast';
+            t.style.cssText = 'position:fixed;bottom:28px;left:50%;transform:translateX(-50%);padding:13px 26px;border-radius:10px;font-size:14px;font-weight:600;box-shadow:0 6px 24px rgba(0,0,0,.2);z-index:999999;display:flex;align-items:center;gap:10px;opacity:0;transition:opacity .3s;color:#fff;min-width:300px;justify-content:center;';
+            document.body.appendChild(t);
+        }
+        const icon = type === 'error' ? 'fa-exclamation-circle' : (type === 'warning' ? 'fa-exclamation-triangle' : 'fa-check-circle');
+        const bg   = type === 'error' ? '#dc2626' : (type === 'warning' ? '#d97706' : '#16a34a');
+        t.style.background = bg;
+        t.innerHTML = `<i class="fas ${icon}"></i> ${msg}`;
+        t.style.opacity = '1';
+        clearTimeout(t._tid);
+        t._tid = setTimeout(() => { t.style.opacity = '0'; }, 4500);
+    }
+
+    async function apiFetch(method, endpoint, body) {
+        const url = getApiBase() + endpoint;
+        const opts = {
+            method,
+            credentials: 'include',
+            headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' }
+        };
+        if (body) opts.body = JSON.stringify(body);
+        const r = await fetch(url, opts);
+        return r.json();
+    }
+
+    function formatDate(iso) {
+        if (!iso) return '—';
+        try {
+            return new Date(iso).toLocaleString('en-PH', {
+                month: 'short', day: '2-digit', year: 'numeric',
+                hour: '2-digit', minute: '2-digit'
+            });
+        } catch (e) { return iso; }
+    }
+
+    function renderStatus(data) {
+        const active = !!data.maintenance;
+
+        // Status badge
+        const badge    = document.getElementById('maintenanceStatusBadge');
+        const badgeTxt = document.getElementById('maintenanceStatusText');
+        if (badge && badgeTxt) {
+            badge.className = active
+                ? 'maintenance-status-badge maintenance-status-danger'
+                : 'maintenance-status-badge maintenance-status-active';
+            badgeTxt.textContent = active ? 'Maintenance Active' : 'System Active';
+        }
+
+        // Action icon
+        const iconWrap = document.getElementById('maintenanceActionIcon');
+        const iconEl   = document.getElementById('maintenanceActionIconI');
+        const label    = document.getElementById('maintenanceActionLabel');
+        const sub      = document.getElementById('maintenanceActionSub');
+        const btn      = document.getElementById('maintenancePrimaryBtn');
+        const btnText  = document.getElementById('maintenanceBtnText');
+        const lastUpd  = document.getElementById('maintenanceLastUpdated');
+
+        if (iconWrap && iconEl) {
+            if (active) {
+                iconWrap.style.background = '#fef2f2';
+                iconEl.className = 'fas fa-tools';
+                iconEl.style.color = '#dc2626';
+            } else {
+                iconWrap.style.background = '#eff6ff';
+                iconEl.className = 'fas fa-check-circle';
+                iconEl.style.color = '#16a34a';
+            }
+        }
+        if (label) label.textContent = active ? 'Maintenance Active' : 'System Active';
+        if (sub)   sub.textContent   = active ? 'LUPTO & Municipal users are restricted' : 'All users have normal access';
+        if (btn) {
+            btn.className = active
+                ? 'btn-gov btn-maintenance-deactivate'
+                : 'btn-gov btn-maintenance-activate';
+            btn.onclick = active
+                ? () => window.maintenanceMode.showDeactivateModal()
+                : () => window.maintenanceMode.showActivateModal();
+        }
+        if (btnText) btnText.textContent = active ? 'Close Maintenance Mode' : 'Activate Maintenance Mode';
+        if (lastUpd && data.activated_at) {
+            lastUpd.textContent = active
+                ? `Active since: ${formatDate(data.activated_at)}`
+                : '';
+        } else if (lastUpd) {
+            lastUpd.textContent = '';
+        }
+
+        // Top banner
+        const banner = document.getElementById('maintenanceActiveBanner');
+        if (banner) {
+            if (active) {
+                banner.style.display = 'flex';
+                const byEl = document.getElementById('maintenanceActivatedBy');
+                const atEl = document.getElementById('maintenanceActivatedAt');
+                if (byEl) byEl.textContent = data.activated_by || '—';
+                if (atEl) atEl.textContent = formatDate(data.activated_at);
+            } else {
+                banner.style.display = 'none';
+            }
+        }
+    }
+
+    async function loadStatus() {
+        try {
+            const data = await apiFetch('GET', '/api/pitco/settings/maintenance');
+            renderStatus(data);
+        } catch (e) {
+            const badgeTxt = document.getElementById('maintenanceStatusText');
+            if (badgeTxt) badgeTxt.textContent = 'Unavailable';
+        }
+    }
+
+    // ── Modal helpers ─────────────────────────────────────────────────────────
+    function removeModal(id) {
+        const el = document.getElementById(id);
+        if (el) el.remove();
+    }
+
+    function showActivateModal() {
+        removeModal('maintenanceActivateModal');
+        const m = document.createElement('div');
+        m.id = 'maintenanceActivateModal';
+        m.className = 'lupto-modal-overlay';
+        m.style.cssText = "display:flex;z-index:10001;font-family:'Inter','Outfit',system-ui,-apple-system,sans-serif;";
+        m.innerHTML = `
+            <div class="lupto-modal-content" style="max-width:460px;text-align:center;font-family:'Inter','Outfit',system-ui,-apple-system,sans-serif;">
+                <div class="lupto-modal-header" style="background:linear-gradient(135deg,#1e3a8a,#2563eb);font-family:'Outfit','Inter',system-ui,sans-serif;">
+                    <h3 class="lupto-modal-title" style="font-family:'Outfit','Inter',system-ui,sans-serif;font-size:16px;font-weight:700;"><i class="fas fa-tools"></i> Activate Maintenance Mode</h3>
+                </div>
+                <div class="lupto-modal-body" style="padding:32px 28px 20px;font-family:'Inter',system-ui,-apple-system,sans-serif;">
+                    <div style="width:72px;height:72px;border-radius:50%;background:linear-gradient(135deg,#dbeafe,#eff6ff);display:flex;align-items:center;justify-content:center;margin:0 auto 20px;box-shadow:0 4px 16px rgba(30,58,138,0.15);">
+                        <i class="fas fa-tools" style="font-size:30px;color:#1e3a8a;"></i>
+                    </div>
+                    <p style="font-size:16px;font-weight:700;color:#1e293b;margin:0 0 10px;font-family:'Outfit','Inter',system-ui,sans-serif;">Activate System Maintenance?</p>
+                    <p style="font-size:13px;color:#64748b;line-height:1.7;margin:0 0 18px;font-family:'Inter',system-ui,-apple-system,sans-serif;">
+                        Activating maintenance mode will <strong style="color:#1e3a8a;">immediately restrict access</strong>
+                        for all <strong>LUPTO and Municipal</strong> users.<br>
+                        They will see a maintenance screen and cannot access any system features until you close maintenance mode.
+                    </p>
+                    <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:12px 16px;text-align:left;">
+                        <p style="font-size:12px;color:#1e3a8a;margin:0;display:flex;align-items:flex-start;gap:8px;font-family:'Inter',system-ui,-apple-system,sans-serif;">
+                            <i class="fas fa-info-circle" style="margin-top:2px;flex-shrink:0;color:#2563eb;"></i>
+                            <span><strong>Note:</strong> User sessions are preserved — no one will be logged out.
+                            PICTO will retain full access throughout maintenance.</span>
+                        </p>
+                    </div>
+                </div>
+                <div class="lupto-modal-footer" style="justify-content:center;gap:12px;display:flex;padding:16px 24px;font-family:'Inter',system-ui,-apple-system,sans-serif;">
+                    <button class="btn-gov btn-gov-secondary" onclick="document.getElementById('maintenanceActivateModal').remove()" style="min-width:110px;font-family:'Inter',system-ui,-apple-system,sans-serif;font-weight:600;">
+                        <i class="fas fa-times"></i> Cancel
+                    </button>
+                    <button class="btn-gov" id="maintenanceConfirmActivateBtn" onclick="window.maintenanceMode._confirmActivate()" style="background:linear-gradient(135deg,#1e3a8a,#2563eb);border-color:#1e3a8a;min-width:180px;justify-content:center;font-family:'Inter',system-ui,-apple-system,sans-serif;font-weight:600;">
+                        <i class="fas fa-tools"></i> Activate Maintenance
+                    </button>
+                </div>
+            </div>`;
+        document.body.appendChild(m);
+    }
+
+    function showDeactivateModal() {
+        removeModal('maintenanceDeactivateModal');
+        const m = document.createElement('div');
+        m.id = 'maintenanceDeactivateModal';
+        m.className = 'lupto-modal-overlay';
+        m.style.cssText = "display:flex;z-index:10001;font-family:'Inter','Outfit',system-ui,-apple-system,sans-serif;";
+        m.innerHTML = `
+            <div class="lupto-modal-content" style="max-width:440px;text-align:center;font-family:'Inter','Outfit',system-ui,-apple-system,sans-serif;">
+                <div class="lupto-modal-header" style="background:linear-gradient(135deg,#991b1b,#dc2626);font-family:'Outfit','Inter',system-ui,sans-serif;">
+                    <h3 class="lupto-modal-title" style="font-family:'Outfit','Inter',system-ui,sans-serif;font-size:16px;font-weight:700;"><i class="fas fa-power-off"></i> Close Maintenance Mode</h3>
+                </div>
+                <div class="lupto-modal-body" style="padding:32px 28px 20px;font-family:'Inter',system-ui,-apple-system,sans-serif;">
+                    <div style="width:72px;height:72px;border-radius:50%;background:linear-gradient(135deg,#dcfce7,#bbf7d0);display:flex;align-items:center;justify-content:center;margin:0 auto 20px;box-shadow:0 4px 16px rgba(22,163,74,0.2);">
+                        <i class="fas fa-unlock" style="font-size:30px;color:#16a34a;"></i>
+                    </div>
+                    <p style="font-size:16px;font-weight:700;color:#1e293b;margin:0 0 10px;font-family:'Outfit','Inter',system-ui,sans-serif;">Restore Normal System Access?</p>
+                    <p style="font-size:13px;color:#64748b;line-height:1.7;margin:0;font-family:'Inter',system-ui,-apple-system,sans-serif;">
+                        Closing maintenance mode will <strong style="color:#16a34a;">immediately restore</strong>
+                        full access for all LUPTO and Municipal users.<br>
+                        They will be able to use the system normally without any manual intervention.
+                    </p>
+                </div>
+                <div class="lupto-modal-footer" style="justify-content:center;gap:12px;display:flex;padding:16px 24px;font-family:'Inter',system-ui,-apple-system,sans-serif;">
+                    <button class="btn-gov btn-gov-secondary" onclick="document.getElementById('maintenanceDeactivateModal').remove()" style="min-width:110px;font-family:'Inter',system-ui,-apple-system,sans-serif;font-weight:600;">
+                        <i class="fas fa-times"></i> Cancel
+                    </button>
+                    <button class="btn-gov" id="maintenanceConfirmDeactivateBtn" onclick="window.maintenanceMode._confirmDeactivate()" style="background:linear-gradient(135deg,#16a34a,#15803d);border-color:#15803d;min-width:180px;justify-content:center;font-family:'Inter',system-ui,-apple-system,sans-serif;font-weight:600;">
+                        <i class="fas fa-unlock"></i> Restore Access
+                    </button>
+                </div>
+            </div>`;
+        document.body.appendChild(m);
+    }
+
+    async function _confirmActivate() {
+        const btn = document.getElementById('maintenanceConfirmActivateBtn');
+        if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Activating...'; }
+        try {
+            const data = await apiFetch('POST', '/api/pitco/settings/maintenance/activate');
+            removeModal('maintenanceActivateModal');
+            if (data.success) {
+                showToast('Maintenance mode activated. Users are now restricted.', 'warning');
+                await loadStatus();
+            } else {
+                showToast(data.error || data.message || 'Failed to activate.', 'error');
+            }
+        } catch (e) {
+            showToast('Failed to activate. Please try again.', 'error');
+            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-tools"></i> Activate Maintenance'; }
+        }
+    }
+
+    async function _confirmDeactivate() {
+        const btn = document.getElementById('maintenanceConfirmDeactivateBtn');
+        if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Restoring...'; }
+        try {
+            const data = await apiFetch('POST', '/api/pitco/settings/maintenance/deactivate');
+            removeModal('maintenanceDeactivateModal');
+            if (data.success) {
+                showToast('Maintenance mode closed. System access restored.', 'success');
+                await loadStatus();
+            } else {
+                showToast(data.error || data.message || 'Failed to deactivate.', 'error');
+            }
+        } catch (e) {
+            showToast('Failed to deactivate. Please try again.', 'error');
+            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-unlock"></i> Restore Access'; }
+        }
+    }
+
+    window.maintenanceMode = {
+        loadStatus,
+        showActivateModal,
+        showDeactivateModal,
+        _confirmActivate,
+        _confirmDeactivate,
+    };
+
+    // Auto-init
+    document.addEventListener('DOMContentLoaded', loadStatus);
+    // Also init if DOM already ready
+    if (document.readyState !== 'loading') loadStatus();
+})();

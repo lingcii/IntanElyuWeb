@@ -50,3 +50,60 @@ if (!empty($_SESSION['must_change_password'])) {
     }
 }
 
+// ── Maintenance Mode enforcement (server-side) ──────────────────────────────
+// PICTO is always allowed through. LUPTO and Municipal users are blocked
+// while maintenance mode is active.
+if (!function_exists('_sb_is_picto')) {
+    function _sb_is_picto(string $role): bool {
+        return in_array($role, ['picto', 'pitco'], true);
+    }
+}
+
+$_sb_role = $_SESSION['user_role'] ?? '';
+$_sb_script = basename($_SERVER['SCRIPT_NAME'] ?? '');
+$_sb_maintenance_exempt = ['logout.php', 'sync-session.php', 'maintenance.php'];
+
+if (!_sb_is_picto($_sb_role) && !in_array($_sb_script, $_sb_maintenance_exempt)) {
+    // Use session-cached maintenance status (TTL 5s) to avoid excessive API hits while responding fast
+    $now = time();
+    $cachedAt = $_SESSION['_maintenance_checked_at'] ?? 0;
+    $cacheExpiry = 5; // seconds (fast real-time check)
+
+    if (($now - $cachedAt) > $cacheExpiry) {
+        // Fetch from Laravel API
+        $_sb_api_base = 'http://127.0.0.1:8000';
+        $_sb_ctx = stream_context_create([
+            'http' => [
+                'timeout' => 2,
+                'ignore_errors' => true,
+            ]
+        ]);
+        $_sb_resp = @file_get_contents($_sb_api_base . '/api/system/maintenance-status', false, $_sb_ctx);
+        if ($_sb_resp !== false) {
+            $_sb_data = json_decode($_sb_resp, true);
+            $_SESSION['_maintenance_active'] = !empty($_sb_data['maintenance']);
+        }
+        $_SESSION['_maintenance_checked_at'] = $now;
+    }
+
+    if (!empty($_SESSION['_maintenance_active'])) {
+        if (is_ajax_request()) {
+            http_response_code(503);
+            header('Content-Type: application/json');
+            echo json_encode([
+                'error'       => 'System under maintenance.',
+                'maintenance' => true,
+                'message'     => 'The system is currently under maintenance. Please try again later.',
+            ]);
+            exit;
+        } else {
+            // Redirect to maintenance screen
+            $maintenanceRedirect = str_contains($_SERVER['SCRIPT_NAME'] ?? '', '/views/')
+                ? 'maintenance.php'
+                : 'views/maintenance.php';
+            header('Location: ' . $maintenanceRedirect);
+            exit;
+        }
+    }
+}
+
